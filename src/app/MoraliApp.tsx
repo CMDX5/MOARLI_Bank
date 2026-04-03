@@ -4926,8 +4926,15 @@ function App() {
         setRevealLockedUntil(0);
         showToast("Code PIN affiché");
       } else {
-        // PIN was created before encrypted storage — guide user to reset it
-        showToast("Utilisez 'Modifier' pour créer un nouveau code PIN.");
+        // PIN was created before encrypted storage — auto-redirect to change PIN
+        // The password is verified, so we can let them set a new encrypted PIN
+        setChangePinAccountPw(revealAccountPw.trim());
+        setRevealAccountPw("");
+        setCardPinDraft("");
+        setCardPinConfirm("");
+        setCardPinPassword("");
+        setCardPinStage("change");
+        showToast("Mot de passe vérifié ! Créez un nouveau PIN pour le voir plus tard.");
       }
     } catch {
       const newAttempts = revealAttempts + 1;

@@ -40,6 +40,42 @@ export default function ClientWrapper() {
     };
   }, []);
 
+  // ── VisualViewport keyboard handling ──
+  useEffect(() => {
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    if (!vv) return;
+
+    let keyboardHeight = 0;
+
+    const onResize = () => {
+      const diff = window.innerHeight - vv.height;
+      // Only consider it a keyboard if the diff is > 100px (avoids false positives)
+      if (diff > 100) {
+        keyboardHeight = diff;
+        document.documentElement.style.setProperty("--keyboard-height", `${diff}px`);
+        document.body.classList.add("keyboard-open");
+      } else {
+        keyboardHeight = 0;
+        document.documentElement.style.setProperty("--keyboard-height", "0px");
+        document.body.classList.remove("keyboard-open");
+      }
+    };
+
+    vv.addEventListener("resize", onResize);
+    vv.addEventListener("scroll", () => {
+      // Prevent visual viewport offset from keyboard (iOS Safari)
+      if (keyboardHeight > 0) {
+        vv.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+      }
+    });
+
+    return () => {
+      vv.removeEventListener("resize", onResize);
+      document.body.classList.remove("keyboard-open");
+      document.documentElement.style.setProperty("--keyboard-height", "0px");
+    };
+  }, []);
+
   if (error) {
     return (
       <div style={{ padding: 24, background: "#1a1a2e", color: "#ff6b6b", fontFamily: "monospace", whiteSpace: "pre-wrap", fontSize: 12, minHeight: "100vh" }}>

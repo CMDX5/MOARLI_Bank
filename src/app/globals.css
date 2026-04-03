@@ -3,6 +3,7 @@
 :root {
   --app-height: 100dvh;
   --app-height: 100svh;
+  --keyboard-height: 0px;
   color-scheme: dark;
 }
 
@@ -78,3 +79,19 @@ input[type="number"] {
   appearance: textfield;
 }
 
+/* ── GPU fluidity: promote scroll containers to GPU layer ── */
+.content-scrollable,
+.app-viewport,
+.transfer-modal,
+.card-modal,
+.bc-modal {
+  will-change: transform;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+/* ── Keyboard open compensation ── */
+body.keyboard-open .bottom-nav,
+body.keyboard-open .app-viewport {
+  /* When keyboard is open, bottom nav stays visible above keyboard */
+}

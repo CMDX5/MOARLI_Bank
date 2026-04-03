@@ -2064,6 +2064,10 @@ function App() {
   const [cardPinPassword, setCardPinPassword] = useState("");
   const [revealAccountPw, setRevealAccountPw] = useState("");
   const [revealVerifying, setRevealVerifying] = useState(false);
+  const [revealNeedsPin, setRevealNeedsPin] = useState(false);
+  const [revealPinRaw, setRevealPinRaw] = useState("");
+  const [revealPinVerifying, setRevealPinVerifying] = useState(false);
+  const [revealVerifiedPw, setRevealVerifiedPw] = useState("");
   const [pinVerifying, setPinVerifying] = useState(false);
   const [changePinAccountPw, setChangePinAccountPw] = useState("");
   const [cardPinStage, setCardPinStage] = useState<"setup" | "menu" | "reveal" | "change" | "reset">("setup");
@@ -4925,14 +4929,17 @@ function App() {
         setRevealAttempts(0);
         setRevealLockedUntil(0);
         setRevealAccountPw("");
+        setRevealNeedsPin(false);
+        setRevealPinRaw("");
+        setRevealVerifiedPw("");
         showToast("Code PIN affiché");
       } else {
-        // PIN was created before encrypted storage — show message, stay on reveal
+        // PIN not encrypted — ask user to enter their PIN so we can verify + encrypt it
+        setRevealVerifiedPw(revealAccountPw.trim());
         setRevealAccountPw("");
-        setCardPinRevealed(false);
-        setRevealAttempts(0);
-        setRevealLockedUntil(0);
-        showToast("Votre PIN n'est pas chiffré. Utilisez 'Modifier' ou 'PIN oublié'.");
+        setRevealNeedsPin(true);
+        setRevealPinRaw("");
+        showToast("Entrez votre PIN pour le chiffrer et l'afficher.");
       }
     } catch {
       const newAttempts = revealAttempts + 1;
@@ -4946,6 +4953,55 @@ function App() {
       setRevealAccountPw("");
     } finally {
       setRevealVerifying(false);
+    }
+  };
+
+  // ── Encrypt existing PIN with verified password then reveal ──
+  const encryptAndRevealPin = async () => {
+    if (!/^\d{4}$/.test(revealPinRaw)) {
+      showToast("Entrez un code PIN à 4 chiffres");
+      return;
+    }
+    const user = firebaseAuth.currentUser;
+    if (!user) return;
+    setRevealPinVerifying(true);
+    try {
+      // Verify PIN against server hash
+      const token = await user.getIdToken();
+      const pinRes = await fetch("/api/verify-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ pin: revealPinRaw }),
+      });
+      const pinData = await pinRes.json();
+      if (!pinData.valid) {
+        showToast("Code PIN incorrect");
+        setRevealPinRaw("");
+        setRevealPinVerifying(false);
+        return;
+      }
+      // PIN is correct — encrypt it with verified password
+      const uid = user.uid;
+      const encrypted = await encryptPinWithPassword(revealPinRaw, revealVerifiedPw, uid);
+      window.localStorage.setItem("morali_card_pin_encrypted", encrypted.encryptedPin);
+      window.localStorage.setItem("morali_card_pin_iv", encrypted.pinIv);
+      await fetch("/api/pin/store", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ encryptedPin: encrypted.encryptedPin, pinIv: encrypted.pinIv }),
+      });
+      // Show PIN
+      setRevealedPinDigits(revealPinRaw.split("").join(" "));
+      setCardPinRevealed(true);
+      setRevealNeedsPin(false);
+      setRevealPinRaw("");
+      setRevealVerifiedPw("");
+      setSessionPinPlaintext(revealPinRaw);
+      showToast("PIN chiffré et affiché avec succès !");
+    } catch {
+      showToast("Erreur lors du chiffrement");
+    } finally {
+      setRevealPinVerifying(false);
     }
   };
 
@@ -11248,57 +11304,96 @@ function App() {
                 </div>
               ) : cardPinStage === "reveal" ? (
                 <div className="bc-step-content" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>Vérification de sécurité</div>
-                    <div style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.5 }}>Entrez le mot de passe de votre compte Morali pour afficher votre code PIN.</div>
-                  </div>
 
-                  <div className="bc-form">
-                    <div className="bc-field">
-                      <div className="bc-field-label">Mot de passe du compte</div>
-                      <input
-                        className="bc-field-input"
-                        type="password"
-                        value={revealAccountPw}
-                        onChange={(event) => setRevealAccountPw(event.target.value)}
-                        placeholder="Votre mot de passe"
-                        style={{ textAlign: "center", fontSize: 16, fontWeight: 700 }}
-                        autoFocus
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    className="bc-btn-full"
-                    onClick={revealPinWithPassword}
-                    disabled={!revealAccountPw.trim() || revealVerifying || revealLockedUntil > Date.now()}
-                    style={!revealAccountPw.trim() || revealVerifying || revealLockedUntil > Date.now() ? { opacity: .4 } : {}}
-                  >
-                    {revealVerifying ? <div className="btn-loader" /> : revealLockedUntil > Date.now() ? "Verrouillé" : "Vérifier et afficher"}
-                  </button>
-
-                  {revealLockedUntil > Date.now() && (
-                    <div style={{ textAlign: "center", padding: "8px 12px", borderRadius: 12, background: "rgba(239,68,68,.08)", border: "1px solid rgba(239,68,68,.15)" }}>
-                      <div style={{ fontSize: 10, fontWeight: 800, color: "#f87171" }}>Trop de tentatives incorrectes</div>
-                      <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>Réessayez dans quelques minutes</div>
-                    </div>
+                  {/* PIN revealed successfully */}
+                  {cardPinRevealed && revealedPinDigits ? (
+                    <>
+                      <div className="pin-display">
+                        <div className="pin-kicker">Votre code PIN</div>
+                        <div className="pin-code revealed">{revealedPinDigits}</div>
+                      </div>
+                      <div className="bc-actions">
+                        <button className="bc-btn bc-btn-secondary" onClick={() => { setCardPinStage("menu"); setCardPinRevealed(false); setRevealAccountPw(""); }}>Retour</button>
+                        <button className="bc-btn bc-btn-primary" onClick={() => setCardPinStage("menu")}>OK</button>
+                      </div>
+                    </>
+                  ) : revealNeedsPin ? (
+                    /* PIN not encrypted — ask user to enter their PIN to encrypt + reveal */
+                    <>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>Chiffrer votre PIN</div>
+                        <div style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.5 }}>Mot de passe vérifié ✓. Entrez votre code PIN pour le chiffrer et l'afficher. Cette étape ne se fera qu'une seule fois.</div>
+                      </div>
+                      <div className="bc-form">
+                        <div className="bc-field">
+                          <div className="bc-field-label">Votre code PIN</div>
+                          <input
+                            className="bc-field-input"
+                            type="password"
+                            inputMode="numeric"
+                            maxLength={4}
+                            value={revealPinRaw}
+                            onChange={(event) => setRevealPinRaw(event.target.value.replace(/\D/g, "").slice(0, 4))}
+                            placeholder="••••"
+                            style={{ textAlign: "center", fontSize: 22, letterSpacing: ".3em", fontWeight: 900 }}
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <button
+                        className="bc-btn-full"
+                        onClick={encryptAndRevealPin}
+                        disabled={revealPinRaw.length !== 4 || revealPinVerifying}
+                        style={revealPinRaw.length !== 4 || revealPinVerifying ? { opacity: .4 } : {}}
+                      >
+                        {revealPinVerifying ? <div className="btn-loader" /> : "Chiffrer et afficher"}
+                      </button>
+                      <button className="bc-btn bc-btn-secondary" onClick={() => { setRevealNeedsPin(false); setRevealPinRaw(""); setRevealVerifiedPw(""); setCardPinStage("menu"); }}>Annuler</button>
+                    </>
+                  ) : (
+                    /* Default: ask for account password */
+                    <>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>Vérification de sécurité</div>
+                        <div style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.5 }}>Entrez le mot de passe de votre compte Morali pour afficher votre code PIN.</div>
+                      </div>
+                      <div className="bc-form">
+                        <div className="bc-field">
+                          <div className="bc-field-label">Mot de passe du compte</div>
+                          <input
+                            className="bc-field-input"
+                            type="password"
+                            value={revealAccountPw}
+                            onChange={(event) => setRevealAccountPw(event.target.value)}
+                            placeholder="Votre mot de passe"
+                            style={{ textAlign: "center", fontSize: 16, fontWeight: 700 }}
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <button
+                        className="bc-btn-full"
+                        onClick={revealPinWithPassword}
+                        disabled={!revealAccountPw.trim() || revealVerifying || revealLockedUntil > Date.now()}
+                        style={!revealAccountPw.trim() || revealVerifying || revealLockedUntil > Date.now() ? { opacity: .4 } : {}}
+                      >
+                        {revealVerifying ? <div className="btn-loader" /> : revealLockedUntil > Date.now() ? "Verrouillé" : "Vérifier et afficher"}
+                      </button>
+                      {revealLockedUntil > Date.now() && (
+                        <div style={{ textAlign: "center", padding: "8px 12px", borderRadius: 12, background: "rgba(239,68,68,.08)", border: "1px solid rgba(239,68,68,.15)" }}>
+                          <div style={{ fontSize: 10, fontWeight: 800, color: "#f87171" }}>Trop de tentatives incorrectes</div>
+                          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>Réessayez dans quelques minutes</div>
+                        </div>
+                      )}
+                      {revealAttempts > 0 && revealLockedUntil <= Date.now() && (
+                        <div style={{ textAlign: "center", fontSize: 10, color: "#fbbf24", fontWeight: 700 }}>{3 - revealAttempts} tentative(s) restante(s)</div>
+                      )}
+                      <div className="bc-actions">
+                        <button className="bc-btn bc-btn-secondary" onClick={() => { setCardPinStage("menu"); setRevealAccountPw(""); }}>Retour</button>
+                      </div>
+                    </>
                   )}
 
-                  {revealAttempts > 0 && revealLockedUntil <= Date.now() && (
-                    <div style={{ textAlign: "center", fontSize: 10, color: "#fbbf24", fontWeight: 700 }}>{3 - revealAttempts} tentative(s) restante(s)</div>
-                  )}
-
-                  {cardPinRevealed && revealedPinDigits && (
-                    <div className="pin-display" style={{ marginTop: 4 }}>
-                      <div className="pin-kicker">Votre code PIN</div>
-                      <div className="pin-code revealed">{revealedPinDigits}</div>
-                    </div>
-                  )}
-
-                  <div className="bc-actions">
-                    <button className="bc-btn bc-btn-secondary" onClick={() => { setCardPinStage("menu"); setCardPinRevealed(false); setRevealAccountPw(""); }}>Retour</button>
-                    <button className="bc-btn bc-btn-primary" onClick={() => setCardPinStage("menu")}>OK</button>
-                  </div>
                 </div>
               ) : cardPinStage === "reset" ? (
                 <div className="bc-step-content" style={{ display: "flex", flexDirection: "column", gap: 16 }}>

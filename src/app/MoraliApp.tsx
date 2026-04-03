@@ -4824,7 +4824,6 @@ function App() {
     try {
       const salt = await generatePinSalt();
       const hash = await hashPin(cardPinDraft, salt);
-      // NOTE: hash/salt are NOT stored in localStorage — server is source of truth
       // Remove any legacy items
       window.localStorage.removeItem("morali_card_pin");
       window.localStorage.removeItem("morali_card_pin_hash");
@@ -4832,10 +4831,26 @@ function App() {
       setSavedCardPinHash(hash);
       setSavedCardPinSalt(salt);
       setSavedCardPin("••••");
-      setSessionPinPlaintext(cardPinDraft); // Store in memory only (not localStorage)
+      setSessionPinPlaintext(cardPinDraft);
       cardPinExistsRef.current = true;
       setCardPinRevealed(false);
       setCardPinPassword("");
+      // Store on server (source of truth)
+      try {
+        const token = await firebaseAuth.currentUser?.getIdToken();
+        await fetch("/api/pin/store", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ pinHash: hash, salt }),
+        });
+      } catch { /* server store failed */ }
+      // Also store directly in Firestore as fallback
+      try {
+        const uid = firebaseAuth.currentUser?.uid;
+        if (uid) {
+          await setDoc(doc(firebaseDb, "pinRecords", uid), { pinHash: hash, salt }, { merge: true });
+        }
+      } catch { /* client Firestore also failed */ }
       setCardPinStage("menu");
       showToast("Code PIN de la carte enregistré");
     } catch {
@@ -4893,7 +4908,8 @@ function App() {
         setRevealLockedUntil(0);
         showToast("Code PIN affiché");
       } else {
-        showToast("Code PIN créé avant la mise à jour. Veuillez le modifier.");
+        // PIN was created before encrypted storage — guide user to reset it
+        showToast("Utilisez 'Modifier' pour créer un nouveau code PIN.");
       }
     } catch {
       const newAttempts = revealAttempts + 1;
@@ -4911,51 +4927,60 @@ function App() {
   };
 
   const changeCardPinCode = async () => {
-    if (!changePinAccountPw.trim()) {
-      showToast("Entrez votre mot de passe de compte");
-      return;
-    }
     if (!/^\d{4}$/.test(cardPinPassword) || !/^\d{4}$/.test(cardPinDraft) || cardPinDraft !== cardPinConfirm) {
       showToast("Vérifiez les codes PIN");
       return;
     }
-    // Verify old PIN first
+    // Verify old PIN via server (client-side state may be empty after reload)
     try {
-      const hash = await hashPin(cardPinPassword, savedCardPinSalt);
-      if (hash !== savedCardPinHash) {
+      const token = await firebaseAuth.currentUser?.getIdToken();
+      const pinRes = await fetch("/api/verify-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ pin: cardPinPassword }),
+      });
+      const pinData = await pinRes.json();
+      if (!pinData.valid) {
         showToast("Ancien code PIN incorrect");
-        return;
-      }
-      // Verify account password
-      try {
-        if (!firebaseAuth.currentUser?.email) { showToast("Aucun email trouvé"); return; }
-        await signInWithEmailAndPassword(firebaseAuth, firebaseAuth.currentUser.email, changePinAccountPw.trim());
-      } catch {
-        showToast("Mot de passe incorrect");
         return;
       }
       // Save new PIN
       const salt = await generatePinSalt();
       const newHash = await hashPin(cardPinDraft, salt);
-      // NOTE: hash/salt are NOT stored in localStorage — server is source of truth
       setSavedCardPinHash(newHash);
       setSavedCardPinSalt(salt);
       setSavedCardPin("\u2022\u2022\u2022\u2022");
-      setSessionPinPlaintext(cardPinDraft); // Update session memory
+      setSessionPinPlaintext(cardPinDraft);
       cardPinExistsRef.current = true;
-      // Encrypt new PIN with account password
-      const encrypted = await encryptPinWithPassword(cardPinDraft, changePinAccountPw.trim(), firebaseAuth.currentUser?.uid || "");
-      window.localStorage.setItem("morali_card_pin_encrypted", encrypted.encryptedPin);
-      window.localStorage.setItem("morali_card_pin_iv", encrypted.pinIv);
-      // Store encrypted PIN on server
+      // Encrypt new PIN with account password if provided (for future reveal)
+      if (changePinAccountPw.trim() && firebaseAuth.currentUser?.uid) {
+        try {
+          const encrypted = await encryptPinWithPassword(cardPinDraft, changePinAccountPw.trim(), firebaseAuth.currentUser.uid);
+          window.localStorage.setItem("morali_card_pin_encrypted", encrypted.encryptedPin);
+          window.localStorage.setItem("morali_card_pin_iv", encrypted.pinIv);
+          await fetch("/api/pin/store", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ pinHash: newHash, salt, encryptedPin: encrypted.encryptedPin, pinIv: encrypted.pinIv }),
+          });
+        } catch { /* encryption failed, store without encrypted version */ }
+      } else {
+        // Store without encryption (PIN reveal won't work but PIN verification will)
+        try {
+          await fetch("/api/pin/store", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ pinHash: newHash, salt }),
+          });
+        } catch { /* server store failed */ }
+      }
+      // Also store directly in Firestore as fallback
       try {
-        const token = await firebaseAuth.currentUser?.getIdToken();
-        await fetch("/api/pin/store", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ pinHash: newHash, salt, encryptedPin: encrypted.encryptedPin, pinIv: encrypted.pinIv }),
-        });
-      } catch { /* server store failed, localStorage still has the data */ }
+        const uid = firebaseAuth.currentUser?.uid;
+        if (uid) {
+          await setDoc(doc(firebaseDb, "pinRecords", uid), { pinHash: newHash, salt }, { merge: true });
+        }
+      } catch { /* client Firestore also failed */ }
       setCardPinRevealed(false);
       setRevealedPinDigits("");
       setCardPinPassword("");
@@ -10907,8 +10932,12 @@ function App() {
                       <div className="bc-field-label">Confirmer nouveau code PIN</div>
                       <input className="bc-field-input" type="password" inputMode="numeric" maxLength={4} value={cardPinConfirm} onChange={(event) => setCardPinConfirm(event.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="••••" style={{ textAlign: "center", fontSize: 22, letterSpacing: ".3em", fontWeight: 900 }} />
                     </div>
+                    <div className="bc-notice" style={{ background: "rgba(59,130,246,.04)", borderColor: "rgba(59,130,246,.12)" }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(96,165,250,.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                      <div className="bc-notice-text">Le mot de passe du compte est optionnel. Saisissez-le pour pouvoir afficher votre PIN plus tard.</div>
+                    </div>
                     <div className="bc-field">
-                      <div className="bc-field-label">Mot de passe du compte</div>
+                      <div className="bc-field-label">Mot de passe du compte <span style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>(optionnel)</span></div>
                       <input
                         className="bc-field-input"
                         type="password"
@@ -10920,7 +10949,7 @@ function App() {
                     </div>
                   </div>
 
-                  <button className="bc-btn-full" onClick={changeCardPinCode} disabled={cardPinPassword.length !== 4 || cardPinDraft.length !== 4 || cardPinConfirm.length !== 4 || !changePinAccountPw.trim()} style={cardPinPassword.length !== 4 || cardPinDraft.length !== 4 || cardPinConfirm.length !== 4 || !changePinAccountPw.trim() ? { opacity: .4 } : {}}>
+                  <button className="bc-btn-full" onClick={changeCardPinCode} disabled={cardPinPassword.length !== 4 || cardPinDraft.length !== 4 || cardPinConfirm.length !== 4} style={cardPinPassword.length !== 4 || cardPinDraft.length !== 4 || cardPinConfirm.length !== 4 ? { opacity: .4 } : {}}>
                     Mettre à jour le PIN
                   </button>
 

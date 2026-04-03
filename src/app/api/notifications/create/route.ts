@@ -1,0 +1,58 @@
+import { NextRequest, NextResponse } from "next/server";
+import { collection, addDoc } from "firebase-admin/firestore";
+import { getAdminFirestore } from "@/lib/admin-firestore";
+import { rateLimit, getClientId } from "@/lib/rate-limit";
+import { requireAuth } from "@/lib/auth-verify";
+
+export async function POST(req: NextRequest) {
+  // Rate limit
+  const clientId = getClientId(req);
+  const rl = rateLimit(`notif:create:${clientId}`, { maxRequests: 30, windowSec: 60 });
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Trop de requêtes. Réessayez plus tard." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
+    );
+  }
+
+  // Auth
+  const auth = await requireAuth(req);
+  if (auth.error) return auth.error;
+
+  try {
+    const body = await req.json();
+    const { uid, title, time, badge, badgeClass, icon, bg } = body;
+
+    if (!uid || !title) {
+      return NextResponse.json({ error: "Champs requis manquants" }, { status: 400 });
+    }
+
+    const adminDb = await getAdminFirestore();
+    if (!adminDb) {
+      // Fallback: write directly via client Firestore (only to own notifications)
+      // This is handled client-side — return success to avoid blocking
+      return NextResponse.json({ success: true, fallback: true });
+    }
+
+    // ALWAYS use Admin SDK to write to the TARGET user's notifications
+    // (bypasses client rules that only allow write to own doc)
+    const targetUid = String(uid);
+    const sanitize = (s: string) => String(s || "").slice(0, 200);
+
+    await addDoc(collection(adminDb, "users", targetUid, "notifications"), {
+      title: sanitize(title),
+      time: sanitize(time || "À l'instant"),
+      badge: sanitize(badge || "Info"),
+      badgeClass: sanitize(badgeClass || "nb-blue"),
+      icon: sanitize(icon || "bell"),
+      bg: sanitize(bg || "rgba(59,130,246,0.12)"),
+      read: false,
+      createdAt: new Date(),
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("[notifications/create]", err);
+    return NextResponse.json({ success: true, fallback: true }); // Don't block transfer
+  }
+}

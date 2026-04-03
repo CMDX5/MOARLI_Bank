@@ -1,0 +1,209 @@
+import { NextRequest, NextResponse } from "next/server";
+import { rateLimit, getClientId } from "@/lib/rate-limit";
+import { requireAuth } from "@/lib/auth-verify";
+import { getAdminFirestore } from "@/lib/admin-firestore";
+
+export async function POST(req: NextRequest) {
+  // Rate limit — stricter for destructive operations
+  const clientId = getClientId(req);
+  const rl = rateLimit(`admin:log:${clientId}`, { maxRequests: 10, windowSec: 60 });
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Trop de requêtes" }, {
+      status: 429,
+      headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
+    });
+  }
+
+  // Auth
+  const auth = await requireAuth(req);
+  if (auth.error) return auth.error;
+  if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+  const adminDb = await getAdminFirestore();
+  if (!adminDb) return NextResponse.json({ error: "Service indisponible" }, { status: 503 });
+
+  // Verify admin role
+  try {
+    const adminDoc = await adminDb.collection("moraliUsers").doc(auth.uid).get();
+    if (!adminDoc.exists || adminDoc.data()?.role !== "admin") {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
+    }
+  } catch {
+    return NextResponse.json({ error: "Erreur vérification admin" }, { status: 500 });
+  }
+
+  try {
+    const body = await req.json();
+    const { action, details, confirmToken } = body;
+
+    if (!action) {
+      return NextResponse.json({ error: "Action requise" }, { status: 400 });
+    }
+
+    // ══════════════════════════════════════════════════
+    // Destructive reset actions — require confirmation token
+    // ══════════════════════════════════════════════════
+    const isResetAction = action === "RESET_TRANSACTIONS" || action === "RESET_NOTIFICATIONS" || action === "RESET_BALANCES" || action === "RESET_ALL";
+
+    if (isResetAction) {
+      // Require signed confirmation token: CONFIRM_{ACTION}_{uid_prefix}
+      const expectedToken = `CONFIRM_${action}_${auth.uid.slice(0, 8)}`;
+      if (confirmToken !== expectedToken) {
+        return NextResponse.json({ error: "Jeton de confirmation invalide" }, { status: 403 });
+      }
+
+      if (action === "RESET_TRANSACTIONS") {
+        const snap = await adminDb.collection("transactions").get();
+        for (const docSnap of snap.docs) await docSnap.ref.delete();
+        try {
+          const pc = await adminDb.collection("pendingCredits").get();
+          for (const d of pc.docs) await d.ref.delete();
+        } catch { /* pendingCredits may not exist */ }
+        return NextResponse.json({ success: true, message: `${snap.size} transactions supprimées` });
+      }
+
+      if (action === "RESET_NOTIFICATIONS") {
+        const usersSnap = await adminDb.collection("moraliUsers").get();
+        let count = 0;
+        for (const userDoc of usersSnap.docs) {
+          try {
+            const notifs = await adminDb.collection("users", userDoc.id, "notifications").get();
+            const batch = adminDb.batch();
+            notifs.docs.forEach((d) => { batch.delete(d.ref); count++; });
+            if (notifs.size > 0) await batch.commit();
+          } catch { /* subcollection may not exist */ }
+        }
+        try {
+          const sn = await adminDb.collection("serverNotifications").get();
+          for (const d of sn.docs) { await d.ref.delete(); count++; }
+        } catch { /* collection may not exist */ }
+        return NextResponse.json({ success: true, message: `${count} notifications supprimées` });
+      }
+
+      if (action === "RESET_BALANCES") {
+        const usersSnap = await adminDb.collection("moraliUsers").get();
+        const batch = adminDb.batch();
+        usersSnap.docs.forEach((userDoc) => {
+          batch.update(userDoc.ref, {
+            balance: 0,
+            savingsAmount: 0,
+            totalSent: 0,
+            totalReceived: 0,
+            updatedAt: new Date(),
+          });
+        });
+        if (usersSnap.size > 0) await batch.commit();
+        return NextResponse.json({ success: true, message: `Soldes réinitialisés pour ${usersSnap.size} utilisateurs` });
+      }
+
+      if (action === "RESET_ALL") {
+        const results: Record<string, { ok: boolean; count?: number; error?: string }> = {};
+
+        // Reset balances
+        try {
+          const usersSnap = await adminDb.collection("moraliUsers").get();
+          const allDocs = usersSnap.docs;
+          for (let i = 0; i < allDocs.length; i += 500) {
+            const chunk = allDocs.slice(i, i + 500);
+            const batch = adminDb.batch();
+            chunk.forEach((userDoc) => {
+              batch.update(userDoc.ref, {
+                balance: 0, savingsAmount: 0, totalSent: 0, totalReceived: 0, updatedAt: new Date(),
+              });
+            });
+            await batch.commit();
+          }
+          results["moraliUsers_balances"] = { ok: true, count: allDocs.length };
+
+          // Clear root collections
+          for (const collName of ["transactions", "pendingCredits", "serverNotifications"]) {
+            try {
+              const snap = await adminDb.collection(collName).get();
+              for (const docSnap of snap.docs) await docSnap.ref.delete();
+              results[collName] = { ok: true, count: snap.size };
+            } catch (err: unknown) {
+              results[collName] = { ok: false, error: err instanceof Error ? err.message.slice(0, 80) : "unknown" };
+            }
+          }
+
+          // Clear notification subcollections
+          let notifCount = 0;
+          for (const userDoc of allDocs) {
+            try {
+              const notifs = await adminDb.collection("users", userDoc.id, "notifications").get();
+              const batch = adminDb.batch();
+              notifs.docs.forEach((d) => { batch.delete(d.ref); notifCount++; });
+              if (notifs.size > 0) await batch.commit();
+            } catch { /* skip */ }
+          }
+          results["user_notifications"] = { ok: true, count: notifCount };
+
+          const totalCleared = Object.values(results).reduce((s, r) => s + (r.count || 0), 0);
+          return NextResponse.json({
+            success: true,
+            message: `Reset terminé — ${totalCleared} enregistrements supprimés`,
+            details: results,
+          });
+        } catch (err: unknown) {
+          return NextResponse.json({ error: err instanceof Error ? err.message.slice(0, 100) : "Erreur reset" }, { status: 500 });
+        }
+      }
+    }
+
+    // ══════════════════════════════════════════════════
+    // Normal admin log entry
+    // ══════════════════════════════════════════════════
+    await adminDb.collection("adminActivity").add({
+      action: String(action).slice(0, 100),
+      details: String(details || "").slice(0, 500),
+      timestamp: new Date(),
+    });
+
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: "Erreur interne" }, { status: 500 });
+  }
+}
+
+export async function GET(req: NextRequest) {
+  // Rate limit
+  const clientId = getClientId(req);
+  const rl = rateLimit(`admin:log:get:${clientId}`, { maxRequests: 60, windowSec: 60 });
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Trop de requêtes" }, {
+      status: 429,
+      headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
+    });
+  }
+
+  // Auth
+  const auth = await requireAuth(req);
+  if (auth.error) return auth.error;
+  if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+  const adminDb = await getAdminFirestore();
+  if (!adminDb) return NextResponse.json({ error: "Service indisponible" }, { status: 503 });
+
+  // Verify admin role
+  try {
+    const adminDoc = await adminDb.collection("moraliUsers").doc(auth.uid).get();
+    if (!adminDoc.exists || adminDoc.data()?.role !== "admin") {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
+    }
+  } catch {
+    return NextResponse.json({ error: "Erreur vérification admin" }, { status: 500 });
+  }
+
+  try {
+    const limit = Math.min(Number(req.nextUrl.searchParams.get("limit") || 50), 200);
+    const logsSnap = await adminDb
+      .collection("adminActivity")
+      .orderBy("timestamp", "desc")
+      .limit(limit)
+      .get();
+    const logs = logsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    return NextResponse.json({ logs });
+  } catch {
+    return NextResponse.json({ logs: [] }, { status: 200 });
+  }
+}

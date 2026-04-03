@@ -2066,8 +2066,7 @@ function App() {
   const [revealVerifying, setRevealVerifying] = useState(false);
   const [pinVerifying, setPinVerifying] = useState(false);
   const [changePinAccountPw, setChangePinAccountPw] = useState("");
-  const [cardPinStage, setCardPinStage] = useState<"setup" | "menu" | "reveal" | "change" | "reset" | "recreate">("setup");
-  const [recreatePwVerified, setRecreatePwVerified] = useState(false);
+  const [cardPinStage, setCardPinStage] = useState<"setup" | "menu" | "reveal" | "change" | "reset">("setup");
   const [pinResetSending, setPinResetSending] = useState(false);
   const [pinResetOtpSent, setPinResetOtpSent] = useState(false);
   const [pinResetOtpCode, setPinResetOtpCode] = useState("");
@@ -4925,17 +4924,15 @@ function App() {
         setCardPinRevealed(true);
         setRevealAttempts(0);
         setRevealLockedUntil(0);
+        setRevealAccountPw("");
         showToast("Code PIN affiché");
       } else {
-        // PIN was created before encrypted storage — redirect to recreate stage
-        // Password already verified, no need to ask for old PIN
-        setChangePinAccountPw(revealAccountPw.trim());
+        // PIN was created before encrypted storage — show message, stay on reveal
         setRevealAccountPw("");
-        setCardPinDraft("");
-        setCardPinConfirm("");
-        setRecreatePwVerified(true);
-        setCardPinStage("recreate");
-        showToast("Mot de passe vérifié ! Définissez votre PIN pour l'afficher.");
+        setCardPinRevealed(false);
+        setRevealAttempts(0);
+        setRevealLockedUntil(0);
+        showToast("Votre PIN n'est pas chiffré. Utilisez 'Modifier' ou 'PIN oublié'.");
       }
     } catch {
       const newAttempts = revealAttempts + 1;
@@ -5017,58 +5014,6 @@ function App() {
       showToast("Code PIN mis à jour");
     } catch {
       showToast("Erreur lors de la mise à jour");
-    }
-  };
-
-  // ── Recreate PIN (after password verified from "reveal" — no old PIN needed) ──
-  const recreatePinAndReveal = async () => {
-    if (!/^\d{4}$/.test(cardPinDraft) || cardPinDraft !== cardPinConfirm) {
-      showToast("Les codes PIN ne correspondent pas");
-      return;
-    }
-    try {
-      const token = await firebaseAuth.currentUser?.getIdToken();
-      const uid = firebaseAuth.currentUser?.uid;
-      if (!uid) return;
-
-      const salt = await generatePinSalt();
-      const newHash = await hashPin(cardPinDraft, salt);
-      setSavedCardPinHash(newHash);
-      setSavedCardPinSalt(salt);
-      setSavedCardPin("\u2022\u2022\u2022\u2022");
-      setSessionPinPlaintext(cardPinDraft);
-      cardPinExistsRef.current = true;
-
-      // Encrypt PIN with verified password and store
-      if (changePinAccountPw.trim()) {
-        try {
-          const encrypted = await encryptPinWithPassword(cardPinDraft, changePinAccountPw.trim(), uid);
-          window.localStorage.setItem("morali_card_pin_encrypted", encrypted.encryptedPin);
-          window.localStorage.setItem("morali_card_pin_iv", encrypted.pinIv);
-          await fetch("/api/pin/store", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ pinHash: newHash, salt, encryptedPin: encrypted.encryptedPin, pinIv: encrypted.pinIv }),
-          });
-        } catch { /* encryption failed */ }
-      }
-
-      // Store in Firestore as fallback
-      try {
-        await setDoc(doc(firebaseDb, "pinRecords", uid), { pinHash: newHash, salt }, { merge: true });
-      } catch { /* fallback failed */ }
-
-      // Show the PIN immediately
-      setRevealedPinDigits(cardPinDraft.split("").join(" "));
-      setCardPinRevealed(true);
-      setCardPinDraft("");
-      setCardPinConfirm("");
-      setChangePinAccountPw("");
-      setRecreatePwVerified(false);
-      setCardPinStage("reveal");
-      showToast("Nouveau PIN créé et affiché !");
-    } catch {
-      showToast("Erreur lors de la création du PIN");
     }
   };
 
@@ -11475,38 +11420,6 @@ function App() {
                   </button>
 
                   <button className="bc-btn-full bc-btn-secondary" onClick={() => { setCardPinDraft(""); setCardPinConfirm(""); setCardPinPassword(""); setChangePinAccountPw(""); setCardPinStage("menu"); }}>Annuler</button>
-                </div>
-              )}
-
-              {cardPinStage === "recreate" && (
-                <div className="bc-step-content" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>Définir votre code PIN</div>
-                    <div style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.5 }}>
-                      {recreatePwVerified ? (
-                        <>Votre mot de passe a été vérifié. Créez votre code PIN à 4 chiffres pour pouvoir l'afficher ultérieurement.</>
-                      ) : (
-                        <>Votre PIN n'est pas encore chiffré. Créez-le maintenant pour pouvoir l'afficher.</>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="bc-form">
-                    <div className="bc-field">
-                      <div className="bc-field-label">Nouveau code PIN</div>
-                      <input className="bc-field-input" type="password" inputMode="numeric" maxLength={4} value={cardPinDraft} onChange={(event) => setCardPinDraft(event.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="••••" style={{ textAlign: "center", fontSize: 22, letterSpacing: ".3em", fontWeight: 900 }} />
-                    </div>
-                    <div className="bc-field">
-                      <div className="bc-field-label">Confirmer le code PIN</div>
-                      <input className="bc-field-input" type="password" inputMode="numeric" maxLength={4} value={cardPinConfirm} onChange={(event) => setCardPinConfirm(event.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="••••" style={{ textAlign: "center", fontSize: 22, letterSpacing: ".3em", fontWeight: 900 }} />
-                    </div>
-                  </div>
-
-                  <button className="bc-btn-full" onClick={recreatePinAndReveal} disabled={cardPinDraft.length !== 4 || cardPinConfirm.length !== 4 || cardPinDraft !== cardPinConfirm} style={cardPinDraft.length !== 4 || cardPinConfirm.length !== 4 || cardPinDraft !== cardPinConfirm ? { opacity: .4 } : {}}>
-                    Créer et afficher le PIN
-                  </button>
-
-                  <button className="bc-btn-full bc-btn-secondary" onClick={() => { setCardPinDraft(""); setCardPinConfirm(""); setChangePinAccountPw(""); setRecreatePwVerified(false); setCardPinStage("menu"); }}>Annuler</button>
                 </div>
               )}
 

@@ -4966,15 +4966,30 @@ function App() {
     if (!user) return;
     setRevealPinVerifying(true);
     try {
-      // Verify PIN against server hash
-      const token = await user.getIdToken();
-      const pinRes = await fetch("/api/verify-pin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ pin: revealPinRaw }),
-      });
-      const pinData = await pinRes.json();
-      if (!pinData.valid) {
+      // Verify PIN against server hash, fallback to client Firestore
+      let pinValid = false;
+      try {
+        const token = await user.getIdToken();
+        const pinRes = await fetch("/api/verify-pin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ pin: revealPinRaw }),
+        });
+        const pinData = await pinRes.json();
+        pinValid = !!pinData.valid;
+      } catch {
+        // Fallback: verify against client Firestore directly
+        try {
+          const snap = await getDoc(doc(firebaseDb, "pinRecords", user.uid));
+          if (snap.exists()) {
+            const record = snap.data();
+            const checkHash = await hashPin(revealPinRaw, record.salt);
+            pinValid = checkHash === record.pinHash;
+          }
+        } catch { /* both methods failed */ }
+      }
+
+      if (!pinValid) {
         showToast("Code PIN incorrect");
         setRevealPinRaw("");
         setRevealPinVerifying(false);
@@ -4985,11 +5000,19 @@ function App() {
       const encrypted = await encryptPinWithPassword(revealPinRaw, revealVerifiedPw, uid);
       window.localStorage.setItem("morali_card_pin_encrypted", encrypted.encryptedPin);
       window.localStorage.setItem("morali_card_pin_iv", encrypted.pinIv);
-      await fetch("/api/pin/store", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ encryptedPin: encrypted.encryptedPin, pinIv: encrypted.pinIv }),
-      });
+      // Store encrypted PIN on server
+      try {
+        const token = await user.getIdToken();
+        await fetch("/api/pin/store", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ encryptedPin: encrypted.encryptedPin, pinIv: encrypted.pinIv }),
+        });
+      } catch { /* server store failed, localStorage is enough */ }
+      // Also store in client Firestore as fallback
+      try {
+        await setDoc(doc(firebaseDb, "pinRecords", uid), { encryptedPin: encrypted.encryptedPin, pinIv: encrypted.pinIv }, { merge: true });
+      } catch { /* client Firestore also failed */ }
       // Show PIN
       setRevealedPinDigits(revealPinRaw.split("").join(" "));
       setCardPinRevealed(true);

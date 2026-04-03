@@ -7,7 +7,6 @@ import {
   GoogleAuthProvider,
   getRedirectResult,
   onAuthStateChanged,
-  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
@@ -55,7 +54,8 @@ const sanitizeAmount = (value: string): number => {
   return Number.isFinite(num) && num >= 0 ? num : NaN;
 };
 
-type AuthTab = "login" | "register";
+type AuthTab = "login" | "register" | "forgot";
+type ForgotStep = "email" | "code" | "newPassword" | "success";
 type Screen = "auth" | "dashboard" | "payments" | "cards" | "profile" | "privileges" | "transaction" | "services" | "merchant" | "microcredit" | "personalloan" | "loans" | "currency" | "credit" | "internet" | "canalplus" | "electricity" | "water" | "tontine" | "crypto" | "savings" | "wallet" | "admin";
 type AdminTab = "overview" | "users" | "transactions" | "analytics" | "settings" | "loans" | "audit";
 type NavItem = "Accueil" | "Cartes" | "Privilèges" | "Profil";
@@ -1829,6 +1829,16 @@ function App() {
   const [screen, setScreen] = useState<Screen>("auth");
   const [transactionReturnScreen, setTransactionReturnScreen] = useState<Screen>("dashboard");
   const [authTab, setAuthTab] = useState<AuthTab>("login");
+  const [forgotStep, setForgotStep] = useState<ForgotStep>("email");
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotOtpCode, setForgotOtpCode] = useState("");
+  const [forgotDemoOtp, setForgotDemoOtp] = useState("");
+  const [forgotSending, setForgotSending] = useState(false);
+  const [forgotVerifying, setForgotVerifying] = useState(false);
+  const [forgotVerified, setForgotVerified] = useState(false);
+  const [forgotNewPw, setForgotNewPw] = useState("");
+  const [forgotConfirmPw, setForgotConfirmPw] = useState("");
+  const [forgotResetting, setForgotResetting] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [showRegisterSuccess, setShowRegisterSuccess] = useState(false);
   const [showPinSetup, setShowPinSetup] = useState(false);
@@ -2056,7 +2066,15 @@ function App() {
   const [revealVerifying, setRevealVerifying] = useState(false);
   const [pinVerifying, setPinVerifying] = useState(false);
   const [changePinAccountPw, setChangePinAccountPw] = useState("");
-  const [cardPinStage, setCardPinStage] = useState<"setup" | "menu" | "reveal" | "change">("setup");
+  const [cardPinStage, setCardPinStage] = useState<"setup" | "menu" | "reveal" | "change" | "reset">("setup");
+  const [pinResetSending, setPinResetSending] = useState(false);
+  const [pinResetOtpSent, setPinResetOtpSent] = useState(false);
+  const [pinResetOtpCode, setPinResetOtpCode] = useState("");
+  const [pinResetDemoOtp, setPinResetDemoOtp] = useState("");
+  const [pinResetVerifying, setPinResetVerifying] = useState(false);
+  const [pinResetVerified, setPinResetVerified] = useState(false);
+  const [pinResetNewPin, setPinResetNewPin] = useState("");
+  const [pinResetConfirmPin, setPinResetConfirmPin] = useState("");
   const cardPinExistsRef = useRef(false);
   const [securityModalOpen, setSecurityModalOpen] = useState(false);
   const [passwordStage, setPasswordStage] = useState<"menu" | "change">("menu");
@@ -4994,6 +5012,124 @@ function App() {
     }
   };
 
+  // ── PIN Reset via Email OTP ──
+  const sendPinResetOtp = async () => {
+    const user = firebaseAuth.currentUser;
+    if (!user?.email) {
+      showToast("Aucun email associé à ce compte");
+      return;
+    }
+    setPinResetSending(true);
+    setPinResetDemoOtp("");
+    setPinResetOtpCode("");
+    try {
+      const res = await fetch("/api/email/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPinResetOtpSent(true);
+        if (data.demoOtp) {
+          setPinResetDemoOtp(data.demoOtp);
+        }
+        showToast(data.demoMode ? "Code de test généré (mode démo)" : "Code envoyé par email");
+      } else {
+        showToast(data.error || "Erreur d'envoi du code");
+      }
+    } catch {
+      showToast("Erreur d'envoi du code");
+    } finally {
+      setPinResetSending(false);
+    }
+  };
+
+  const verifyPinResetOtp = async () => {
+    const user = firebaseAuth.currentUser;
+    if (!user?.email) return;
+    if (pinResetOtpCode.length !== 6) {
+      showToast("Entrez le code à 6 chiffres");
+      return;
+    }
+    setPinResetVerifying(true);
+    try {
+      const res = await fetch("/api/email/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email, code: pinResetOtpCode }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setPinResetVerified(true);
+        showToast("Email vérifié ! Créez votre nouveau code PIN.");
+      } else {
+        showToast(data.error || "Code incorrect");
+      }
+    } catch {
+      showToast("Erreur de vérification");
+    } finally {
+      setPinResetVerifying(false);
+    }
+  };
+
+  const resetPinWithNewCode = async () => {
+    if (!/^\d{4}$/.test(pinResetNewPin) || pinResetNewPin !== pinResetConfirmPin) {
+      showToast("Les codes PIN ne correspondent pas");
+      return;
+    }
+    try {
+      const token = await firebaseAuth.currentUser?.getIdToken();
+      if (!token) {
+        showToast("Non autorisé");
+        return;
+      }
+      const salt = await generatePinSalt();
+      const newHash = await hashPin(pinResetNewPin, salt);
+      // Save new PIN via reset endpoint
+      const res = await fetch("/api/pin/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ pinHash: newHash, salt }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        // Update local state
+        setSavedCardPinHash(newHash);
+        setSavedCardPinSalt(salt);
+        setSavedCardPin("\u2022\u2022\u2022\u2022");
+        setSessionPinPlaintext(pinResetNewPin);
+        cardPinExistsRef.current = true;
+        // Also try to store in client Firestore as fallback
+        try {
+          const uid = firebaseAuth.currentUser?.uid;
+          if (uid) {
+            await setDoc(doc(firebaseDb, "pinRecords", uid), { pinHash: newHash, salt }, { merge: true });
+          }
+        } catch { /* client Firestore also failed */ }
+        // Reset state and go to menu
+        resetPinResetState();
+        setCardPinStage("menu");
+        showToast("Code PIN réinitialisé avec succès");
+      } else {
+        showToast(data.error || "Erreur de réinitialisation");
+      }
+    } catch {
+      showToast("Erreur lors de la réinitialisation");
+    }
+  };
+
+  const resetPinResetState = () => {
+    setPinResetOtpSent(false);
+    setPinResetOtpCode("");
+    setPinResetDemoOtp("");
+    setPinResetVerified(false);
+    setPinResetNewPin("");
+    setPinResetConfirmPin("");
+    setPinResetSending(false);
+    setPinResetVerifying(false);
+  };
+
   const saveCardSettings = async () => {
     if (authUid) {
       try {
@@ -5329,16 +5465,103 @@ function App() {
     }
   };
 
-  const handleForgot = async () => {
-    if (!loginEmail.trim()) {
-      showToast("Entrez votre email d'abord");
+  const handleForgot = () => {
+    setForgotEmail(loginEmail.trim());
+    setForgotOtpCode("");
+    setForgotDemoOtp("");
+    setForgotSending(false);
+    setForgotVerifying(false);
+    setForgotVerified(false);
+    setForgotNewPw("");
+    setForgotConfirmPw("");
+    setForgotResetting(false);
+    setForgotStep("email");
+    setAuthTab("forgot");
+  };
+
+  const forgotSendCode = async () => {
+    if (!forgotEmail.trim() || !forgotEmail.includes("@")) {
+      showToast("Entrez un email valide");
       return;
     }
+    setForgotSending(true);
+    setForgotOtpCode("");
+    setForgotDemoOtp("");
     try {
-      await sendPasswordResetEmail(firebaseAuth, loginEmail.trim());
-      showToast(`Lien de réinitialisation envoyé à ${loginEmail}`);
+      const res = await fetch("/api/auth/send-reset-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setForgotStep("code");
+        if (data.demoOtp) setForgotDemoOtp(data.demoOtp);
+        showToast(data.demoMode ? "Code de test généré (mode démo)" : "Code envoyé par email");
+      } else {
+        showToast(data.error || "Erreur d'envoi du code");
+      }
     } catch {
-      showToast("Impossible d'envoyer le lien de réinitialisation");
+      showToast("Erreur d'envoi du code");
+    } finally {
+      setForgotSending(false);
+    }
+  };
+
+  const forgotVerifyCode = async () => {
+    if (forgotOtpCode.length !== 6) {
+      showToast("Entrez le code à 6 chiffres");
+      return;
+    }
+    setForgotVerifying(true);
+    try {
+      const res = await fetch("/api/auth/verify-reset-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail.trim(), code: forgotOtpCode }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setForgotVerified(true);
+        setForgotStep("newPassword");
+        showToast("Code vérifié ! Choisissez votre nouveau mot de passe.");
+      } else {
+        showToast(data.error || "Code incorrect");
+      }
+    } catch {
+      showToast("Erreur de vérification");
+    } finally {
+      setForgotVerifying(false);
+    }
+  };
+
+  const forgotResetPassword = async () => {
+    if (forgotNewPw.length < 8) {
+      showToast("Le mot de passe doit contenir au moins 8 caractères");
+      return;
+    }
+    if (forgotNewPw !== forgotConfirmPw) {
+      showToast("Les mots de passe ne correspondent pas");
+      return;
+    }
+    setForgotResetting(true);
+    try {
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail.trim(), newPassword: forgotNewPw }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setForgotStep("success");
+        showToast("Mot de passe modifié avec succès !");
+      } else {
+        showToast(data.error || "Erreur de réinitialisation");
+      }
+    } catch {
+      showToast("Erreur lors de la réinitialisation");
+    } finally {
+      setForgotResetting(false);
     }
   };
 
@@ -7120,6 +7343,162 @@ function App() {
                   <div className="auth-link">
                     Pas encore de compte ? <span onClick={() => switchAuthTab("register")}>S'inscrire</span>
                   </div>
+                </div>
+
+                {/* ── Forgot Password Panel ── */}
+                <div className={`auth-panel ${authTab === "forgot" ? "active" : ""}`}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 20 }}>
+                    <div className="form-section-title" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <button type="button" onClick={() => setAuthTab("login")} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+                      </button>
+                      Mot de passe oublié
+                    </div>
+                    <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.5, paddingLeft: 28 }}>
+                      {forgotStep === "email" && "Entrez votre email pour recevoir un code de vérification."}
+                      {forgotStep === "code" && "Saisissez le code envoyé à votre email."}
+                      {forgotStep === "newPassword" && "Choisissez votre nouveau mot de passe."}
+                      {forgotStep === "success" && "Votre mot de passe a été modifié avec succès."}
+                    </div>
+                  </div>
+
+                  {/* Step indicators */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0, marginBottom: 22 }}>
+                    {["email", "code", "newPassword"].map((step, i) => (
+                      <React.Fragment key={step}>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                          <div style={{
+                            width: 28, height: 28, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 11, fontWeight: 800,
+                            background: forgotStep === step || (step === "email" && forgotStep === "code") || (step !== "newPassword" && forgotStep === "newPassword")
+                              ? "rgba(212,164,55,.15)" : "rgba(255,255,255,.04)",
+                            border: forgotStep === step || (step === "email" && forgotStep === "code") || (step !== "newPassword" && forgotStep === "newPassword")
+                              ? "1px solid rgba(212,164,55,.3)" : "1px solid rgba(255,255,255,.08)",
+                            color: forgotStep === step || (step === "email" && forgotStep === "code") || (step !== "newPassword" && forgotStep === "newPassword")
+                              ? "#D4A437" : "#475569",
+                          }}>
+                            {forgotStep === "success" || (step !== "newPassword" && forgotStep === "newPassword") || (step === "email" && forgotStep !== "email") ? "✓" : i + 1}
+                          </div>
+                          <div style={{ fontSize: 9, color: "#475569", fontWeight: 700 }}>{step === "email" ? "Email" : step === "code" ? "Code" : "Nv. MDP"}</div>
+                        </div>
+                        {i < 2 && (
+                          <div style={{
+                            width: 48, height: 2, borderRadius: 1, margin: "0 6px", marginBottom: 16,
+                            background: (step === "email" && forgotStep !== "email") || (step === "code" && forgotStep === "newPassword") || forgotStep === "success"
+                              ? "rgba(212,164,55,.3)" : "rgba(255,255,255,.06)",
+                          }} />
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </div>
+
+                  {/* Step: Email */}
+                  {forgotStep === "email" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                      <div className="field">
+                        <label className="field-label">Adresse email</label>
+                        <div className="field-wrap">
+                          <input
+                            type="email"
+                            className="field-input"
+                            placeholder="votre@email.com"
+                            value={forgotEmail}
+                            onChange={(e) => setForgotEmail(e.target.value)}
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <button className="btn-primary" onClick={forgotSendCode} disabled={forgotSending || !forgotEmail.trim() || !forgotEmail.includes("@")} style={forgotSending || !forgotEmail.trim() || !forgotEmail.includes("@") ? { opacity: .4 } : {}}>
+                        {forgotSending ? <div className="btn-loader" /> : "Envoyer le code"}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Step: Code */}
+                  {forgotStep === "code" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                      <div className="field">
+                        <label className="field-label">Code de vérification</label>
+                        <div className="field-wrap">
+                          <input
+                            type="text"
+                            className="field-input"
+                            inputMode="numeric"
+                            maxLength={6}
+                            placeholder="000000"
+                            value={forgotOtpCode}
+                            onChange={(e) => setForgotOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                            style={{ textAlign: "center", fontSize: 20, letterSpacing: ".3em", fontWeight: 900 }}
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+
+                      {forgotDemoOtp && (
+                        <div style={{ textAlign: "center", padding: "10px 14px", borderRadius: 14, background: "rgba(212,164,55,.06)", border: "1px solid rgba(212,164,55,.12)" }}>
+                          <div style={{ fontSize: 9, fontWeight: 800, color: "#D4A437", letterSpacing: ".1em", textTransform: "uppercase" }}>Mode démo</div>
+                          <div style={{ fontSize: 20, fontWeight: 900, color: "#fff", letterSpacing: ".2em", marginTop: 2 }}>{forgotDemoOtp}</div>
+                        </div>
+                      )}
+
+                      <button className="btn-primary" onClick={forgotVerifyCode} disabled={forgotOtpCode.length !== 6 || forgotVerifying} style={forgotOtpCode.length !== 6 || forgotVerifying ? { opacity: .4 } : {}}>
+                        {forgotVerifying ? <div className="btn-loader" /> : "Vérifier le code"}
+                      </button>
+
+                      <div style={{ textAlign: "center" }}>
+                        <span style={{ fontSize: 12, color: "#64748b" }}>Pas de code ? </span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "#D4A437", cursor: "pointer" }} onClick={forgotSendCode}>Renvoyer</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step: New Password */}
+                  {forgotStep === "newPassword" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                      <div className="field">
+                        <label className="field-label">Nouveau mot de passe</label>
+                        <div className="field-wrap">
+                          <input
+                            type="password"
+                            className="field-input"
+                            placeholder="Minimum 8 caractères"
+                            value={forgotNewPw}
+                            onChange={(e) => setForgotNewPw(e.target.value)}
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <div className="field">
+                        <label className="field-label">Confirmer le mot de passe</label>
+                        <div className="field-wrap">
+                          <input
+                            type="password"
+                            className="field-input"
+                            placeholder="Confirmez le mot de passe"
+                            value={forgotConfirmPw}
+                            onChange={(e) => setForgotConfirmPw(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <button className="btn-primary" onClick={forgotResetPassword} disabled={forgotNewPw.length < 8 || forgotNewPw !== forgotConfirmPw || forgotResetting} style={forgotNewPw.length < 8 || forgotNewPw !== forgotConfirmPw || forgotResetting ? { opacity: .4 } : {}}>
+                        {forgotResetting ? <div className="btn-loader" /> : "Réinitialiser le mot de passe"}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Step: Success */}
+                  {forgotStep === "success" && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center", textAlign: "center", padding: "20px 0" }}>
+                      <div style={{ width: 64, height: 64, borderRadius: "50%", background: "rgba(34,197,94,.1)", border: "2px solid rgba(34,197,94,.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                      </div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: "#fff" }}>Mot de passe modifié !</div>
+                      <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.6 }}>Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.</div>
+                      <button className="btn-primary" onClick={() => { setLoginEmail(forgotEmail); setLoginPassword(""); setAuthTab("login"); }} style={{ marginTop: 4 }}>
+                        Se connecter
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className={`auth-panel ${authTab === "register" ? "active" : ""}`}>
@@ -10850,9 +11229,13 @@ function App() {
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                       Afficher
                     </button>
-                    <button className="pin-action-btn danger" onClick={() => { setCardPinDraft(""); setCardPinConfirm(""); setCardPinStage("change"); }}>
+                    <button className="pin-action-btn" onClick={() => { setCardPinDraft(""); setCardPinConfirm(""); setCardPinStage("change"); }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                       Modifier
+                    </button>
+                    <button className="pin-action-btn" style={{ color: "#fbbf24" }} onClick={() => { resetPinResetState(); setCardPinStage("reset"); }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+                      PIN oublié
                     </button>
                   </div>
 
@@ -10910,6 +11293,84 @@ function App() {
                   <div className="bc-actions">
                     <button className="bc-btn bc-btn-secondary" onClick={() => { setCardPinStage("menu"); setCardPinRevealed(false); setRevealAccountPw(""); }}>Retour</button>
                     <button className="bc-btn bc-btn-primary" onClick={() => setCardPinStage("menu")}>OK</button>
+                  </div>
+                </div>
+              ) : cardPinStage === "reset" ? (
+                <div className="bc-step-content" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>Réinitialiser le code PIN</div>
+                    <div style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.5 }}>Un code de confirmation sera envoyé à votre email pour vérifier votre identité.</div>
+                  </div>
+
+                  {!pinResetOtpSent ? (
+                    <>
+                      <div className="bc-notice" style={{ background: "rgba(251,191,36,.04)", borderColor: "rgba(251,191,36,.12)" }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(251,191,36,.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+                        <div className="bc-notice-text">Le code sera envoyé à : <strong style={{ color: "#fbbf24" }}>{firebaseAuth.currentUser?.email || "..."}</strong></div>
+                      </div>
+                      <button className="bc-btn-full" onClick={sendPinResetOtp} disabled={pinResetSending} style={pinResetSending ? { opacity: .4 } : {}}>
+                        {pinResetSending ? <div className="btn-loader" /> : "Envoyer le code par email"}
+                      </button>
+                    </>
+                  ) : !pinResetVerified ? (
+                    <>
+                      <div className="bc-form">
+                        <div className="bc-field">
+                          <div className="bc-field-label">Code de confirmation</div>
+                          <input
+                            className="bc-field-input"
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={6}
+                            value={pinResetOtpCode}
+                            onChange={(event) => setPinResetOtpCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                            placeholder="000000"
+                            style={{ textAlign: "center", fontSize: 22, letterSpacing: ".3em", fontWeight: 900 }}
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+
+                      {pinResetDemoOtp && (
+                        <div style={{ textAlign: "center", padding: "8px 12px", borderRadius: 12, background: "rgba(251,191,36,.06)", border: "1px solid rgba(251,191,36,.12)" }}>
+                          <div style={{ fontSize: 9, fontWeight: 800, color: "#fbbf24", letterSpacing: ".1em", textTransform: "uppercase" }}>Mode démo</div>
+                          <div style={{ fontSize: 18, fontWeight: 900, color: "#fff", letterSpacing: ".2em", marginTop: 2 }}>{pinResetDemoOtp}</div>
+                        </div>
+                      )}
+
+                      <button className="bc-btn-full" onClick={verifyPinResetOtp} disabled={pinResetOtpCode.length !== 6 || pinResetVerifying} style={pinResetOtpCode.length !== 6 || pinResetVerifying ? { opacity: .4 } : {}}>
+                        {pinResetVerifying ? <div className="btn-loader" /> : "Vérifier le code"}
+                      </button>
+
+                      <div style={{ textAlign: "center" }}>
+                        <span style={{ fontSize: 11, color: "#64748b" }}>Pas de code ? </span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#fbbf24", cursor: "pointer" }} onClick={sendPinResetOtp}>Renvoyer</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="bc-notice" style={{ background: "rgba(34,197,94,.04)", borderColor: "rgba(34,197,94,.12)" }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(34,197,94,.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                        <div className="bc-notice-text">Email vérifié ! Créez votre nouveau code PIN.</div>
+                      </div>
+                      <div className="bc-form">
+                        <div className="bc-field">
+                          <div className="bc-field-label">Nouveau code PIN</div>
+                          <input className="bc-field-input" type="password" inputMode="numeric" maxLength={4} value={pinResetNewPin} onChange={(event) => setPinResetNewPin(event.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="••••" style={{ textAlign: "center", fontSize: 22, letterSpacing: ".3em", fontWeight: 900 }} />
+                        </div>
+                        <div className="bc-field">
+                          <div className="bc-field-label">Confirmer le code PIN</div>
+                          <input className="bc-field-input" type="password" inputMode="numeric" maxLength={4} value={pinResetConfirmPin} onChange={(event) => setPinResetConfirmPin(event.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="••••" style={{ textAlign: "center", fontSize: 22, letterSpacing: ".3em", fontWeight: 900 }} />
+                        </div>
+                      </div>
+                      <button className="bc-btn-full" onClick={resetPinWithNewCode} disabled={pinResetNewPin.length !== 4 || pinResetConfirmPin.length !== 4 || pinResetNewPin !== pinResetConfirmPin} style={pinResetNewPin.length !== 4 || pinResetConfirmPin.length !== 4 || pinResetNewPin !== pinResetConfirmPin ? { opacity: .4 } : {}}>
+                        Réinitialiser le PIN
+                      </button>
+                    </>
+                  )}
+
+                  <div className="bc-actions">
+                    <button className="bc-btn bc-btn-secondary" onClick={() => { resetPinResetState(); setCardPinStage("menu"); }}>Retour</button>
                   </div>
                 </div>
               ) : (

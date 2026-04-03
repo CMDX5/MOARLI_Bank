@@ -17,7 +17,7 @@ let adminInitResult: boolean | null = null;
  * 2. service-account-key.json in project root
  * 3. GOOGLE_APPLICATION_CREDENTIALS env var as JSON string
  */
-async function getAdminAuth(): Promise<import("firebase-admin/auth").Auth | null> {
+export async function getAdminAuth(): Promise<import("firebase-admin/auth").Auth | null> {
   if (adminAuth) return adminAuth;
   if (adminInitAttempted) return null;
 

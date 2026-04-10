@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimit, getClientId } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
 import { getAdminAuth } from "@/lib/auth-verify";
 
 /**
@@ -9,7 +9,7 @@ import { getAdminAuth } from "@/lib/auth-verify";
  */
 export async function POST(req: NextRequest) {
   const clientId = getClientId(req);
-  const rl = rateLimit(`auth:reset-pw:${clientId}`, { maxRequests: 2, windowSec: 300 });
+  const rl = rateLimitByIp(`auth:reset-pw:${clientId}`, { maxRequests: 2, windowSec: 300 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de tentatives. Réessayez dans 5 minutes." }, { status: 429 });
   }

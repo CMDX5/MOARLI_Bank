@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimit, getClientId } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
 
 /**
  * Admin Login API — SERVER-SIDE CREDENTIAL VERIFICATION
@@ -21,7 +21,7 @@ const LOCKOUT_WINDOW_SEC = 300; // 5 minutes
 export async function POST(req: NextRequest) {
   // ── Rate limit ──
   const clientId = getClientId(req);
-  const rl = rateLimit(`admin:login:${clientId}`, { maxRequests: MAX_ATTEMPTS, windowSec: LOCKOUT_WINDOW_SEC });
+  const rl = rateLimitByIp(`admin:login:${clientId}`, { maxRequests: MAX_ATTEMPTS, windowSec: LOCKOUT_WINDOW_SEC });
   if (!rl.allowed) {
     return NextResponse.json(
       { success: false, error: "Trop de tentatives. Réessayez dans 5 minutes." },

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimit, getClientId } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
 import { verifyOtp } from "@/lib/otp-store";
 
 export async function POST(req: NextRequest) {
   const clientId = getClientId(req);
-  const rl = rateLimit(`sms:verify-otp:${clientId}`, { maxRequests: 10, windowSec: 60 });
+  const rl = rateLimitByIp(`sms:verify-otp:${clientId}`, { maxRequests: 10, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de tentatives" }, { status: 429 });
   }

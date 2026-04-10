@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimit, getClientId } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
 import { requireAdmin } from "@/lib/auth-verify";
 import { getAdminFirestore } from "@/lib/admin-firestore";
 
 export async function POST(req: NextRequest) {
   // Rate limit — stricter for destructive operations
   const clientId = getClientId(req);
-  const rl = rateLimit(`admin:log:${clientId}`, { maxRequests: 10, windowSec: 60 });
+  const rl = rateLimitByIp(`admin:log:${clientId}`, { maxRequests: 10, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de requêtes" }, {
       status: 429,
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const clientId = getClientId(req);
-  const rl = rateLimit(`admin:log:get:${clientId}`, { maxRequests: 60, windowSec: 60 });
+  const rl = rateLimitByIp(`admin:log:get:${clientId}`, { maxRequests: 60, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de requêtes" }, {
       status: 429,

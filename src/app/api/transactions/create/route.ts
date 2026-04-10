@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { collection, addDoc, query, where, getDocs, limit as queryLimit } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/admin-firestore";
-import { rateLimit, getClientId } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
 
 export async function POST(req: NextRequest) {
   // Rate limit
   const clientId = getClientId(req);
-  const rl = rateLimit(`tx:create:${clientId}`, { maxRequests: 30, windowSec: 60 });
+  const rl = rateLimitByIp(`tx:create:${clientId}`, { maxRequests: 30, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Trop de requêtes. Réessayez plus tard." },

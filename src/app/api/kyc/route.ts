@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimit, getClientId } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
 import { getAdminFirestore } from "@/lib/admin-firestore";
 
 // POST: Submit KYC documents
 export async function POST(req: NextRequest) {
   const clientId = getClientId(req);
-  const rl = rateLimit(`kyc:submit:${clientId}`, { maxRequests: 5, windowSec: 60 });
+  const rl = rateLimitByIp(`kyc:submit:${clientId}`, { maxRequests: 5, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de requêtes" }, {
       status: 429,

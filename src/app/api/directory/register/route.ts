@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimit, getClientId } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
 import { getAdminFirestore } from "@/lib/admin-firestore";
 import { doc, setDoc, serverTimestamp, getFirestore as getClientFirestore } from "firebase/firestore";
@@ -19,7 +19,7 @@ import { doc, setDoc, serverTimestamp, getFirestore as getClientFirestore } from
 export async function POST(req: NextRequest) {
   // ── Rate limit ──
   const clientId = getClientId(req);
-  const rl = rateLimit(`directory:register:${clientId}`, { maxRequests: 15, windowSec: 60 });
+  const rl = rateLimitByIp(`directory:register:${clientId}`, { maxRequests: 15, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de requêtes" }, {
       status: 429,

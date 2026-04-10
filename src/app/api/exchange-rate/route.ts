@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimit, getClientId } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
 
 // TODO: Integrate real exchange rate API (e.g., Fixer.io, Open Exchange Rates, XE API)
 // For CFA (XAF) currencies: 1 XAF = fixed peg to EUR (1 EUR = 655.957 XAF)
@@ -24,7 +24,7 @@ const EUR_XAF = 655.957;
 export async function GET(req: NextRequest) {
   // Rate limit: 30 requests per 60 seconds
   const clientId = getClientId(req);
-  const rl = rateLimit(`exchange-rate:${clientId}`, { maxRequests: 30, windowSec: 60 });
+  const rl = rateLimitByIp(`exchange-rate:${clientId}`, { maxRequests: 30, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de requêtes" }, {
       status: 429,

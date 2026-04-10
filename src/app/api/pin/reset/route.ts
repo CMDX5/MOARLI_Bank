@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/admin-firestore";
-import { rateLimit, getClientId } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
 import { doc, setDoc } from "firebase-admin/firestore";
 
 export async function POST(req: NextRequest) {
   const clientId = getClientId(req);
-  const rl = rateLimit(`pin:reset:${clientId}`, { maxRequests: 3, windowSec: 300 });
+  const rl = rateLimitByIp(`pin:reset:${clientId}`, { maxRequests: 3, windowSec: 300 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de tentatives. Réessayez dans 5 minutes." }, { status: 429 });
   }

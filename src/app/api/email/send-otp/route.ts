@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomInt } from "crypto";
-import { rateLimit, getClientId } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
 import { setOtp } from "@/lib/otp-store";
 
 // Set to true to enable demo mode (returns OTP in response for testing without Resend API)
@@ -8,7 +8,7 @@ const DEMO_MODE = !process.env.RESEND_API_KEY;
 
 export async function POST(req: NextRequest) {
   const clientId = getClientId(req);
-  const rl = rateLimit(`email:send-otp:${clientId}`, { maxRequests: 3, windowSec: 60 });
+  const rl = rateLimitByIp(`email:send-otp:${clientId}`, { maxRequests: 3, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de demandes. Réessayez dans 1 minute." }, { status: 429 });
   }

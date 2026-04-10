@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { collection, addDoc, doc, getDoc, getDocs, deleteDoc, query, where, orderBy, limit as queryLimit } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/admin-firestore";
-import { rateLimit, getClientId } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
 
 /**
@@ -18,7 +18,7 @@ import { requireAuth } from "@/lib/auth-verify";
 export async function GET(req: NextRequest) {
   // ── Rate limit: 60 reads/min ──
   const clientId = getClientId(req);
-  const rl = rateLimit(`pending-credit:GET:${clientId}`, { maxRequests: 60, windowSec: 60 });
+  const rl = rateLimitByIp(`pending-credit:GET:${clientId}`, { maxRequests: 60, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de requêtes" }, {
       status: 429,
@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   // ── Rate limit: 20 writes/min ──
   const clientId = getClientId(req);
-  const rl = rateLimit(`pending-credit:POST:${clientId}`, { maxRequests: 20, windowSec: 60 });
+  const rl = rateLimitByIp(`pending-credit:POST:${clientId}`, { maxRequests: 20, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de requêtes" }, {
       status: 429,
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   // ── Rate limit: 30 deletes/min ──
   const clientId = getClientId(req);
-  const rl = rateLimit(`pending-credit:DELETE:${clientId}`, { maxRequests: 30, windowSec: 60 });
+  const rl = rateLimitByIp(`pending-credit:DELETE:${clientId}`, { maxRequests: 30, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de requêtes" }, {
       status: 429,
@@ -215,7 +215,7 @@ export async function DELETE(req: NextRequest) {
 // PUT: Credit recipient balance directly (uses Admin SDK to bypass client rules)
 export async function PUT(req: NextRequest) {
   const clientId = getClientId(req);
-  const rl = rateLimit(`pending-credit:PUT:${clientId}`, { maxRequests: 20, windowSec: 60 });
+  const rl = rateLimitByIp(`pending-credit:PUT:${clientId}`, { maxRequests: 20, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de requêtes" }, {
       status: 429,

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/admin-firestore";
-import { rateLimit, getClientId } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
 import { createHash, timingSafeEqual } from "crypto";
 import { doc, getDoc } from "firebase-admin/firestore";
 
 export async function POST(req: NextRequest) {
   const clientId = getClientId(req);
-  const rl = rateLimit(`verify-pin:${clientId}`, { maxRequests: 5, windowSec: 60 });
+  const rl = rateLimitByIp(`verify-pin:${clientId}`, { maxRequests: 5, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de tentatives. Réessayez dans 1 minute." }, {
       status: 429,

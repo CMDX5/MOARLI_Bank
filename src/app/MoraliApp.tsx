@@ -58,6 +58,7 @@ import AuthView, { type ProfileFormData } from "@/components/bank/AuthView";
 import DashboardView from "@/components/bank/DashboardView";
 import NotificationsPanel from "@/components/bank/NotificationsPanel";
 import ProfileView from "@/components/bank/ProfileView";
+import TransactionsView from "@/components/bank/TransactionsView";
 
 // ── Local type aliases (sourced from @/types/morali) ──
 // AuthTab, ForgotStep, Screen, AdminTab, NavItem, TransactionType, RegisterData, etc.
@@ -7244,95 +7245,21 @@ function App() {
             onAuthSuccess={() => {}}
             persistMoraliProfile={persistMoraliProfile}
           />
-          <div className={`app-screen ${screen === "transaction" ? "active" : ""}`}>
-            <div className="content-scrollable service-scrollable transaction-safe">
-              <div className="transaction-screen">
-                <div className="transaction-header">
-                  <div className="transaction-topbar">
-                    <h1 className="transaction-headline">{transactionType === "depot" ? "Recharger" : "Retirer"}</h1>
-                    <button className="transaction-back" onClick={closeTransaction} aria-label="Fermer">
-                      <span className="close-x">×</span>
-                    </button>
-                  </div>
-
-                  <div className="transaction-balance">
-                    <div className="transaction-balance-label">Disponible</div>
-                    <div className="transaction-balance-value">
-                      <strong>{formatCurrency(firestoreBalance !== null ? firestoreBalance : dashboardData.balance)}</strong>
-                      <span>XAF</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="transaction-body">
-                  <div className="transaction-group">
-                    <label className="transaction-label">Montant à transférer</label>
-                    <div className="transaction-amount">
-                      <input
-                        type="number"
-                        placeholder="0"
-                        value={transactionAmount}
-                        onChange={(e) => setTransactionAmount(e.target.value)}
-                      />
-                      <span>XAF</span>
-                    </div>
-                  </div>
-
-                  <div className="transaction-group">
-                    <label className="transaction-label">Opérateur local</label>
-                    <div className="operator-grid">
-                      <button
-                        className={`operator-card ${transactionMethod === "mtn" ? "active-mtn" : ""}`}
-                        onClick={() => setTransactionMethod("mtn")}
-                      >
-                        <div className="operator-badge" style={{ background: "#ffcc00", color: "#000" }}>MTN</div>
-                        <span style={{ color: transactionMethod === "mtn" ? "#fff" : "#64748b" }}>MTN MoMo</span>
-                        {transactionMethod === "mtn" && <div className="dot mtn" />}
-                      </button>
-
-                      <button
-                        className={`operator-card ${transactionMethod === "airtel" ? "active-airtel" : ""}`}
-                        onClick={() => setTransactionMethod("airtel")}
-                      >
-                        <div className="operator-badge" style={{ background: "#ff0000", color: "#fff" }}>airtel</div>
-                        <span style={{ color: transactionMethod === "airtel" ? "#fff" : "#64748b" }}>Airtel Money</span>
-                        {transactionMethod === "airtel" && <div className="dot airtel" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="transaction-group">
-                    <label className="transaction-label">Numéro du compte</label>
-                    <div className="phone-input-wrap">
-                      <span className="phone-prefix">+242</span>
-                      <input
-                        type="tel"
-                        placeholder=""
-                        value={transactionPhone}
-                        onChange={(e) => setTransactionPhone(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="transaction-footer">
-                  <div className="transaction-recap">
-                    <div>
-                      <small>Frais (1% inclus)</small>
-                      <strong>{formatCurrency(transactionTotal)} XAF</strong>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <span>Estimation</span>
-                      <p>Instantané</p>
-                    </div>
-                  </div>
-                  <button className="transaction-confirm" onClick={submitTransaction}>
-                    {transactionType === "depot" ? "Confirmer le dépôt" : "Valider le retrait"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          {screen === "transaction" && (
+            <TransactionsView
+              type={transactionType}
+              amount={transactionAmount}
+              onAmountChange={setTransactionAmount}
+              method={transactionMethod}
+              onMethodChange={setTransactionMethod}
+              phone={transactionPhone}
+              onPhoneChange={setTransactionPhone}
+              balance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
+              total={transactionTotal}
+              onClose={closeTransaction}
+              onSubmit={submitTransaction}
+            />
+          )}
 
           <div className={`app-screen ${screen === "services" ? "active" : ""}`}>
             <div className="content-scrollable nav-safe">

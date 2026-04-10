@@ -6277,6 +6277,8 @@ function App() {
   };
 
   const handleAdminLogout = async () => {
+    // SECURITY: Revoke all tokens on server (forces logout on ALL devices)
+    try { await fetch("/api/auth/logout", { method: "POST", headers: await getAuthHeaders() }); } catch { /* best-effort */ }
     try { await signOut(firebaseAuth); } catch { /* ignore */ }
     setIsAdminLoggedIn(false);
     setAdminPermissionLevel("full");
@@ -13807,6 +13809,9 @@ function App() {
                   </button>
                   <button onClick={() => {
                     setLogoutModalOpen(false);
+                    // SECURITY: Revoke tokens server-side FIRST, then sign out client
+                    fetch("/api/auth/logout", { method: "POST", headers: getAuthHeaders ? undefined : undefined })
+                      .catch(() => {});
                     if (isAdminLoggedIn) {
                       handleAdminLogout();
                     } else {

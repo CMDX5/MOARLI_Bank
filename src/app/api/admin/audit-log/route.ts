@@ -1,29 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth-verify";
+import { requireAdmin } from "@/lib/auth-verify";
 import { getAdminFirestore } from "@/lib/admin-firestore";
-import { Firestore } from "firebase-admin/firestore";
-
-/** Verify caller has admin role in Firestore. Returns true if admin, false otherwise. */
-async function verifyAdminRole(uid: string, adminDb: Firestore): Promise<boolean> {
-  try {
-    const userDoc = await adminDb.collection("moraliUsers").doc(uid).get();
-    return userDoc.data()?.role === "admin";
-  } catch {
-    return false;
-  }
-}
 
 export async function GET(req: NextRequest) {
   const adminDb = await getAdminFirestore();
   if (!adminDb) return NextResponse.json({ error: "Service indisponible" }, { status: 503 });
 
-  const auth = await requireAuth(req);
+  // SECURITY: Firebase Custom Claims — not forgeable by client
+  const auth = await requireAdmin(req);
   if (auth.error) return auth.error;
-
-  // Security: Only admins can view audit logs
-  if (!(await verifyAdminRole(auth.uid || "", adminDb))) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
-  }
 
   const url = new URL(req.url);
   const limit = Math.min(Number(url.searchParams.get("limit")) || 50, 200);
@@ -46,13 +31,9 @@ export async function POST(req: NextRequest) {
   const adminDb = await getAdminFirestore();
   if (!adminDb) return NextResponse.json({ error: "Service indisponible" }, { status: 503 });
 
-  const auth = await requireAuth(req);
+  // SECURITY: Firebase Custom Claims
+  const auth = await requireAdmin(req);
   if (auth.error) return auth.error;
-
-  // Security: Only admins can write audit logs
-  if (!(await verifyAdminRole(auth.uid || "", adminDb))) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
-  }
 
   try {
     const { action, target, details } = await req.json();

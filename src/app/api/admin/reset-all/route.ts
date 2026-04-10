@@ -1,35 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth-verify";
+import { requireAdmin } from "@/lib/auth-verify";
 import { getAdminFirestore } from "@/lib/admin-firestore";
 
 /**
  * POST /api/admin/reset-all
  * 
  * DANGER: Resets ALL application data to zero.
- * - Resets all user balances to 0 in Firestore (moraliUsers)
- * - Deletes all Firestore transactions, pendingCredits, notifications
- * - Deletes all Firestore pinRecords and kycRecords
+ * SECURITY: Protected by Firebase Custom Claims (claims.admin === true)
  * 
- * Requires: Admin authentication + confirmReset: "RESET_ALL_DATA"
+ * Requires: Admin Custom Claims + confirmReset: "RESET_ALL_DATA"
  */
 export async function POST(req: NextRequest) {
-  // Auth check
-  const auth = await requireAuth(req);
+  // SECURITY: Firebase Custom Claims — not forgeable by client
+  const auth = await requireAdmin(req);
   if (auth.error) return auth.error;
   if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
   const adminDb = await getAdminFirestore();
   if (!adminDb) return NextResponse.json({ error: "Service indisponible" }, { status: 503 });
-
-  // Verify admin role via Firestore
-  try {
-    const adminDoc = await adminDb.collection("moraliUsers").doc(auth.uid).get();
-    if (!adminDoc.exists || adminDoc.data()?.role !== "admin") {
-      return NextResponse.json({ error: "Accès refusé — admin uniquement" }, { status: 403 });
-    }
-  } catch {
-    return NextResponse.json({ error: "Erreur vérification admin" }, { status: 500 });
-  }
 
   try {
     const body = await req.json();

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, getClientId } from "@/lib/rate-limit";
-import { requireAuth } from "@/lib/auth-verify";
+import { requireAdmin } from "@/lib/auth-verify";
 import { getAdminFirestore } from "@/lib/admin-firestore";
 
 export async function POST(req: NextRequest) {
@@ -14,23 +14,13 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Auth
-  const auth = await requireAuth(req);
+  // SECURITY: Firebase Custom Claims
+  const auth = await requireAdmin(req);
   if (auth.error) return auth.error;
   if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
   const adminDb = await getAdminFirestore();
   if (!adminDb) return NextResponse.json({ error: "Service indisponible" }, { status: 503 });
-
-  // Verify admin role
-  try {
-    const adminDoc = await adminDb.collection("moraliUsers").doc(auth.uid).get();
-    if (!adminDoc.exists || adminDoc.data()?.role !== "admin") {
-      return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
-    }
-  } catch {
-    return NextResponse.json({ error: "Erreur vérification admin" }, { status: 500 });
-  }
 
   try {
     const body = await req.json();
@@ -46,7 +36,6 @@ export async function POST(req: NextRequest) {
     const isResetAction = action === "RESET_TRANSACTIONS" || action === "RESET_NOTIFICATIONS" || action === "RESET_BALANCES" || action === "RESET_ALL";
 
     if (isResetAction) {
-      // Require signed confirmation token: CONFIRM_{ACTION}_{uid_prefix}
       const expectedToken = `CONFIRM_${action}_${auth.uid.slice(0, 8)}`;
       if (confirmToken !== expectedToken) {
         return NextResponse.json({ error: "Jeton de confirmation invalide" }, { status: 403 });
@@ -99,7 +88,6 @@ export async function POST(req: NextRequest) {
       if (action === "RESET_ALL") {
         const results: Record<string, { ok: boolean; count?: number; error?: string }> = {};
 
-        // Reset balances
         try {
           const usersSnap = await adminDb.collection("moraliUsers").get();
           const allDocs = usersSnap.docs;
@@ -115,7 +103,6 @@ export async function POST(req: NextRequest) {
           }
           results["moraliUsers_balances"] = { ok: true, count: allDocs.length };
 
-          // Clear root collections
           for (const collName of ["transactions", "pendingCredits", "serverNotifications"]) {
             try {
               const snap = await adminDb.collection(collName).get();
@@ -126,7 +113,6 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          // Clear notification subcollections
           let notifCount = 0;
           for (const userDoc of allDocs) {
             try {
@@ -150,9 +136,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ══════════════════════════════════════════════════
     // Normal admin log entry
-    // ══════════════════════════════════════════════════
     await adminDb.collection("adminActivity").add({
       action: String(action).slice(0, 100),
       details: String(details || "").slice(0, 500),
@@ -166,7 +150,6 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  // Rate limit
   const clientId = getClientId(req);
   const rl = rateLimit(`admin:log:get:${clientId}`, { maxRequests: 60, windowSec: 60 });
   if (!rl.allowed) {
@@ -176,23 +159,13 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // Auth
-  const auth = await requireAuth(req);
+  // SECURITY: Firebase Custom Claims
+  const auth = await requireAdmin(req);
   if (auth.error) return auth.error;
   if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
   const adminDb = await getAdminFirestore();
   if (!adminDb) return NextResponse.json({ error: "Service indisponible" }, { status: 503 });
-
-  // Verify admin role
-  try {
-    const adminDoc = await adminDb.collection("moraliUsers").doc(auth.uid).get();
-    if (!adminDoc.exists || adminDoc.data()?.role !== "admin") {
-      return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
-    }
-  } catch {
-    return NextResponse.json({ error: "Erreur vérification admin" }, { status: 500 });
-  }
 
   try {
     const limit = Math.min(Number(req.nextUrl.searchParams.get("limit") || 50), 200);

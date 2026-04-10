@@ -26,24 +26,19 @@ export async function getAdminAuth(): Promise<import("firebase-admin/auth").Auth
     const { getAuth } = await import("firebase-admin/auth");
     const { initializeApp, getApps, cert } = await import("firebase-admin/app");
 
-    // Try to find credentials
     let credential: { projectId: string; privateKey: string; clientEmail: string } | undefined;
 
-    // 1. Check for local service account key file
     const localKeyPath = resolve(process.cwd(), "service-account-key.json");
     if (existsSync(localKeyPath)) {
       const keyData = JSON.parse(readFileSync(localKeyPath, "utf-8"));
       credential = cert(keyData);
     }
 
-    // 2. Check GOOGLE_APPLICATION_CREDENTIALS env var
     if (!credential && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
       const envVal = process.env.GOOGLE_APPLICATION_CREDENTIALS;
       if (envVal.startsWith("{")) {
-        // JSON string directly in env var
         credential = cert(JSON.parse(envVal));
       } else if (existsSync(envVal)) {
-        // Path to JSON file
         const keyData = JSON.parse(readFileSync(envVal, "utf-8"));
         credential = cert(keyData);
       }
@@ -58,10 +53,9 @@ export async function getAdminAuth(): Promise<import("firebase-admin/auth").Auth
       return adminAuth;
     }
 
-    // No credentials found — fallback to local verification
     adminInitResult = false;
     return null;
-  } catch (err) {
+  } catch {
     adminInitResult = false;
     return null;
   }
@@ -69,15 +63,15 @@ export async function getAdminAuth(): Promise<import("firebase-admin/auth").Auth
 
 /**
  * Verify Firebase ID token — PRODUCTION MODE (Firebase Admin SDK).
- * This properly verifies the RS256 signature against Google's public keys.
+ * Returns full DecodedIdToken including customClaims (admin, roleLevel, etc.)
  */
-async function verifyTokenAdmin(token: string): Promise<string | null> {
+async function verifyTokenAdmin(token: string): Promise<import("firebase-admin/auth").DecodedIdToken | null> {
   const auth = await getAdminAuth();
   if (!auth) return null;
 
   try {
     const decoded = await auth.verifyIdToken(token, true);
-    return decoded.uid;
+    return decoded;
   } catch {
     return null;
   }
@@ -85,8 +79,7 @@ async function verifyTokenAdmin(token: string): Promise<string | null> {
 
 /**
  * Verify Firebase ID token — FALLBACK MODE (local JWT claim checking).
- * This validates JWT structure, expiration, issuer, and audience
- * but does NOT verify the cryptographic signature.
+ * Validates structure, expiration, issuer, audience — NOT the signature.
  */
 function verifyTokenLocal(token: string): string | null {
   const parts = token.split(".");
@@ -111,56 +104,157 @@ function verifyTokenLocal(token: string): string | null {
   }
 }
 
-/**
- * Verify Firebase ID token from request.
- *
- * Production: Uses Firebase Admin SDK (full RS256 signature verification)
- * Development: Falls back to local JWT claim checking
- */
-export async function verifyRequestAuth(req: NextRequest): Promise<string | null> {
+// ── Internal: verify token and return uid + claims ──
+async function verifyRequestAuthFull(req: NextRequest): Promise<{ uid: string; claims: Record<string, unknown> } | null> {
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
     const token = authHeader.slice(7).trim();
     if (!token || token.length < 100) return null;
 
-    // Try Admin SDK first (production — full RS256 signature verification)
-    const adminUid = await verifyTokenAdmin(token);
-    if (adminUid) return adminUid;
-
-    // Fallback to local verification (development / sandbox only)
-    // In production, reject unverified tokens to prevent forged JWT attacks
-    if (process.env.NODE_ENV === "production") {
-      return null;
+    // Production: full RS256 signature verification + custom claims
+    const decoded = await verifyTokenAdmin(token);
+    if (decoded) {
+      return { uid: decoded.uid, claims: (decoded.customClaims || {}) as Record<string, unknown> };
     }
-    return verifyTokenLocal(token);
+
+    // Development fallback only
+    if (process.env.NODE_ENV === "production") return null;
+    const localUid = verifyTokenLocal(token);
+    if (localUid) return { uid: localUid, claims: {} };
+    return null;
   } catch {
     return null;
   }
 }
 
 /**
- * Auth middleware for API routes.
- * Returns 401 response if not authenticated, or null if valid.
+ * Verify Firebase ID token and return uid only (backward compatible).
  */
-export async function requireAuth(req: NextRequest): Promise<{ uid: string | null; error?: NextResponse }> {
-  const uid = await verifyRequestAuth(req);
-  if (!uid) {
+export async function verifyRequestAuth(req: NextRequest): Promise<string | null> {
+  const result = await verifyRequestAuthFull(req);
+  return result?.uid ?? null;
+}
+
+// ── Auth result type ──
+export type AuthResult = {
+  uid: string | null;
+  error?: NextResponse;
+  claims?: Record<string, unknown>;
+};
+
+/**
+ * Auth middleware for API routes.
+ * Returns 401 if not authenticated.
+ */
+export async function requireAuth(req: NextRequest): Promise<AuthResult> {
+  const result = await verifyRequestAuthFull(req);
+  if (!result) {
     return {
       uid: null,
       error: NextResponse.json({ error: "Non autorisé" }, { status: 401 }),
     };
   }
-  return { uid };
+  return { uid: result.uid, claims: result.claims };
+}
+
+/**
+ * Admin auth middleware — verifies Firebase CUSTOM CLAIMS (not Firestore role).
+ *
+ * SECURITY: Firebase Custom Claims are:
+ * - Set ONLY via Firebase Admin SDK (server-side only)
+ * - Cannot be forged by client-side Firestore writes
+ * - Embedded in every ID token after next refresh
+ *
+ * Fallback: In development only, checks Firestore role field as secondary.
+ */
+export async function requireAdmin(req: NextRequest): Promise<AuthResult> {
+  const result = await verifyRequestAuthFull(req);
+  if (!result) {
+    return {
+      uid: null,
+      error: NextResponse.json({ error: "Non autorisé" }, { status: 401 }),
+    };
+  }
+
+  const { uid, claims } = result;
+
+  // ── Primary: Firebase Custom Claims (production authoritative) ──
+  if (claims.admin === true) {
+    return { uid, claims };
+  }
+
+  // ── Fallback: Firestore role field (development ONLY) ──
+  if (process.env.NODE_ENV !== "production") {
+    try {
+      const { getAdminFirestore } = await import("@/lib/admin-firestore");
+      const adminDb = await getAdminFirestore();
+      if (adminDb) {
+        const userDoc = await adminDb.collection("moraliUsers").doc(uid).get();
+        if (userDoc.exists() && userDoc.data()?.role === "admin") {
+          return { uid, claims };
+        }
+      }
+    } catch {
+      // Fall through to 403
+    }
+  }
+
+  return {
+    uid: null,
+    error: NextResponse.json({ error: "Accès refusé — admin uniquement" }, { status: 403 }),
+  };
+}
+
+/**
+ * Revoke all refresh tokens for a user (force logout on ALL devices).
+ * The user must re-authenticate to get a new token.
+ */
+export async function revokeUserTokens(uid: string): Promise<boolean> {
+  const auth = await getAdminAuth();
+  if (!auth) return false;
+  try {
+    await auth.revokeRefreshTokens(uid);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Set admin custom claims for a user (server-side only).
+ * This is the ONLY way to grant admin access.
+ */
+export async function setAdminClaim(uid: string, roleLevel: "full" | "viewer" = "full"): Promise<boolean> {
+  const auth = await getAdminAuth();
+  if (!auth) return false;
+  try {
+    await auth.setCustomUserClaims(uid, { admin: true, roleLevel });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Remove admin custom claims from a user.
+ */
+export async function removeAdminClaim(uid: string): Promise<boolean> {
+  const auth = await getAdminAuth();
+  if (!auth) return false;
+  try {
+    await auth.setCustomUserClaims(uid, null);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
  * Check if Admin SDK is properly configured (for health checks).
- * Returns "admin_sdk" (production), "local" (fallback), or null (not initialized).
  */
 export async function getAuthMode(): Promise<"admin_sdk" | "local" | "not_initialized"> {
   if (adminInitResult === null) {
-    // Force initialization attempt
     await getAdminAuth();
   }
   if (adminInitResult === true) return "admin_sdk";

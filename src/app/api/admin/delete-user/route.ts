@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimit, getClientId } from "@/lib/rate-limit";
-import { requireAuth } from "@/lib/auth-verify";
+import { requireAdmin } from "@/lib/auth-verify";
 import { getAdminFirestore } from "@/lib/admin-firestore";
 
 export async function POST(req: NextRequest) {
@@ -14,15 +14,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Auth
-  const auth = await requireAuth(req);
+  // SECURITY: Firebase Custom Claims
+  const auth = await requireAdmin(req);
   if (auth.error) return auth.error;
 
   // Get Admin Firestore
   const adminDb = await getAdminFirestore();
   if (!adminDb) {
     return NextResponse.json(
-      { error: "Configuration requise : veuillez configurer la clé de service Firebase Admin (FIREBASE_SERVICE_ACCOUNT_KEY) sur Vercel pour utiliser cette fonctionnalité." },
+      { error: "Service indisponible" },
       { status: 503 }
     );
   }
@@ -31,18 +31,6 @@ export async function POST(req: NextRequest) {
     const { uid } = await req.json();
     if (!uid || typeof uid !== "string") {
       return NextResponse.json({ error: "UID requis" }, { status: 400 });
-    }
-
-    // Security: Verify caller is admin
-    try {
-      const callerDoc = await adminDb.collection("moraliUsers").doc(auth.uid).get();
-      const callerData = callerDoc.data();
-      if (callerData?.role !== "admin") {
-        return NextResponse.json({ error: "Accès non autorisé" }, { status: 403 });
-      }
-    } catch {
-      // DENY by default if we can't verify admin role (security first)
-      return NextResponse.json({ error: "Service indisponible" }, { status: 503 });
     }
 
     // Prevent admin from deleting themselves

@@ -4,8 +4,17 @@ import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
 import { doc, setDoc } from "firebase-admin/firestore";
 import { validateBody, schemas } from "@/lib/validation";
-import { captureError, captureSecurityEvent } from "@/lib/sentry";
+import { captureError } from "@/lib/sentry";
 
+/**
+ * POST /api/pin/store
+ *
+ * Stores a PIN hash. The client sends a plaintext PIN; the server
+ * hashes it with bcrypt (work factor 12) before storing.
+ *
+ * Accepts both new format (plaintext pin) and legacy format (pinHash+salt)
+ * for backward compatibility during migration.
+ */
 export async function POST(req: NextRequest) {
   const clientId = getClientId(req);
   const rl = rateLimitByIp(`pin:store:${clientId}`, { maxRequests: 10, windowSec: 60 });
@@ -19,13 +28,34 @@ export async function POST(req: NextRequest) {
 
   const adminDb = await getAdminFirestore();
   if (!adminDb) {
-    // Admin SDK not available — return success but tell client to store locally
     return NextResponse.json({ success: true, fallback: true }, { status: 200 });
   }
 
   try {
     const rawBody = await req.json();
-    const validation = validateBody(schemas.pinStore, rawBody);
+
+    // Accept both new (pin) and legacy (pinHash+salt) formats
+    const isNewFormat = rawBody.pin && /^\d{4}$/.test(rawBody.pin);
+
+    if (isNewFormat) {
+      // ── New format: bcrypt-hash the plaintext PIN server-side ──
+      const bcrypt = await import("bcryptjs");
+      const pinBcrypt = await bcrypt.hash(rawBody.pin, 12);
+
+      const pinRef = doc(adminDb, "pinRecords", auth.uid);
+      await setDoc(pinRef, {
+        pinBcrypt,
+        // Keep encrypted PIN fields if provided (for PIN reveal feature)
+        encryptedPin: rawBody.encryptedPin || null,
+        pinIv: rawBody.pinIv || null,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+
+      return NextResponse.json({ success: true, bcrypt: true });
+    }
+
+    // ── Legacy format: store as-is (SHA-256 hash from old client) ──
+    const validation = validateBody(schemas.pinStoreLegacy, rawBody);
     if (!validation.success) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
@@ -39,7 +69,7 @@ export async function POST(req: NextRequest) {
       pinIv: pinIv || null,
     }, { merge: true });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, legacy: true });
   } catch (err) {
     captureError(err, { action: "pin:store", route: "/api/pin/store", uid: auth.uid, level: "error" });
     return NextResponse.json({ success: true, fallback: true });

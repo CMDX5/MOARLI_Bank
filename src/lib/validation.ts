@@ -89,16 +89,30 @@ export const schemas = {
     destination: z.enum(["cash", "airtime", "loan_request", "loan_granted"]).nullable().optional(),
   }),
 
-  /** POST /api/pin/store */
+  /** POST /api/pin/store (new format: server bcrypt-hashes plaintext PIN) */
   pinStore: z.object({
+    pin: pinCode,
+    encryptedPin: z.string().nullable().optional(),
+    pinIv: z.string().nullable().optional(),
+  }),
+
+  /** POST /api/pin/store (legacy format: client-side SHA-256 hash) */
+  pinStoreLegacy: z.object({
     pinHash: z.string().min(1, "Hash PIN requis"),
     salt: z.string().min(1, "Sel requis"),
     encryptedPin: z.string().nullable().optional(),
     pinIv: z.string().nullable().optional(),
   }),
 
-  /** POST /api/pin/reset */
+  /** POST /api/pin/reset (new format: server bcrypt-hashes plaintext PIN) */
   pinReset: z.object({
+    pin: pinCode,
+    encryptedPin: z.string().nullable().optional(),
+    pinIv: z.string().nullable().optional(),
+  }),
+
+  /** POST /api/pin/reset (legacy format: client-side SHA-256 hash) */
+  pinResetLegacy: z.object({
     pinHash: z.string().min(1, "Hash PIN requis"),
     salt: z.string().min(1, "Sel requis"),
     encryptedPin: z.string().nullable().optional(),

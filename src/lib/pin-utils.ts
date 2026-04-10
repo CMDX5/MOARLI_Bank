@@ -1,72 +1,22 @@
 /**
- * Secure PIN hashing utilities.
- * Uses SHA-256 via Web Crypto API (client) or Node crypto (server).
+ * Secure PIN utilities for MORALI PAY.
  *
- * Security notes:
- * - PINs are hashed before storage (never plaintext)
- * - Uses per-user salt (uid-based) to prevent rainbow table attacks
- * - Constant-time comparison to prevent timing attacks
+ * IMPORTANT (Phase 3c — bcrypt migration):
+ * ========================================
+ * PIN hashing is now done SERVER-SIDE with bcrypt (work factor 12).
+ * The client should NEVER hash a PIN for storage/verification purposes.
+ *
+ * This file retains:
+ * - AES-GCM encryption/decryption for PIN reveal feature (browser-only)
+ *
+ * Removed (client-side SHA-256 hashing is no longer used for PIN storage):
+ * - hashPin() — replaced by server-side bcrypt
+ * - verifyPin() — replaced by /api/verify-pin (bcrypt)
+ * - generatePinSalt() — replaced by server-side bcrypt salt generation
+ * - constantTimeCompare() — replaced by bcrypt's built-in timing-safe comparison
  */
 
-/**
- * Constant-time string comparison (works in both browser and Node.js).
- * Iterates through all characters regardless of mismatch position.
- */
-function constantTimeCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return result === 0;
-}
-
-/**
- * Hash a PIN with a salt using SHA-256.
- * Works in both browser (Web Crypto) and Node.js (crypto).
- */
-export async function hashPin(pin: string, salt: string): Promise<string> {
-  const combined = `${salt}:${pin}`;
-
-  if (typeof window !== "undefined" && window.crypto?.subtle) {
-    // Browser environment
-    const encoder = new TextEncoder();
-    const data = encoder.encode(combined);
-    const hashBuffer = await window.crypto.subtle.digest("SHA-256", data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-  }
-
-  // Node.js environment (API routes only)
-  const { createHash } = await import("crypto");
-  return createHash("sha256").update(combined).digest("hex");
-}
-
-/**
- * Verify a PIN against a stored hash.
- * Uses constant-time comparison to prevent timing attacks.
- */
-export async function verifyPin(pin: string, salt: string, storedHash: string): Promise<boolean> {
-  const computedHash = await hashPin(pin, salt);
-  return constantTimeCompare(computedHash, storedHash);
-}
-
-/**
- * Generate a random salt for PIN hashing.
- */
-export async function generatePinSalt(): Promise<string> {
-  if (typeof window !== "undefined" && window.crypto?.getRandomValues) {
-    const array = new Uint8Array(16);
-    window.crypto.getRandomValues(array);
-    return Array.from(array).map((b) => b.toString(16).padStart(2, "0")).join("");
-  }
-
-  // Node.js fallback
-  const { randomBytes } = await import("crypto");
-  return randomBytes(16).toString("hex");
-}
-
-/* ── AES-GCM Encryption for PIN Recovery ── */
+/* ── AES-GCM Encryption for PIN Recovery (Browser-only) ── */
 
 /**
  * Derive an AES-256-GCM key from a password + uid using PBKDF2.
@@ -82,7 +32,7 @@ async function deriveKey(password: string, uid: string, salt: Uint8Array): Promi
     ["deriveKey"]
   );
   return window.crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt, iterations: 100_000, hash: "SHA-256" },
+    { name: "PBKDF2", salt: salt as BufferSource, iterations: 100_000, hash: "SHA-256" as const },
     keyMaterial,
     { name: "AES-GCM", length: 256 },
     false,

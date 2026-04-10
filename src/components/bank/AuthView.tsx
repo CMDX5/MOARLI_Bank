@@ -9,7 +9,7 @@ import {
 } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { firebaseAuth, firebaseDb } from "@/lib/firebase";
-import { hashPin, generatePinSalt, encryptPinWithPassword } from "@/lib/pin-utils";
+import { encryptPinWithPassword } from "@/lib/pin-utils";
 import {
   firebaseAuthMessage,
   getIdentitySeed,
@@ -508,8 +508,6 @@ export default function AuthView({
     }
     setRegPinSaving(true);
     try {
-      const salt = await generatePinSalt();
-      const hash = await hashPin(regPinDraft, salt);
       window.localStorage.removeItem("morali_card_pin");
       window.localStorage.removeItem("morali_card_pin_hash");
       window.localStorage.removeItem("morali_card_pin_salt");
@@ -517,27 +515,15 @@ export default function AuthView({
       const encrypted = await encryptPinWithPassword(regPinDraft, registerData.pw, firebaseAuth.currentUser?.uid || "");
       window.localStorage.setItem("morali_card_pin_encrypted", encrypted.encryptedPin);
       window.localStorage.setItem("morali_card_pin_iv", encrypted.pinIv);
-      // Store encrypted PIN on server
+      // Store PIN on server (server bcrypt-hashes the plaintext PIN)
       try {
         const token = await firebaseAuth.currentUser?.getIdToken();
-        const storeRes = await fetch("/api/pin/store", {
+        await fetch("/api/pin/store", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ pinHash: hash, salt, encryptedPin: encrypted.encryptedPin, pinIv: encrypted.pinIv }),
+          body: JSON.stringify({ pin: regPinDraft, encryptedPin: encrypted.encryptedPin, pinIv: encrypted.pinIv }),
         });
-        const storeData = await storeRes.json().catch(() => ({}));
-        if (!storeData.success || storeData.fallback) {
-          try {
-            const uid = firebaseAuth.currentUser?.uid;
-            if (uid) {
-              const { setDoc: fsSetDoc, doc: fsDoc } = await import("firebase/firestore");
-              await fsSetDoc(fsDoc(firebaseDb, "pinRecords", uid), {
-                pinHash: hash, salt, encryptedPin: encrypted.encryptedPin, pinIv: encrypted.pinIv,
-              });
-            }
-          } catch { /* client Firestore also failed */ }
-        }
-      } catch { /* server store failed */ }
+      } catch { /* server store failed — localStorage encrypted PIN is fallback */ }
       setShowPinSetup(false);
       setRegPinDraft("");
       setRegPinConfirm("");

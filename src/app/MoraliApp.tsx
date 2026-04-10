@@ -28,7 +28,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { firebaseAuth, firebaseDb } from "@/lib/firebase";
-import { hashPin, generatePinSalt, encryptPinWithPassword, decryptPinWithPassword, verifyPin } from "@/lib/pin-utils";
+import { encryptPinWithPassword, decryptPinWithPassword } from "@/lib/pin-utils";
 import { logAdminAction } from "@/lib/admin-logger";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -3945,7 +3945,7 @@ function App() {
     const next = `${transferPin}${value}`.slice(0, 4);
     setTransferPin(next);
     if (next.length === 4) {
-      // ── SERVER-SIDE PIN VERIFICATION (with client-side fallback) ──
+      // ── SERVER-SIDE PIN VERIFICATION ──
       setPinVerifying(true);
       try {
         const res = await fetch("/api/verify-pin", {
@@ -3964,36 +3964,11 @@ function App() {
           return;
         }
         if (res.status === 503 || !res.ok) {
-          // Admin SDK unavailable — fall back to client-side verification
-          try {
-            const pinDoc = await getDoc(doc(firebaseDb, "pinRecords", authUid));
-            if (!pinDoc.exists()) {
-              showToast("Aucun code PIN enregistré");
-              setTransferPin("");
-              setPinVerifying(false);
-              return;
-            }
-            const record = pinDoc.data() as { pinHash?: string; salt?: string };
-            if (!record.pinHash || !record.salt) {
-              showToast("Données PIN corrompues");
-              setTransferPin("");
-              setPinVerifying(false);
-              return;
-            }
-            const isValid = await verifyPin(next, record.salt, record.pinHash);
-            if (!isValid) {
-              showToast("Code PIN incorrect");
-              setTransferPin("");
-              setPinVerifying(false);
-              return;
-            }
-          } catch (clientErr) {
-            console.error("[transferPin] Client verification failed:", clientErr);
-            showToast("Erreur de vérification PIN");
-            setTransferPin("");
-            setPinVerifying(false);
-            return;
-          }
+          // Server unavailable — cannot verify PIN securely
+          showToast("Service indisponible. Réessayez.");
+          setTransferPin("");
+          setPinVerifying(false);
+          return;
         } else if (!data.valid) {
           setTransferPin("");
           showToast("Code PIN incorrect");
@@ -4006,26 +3981,9 @@ function App() {
         // Small delay for visual transition, then execute
         setTimeout(() => executeTransfer(), 400);
       } catch {
-        // Network error — try client-side verification as last resort
-        try {
-          const pinDoc = await getDoc(doc(firebaseDb, "pinRecords", authUid));
-          if (pinDoc.exists()) {
-            const record = pinDoc.data() as { pinHash?: string; salt?: string };
-            if (record.pinHash && record.salt) {
-              const isValid = await verifyPin(next, record.salt, record.pinHash);
-              if (isValid) {
-                setTransferStage("processing");
-                setPinVerifying(false);
-                setTimeout(() => executeTransfer(), 400);
-                return;
-              }
-            }
-          }
-          showToast("Erreur de vérification PIN");
-        } catch {
-          showToast("Erreur de connexion");
-        }
+        showToast("Erreur de connexion");
         setTransferPin("");
+        setPinVerifying(false);
       } finally {
         // pinVerifying is cleared above for success path
         if (transferStage !== "processing") setPinVerifying(false);
@@ -4692,37 +4650,27 @@ function App() {
       showToast("Les codes PIN ne correspondent pas");
       return;
     }
-    // Hash PIN with salt before storing
+    // Send plaintext PIN to server; server hashes with bcrypt
     try {
-      const salt = await generatePinSalt();
-      const hash = await hashPin(cardPinDraft, salt);
       // Remove any legacy items
       window.localStorage.removeItem("morali_card_pin");
       window.localStorage.removeItem("morali_card_pin_hash");
       window.localStorage.removeItem("morali_card_pin_salt");
-      setSavedCardPinHash(hash);
-      setSavedCardPinSalt(salt);
       setSavedCardPin("••••");
       setSessionPinPlaintext(cardPinDraft);
       cardPinExistsRef.current = true;
       setCardPinRevealed(false);
       setCardPinPassword("");
-      // Store on server (source of truth)
+      // Store on server (source of truth — bcrypt)
       try {
         const token = await firebaseAuth.currentUser?.getIdToken();
         await fetch("/api/pin/store", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ pinHash: hash, salt }),
+          body: JSON.stringify({ pin: cardPinDraft }),
         });
       } catch { /* server store failed */ }
-      // Also store directly in Firestore as fallback
-      try {
-        const uid = firebaseAuth.currentUser?.uid;
-        if (uid) {
-          await setDoc(doc(firebaseDb, "pinRecords", uid), { pinHash: hash, salt }, { merge: true });
-        }
-      } catch { /* client Firestore also failed */ }
+      // Server is source of truth for PIN hash (bcrypt)
       setCardPinStage("menu");
       showToast("Code PIN de la carte enregistré");
     } catch {
@@ -4828,15 +4776,10 @@ function App() {
         const pinData = await pinRes.json();
         pinValid = !!pinData.valid;
       } catch {
-        // Fallback: verify against client Firestore directly
-        try {
-          const snap = await getDoc(doc(firebaseDb, "pinRecords", user.uid));
-          if (snap.exists()) {
-            const record = snap.data();
-            const checkHash = await hashPin(revealPinRaw, record.salt);
-            pinValid = checkHash === record.pinHash;
-          }
-        } catch { /* both methods failed */ }
+        showToast("Erreur de vérification");
+        setRevealPinRaw("");
+        setRevealPinVerifying(false);
+        return;
       }
 
       if (!pinValid) {
@@ -4896,11 +4839,7 @@ function App() {
         showToast("Ancien code PIN incorrect");
         return;
       }
-      // Save new PIN
-      const salt = await generatePinSalt();
-      const newHash = await hashPin(cardPinDraft, salt);
-      setSavedCardPinHash(newHash);
-      setSavedCardPinSalt(salt);
+      // Save new PIN (server hashes with bcrypt)
       setSavedCardPin("\u2022\u2022\u2022\u2022");
       setSessionPinPlaintext(cardPinDraft);
       cardPinExistsRef.current = true;
@@ -4913,7 +4852,7 @@ function App() {
           await fetch("/api/pin/store", {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ pinHash: newHash, salt, encryptedPin: encrypted.encryptedPin, pinIv: encrypted.pinIv }),
+            body: JSON.stringify({ pin: cardPinDraft, encryptedPin: encrypted.encryptedPin, pinIv: encrypted.pinIv }),
           });
         } catch { /* encryption failed, store without encrypted version */ }
       } else {
@@ -4922,17 +4861,11 @@ function App() {
           await fetch("/api/pin/store", {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ pinHash: newHash, salt }),
+            body: JSON.stringify({ pin: cardPinDraft }),
           });
         } catch { /* server store failed */ }
       }
-      // Also store directly in Firestore as fallback
-      try {
-        const uid = firebaseAuth.currentUser?.uid;
-        if (uid) {
-          await setDoc(doc(firebaseDb, "pinRecords", uid), { pinHash: newHash, salt }, { merge: true });
-        }
-      } catch { /* client Firestore also failed */ }
+      // Server is source of truth for PIN hash (bcrypt)
       setCardPinRevealed(false);
       setRevealedPinDigits("");
       setCardPinPassword("");
@@ -5018,29 +4951,19 @@ function App() {
         showToast("Non autorisé");
         return;
       }
-      const salt = await generatePinSalt();
-      const newHash = await hashPin(pinResetNewPin, salt);
-      // Save new PIN via reset endpoint
+      // Save new PIN via reset endpoint (server hashes with bcrypt)
       const res = await fetch("/api/pin/reset", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ pinHash: newHash, salt }),
+        body: JSON.stringify({ pin: pinResetNewPin }),
       });
       const data = await res.json();
       if (data.success) {
         // Update local state
-        setSavedCardPinHash(newHash);
-        setSavedCardPinSalt(salt);
         setSavedCardPin("\u2022\u2022\u2022\u2022");
         setSessionPinPlaintext(pinResetNewPin);
         cardPinExistsRef.current = true;
-        // Also try to store in client Firestore as fallback
-        try {
-          const uid = firebaseAuth.currentUser?.uid;
-          if (uid) {
-            await setDoc(doc(firebaseDb, "pinRecords", uid), { pinHash: newHash, salt }, { merge: true });
-          }
-        } catch { /* client Firestore also failed */ }
+        // Server is source of truth for PIN hash (bcrypt)
         // Reset state and go to menu
         resetPinResetState();
         setCardPinStage("menu");
@@ -5114,14 +5037,10 @@ function App() {
     }
     setRegPinSaving(true);
     try {
-      const salt = await generatePinSalt();
-      const hash = await hashPin(regPinDraft, salt);
-      // NOTE: hash/salt are NOT stored in localStorage — server is source of truth
+      // Send plaintext PIN to server; server hashes with bcrypt
       window.localStorage.removeItem("morali_card_pin");
       window.localStorage.removeItem("morali_card_pin_hash");
       window.localStorage.removeItem("morali_card_pin_salt");
-      setSavedCardPinHash(hash);
-      setSavedCardPinSalt(salt);
       setSavedCardPin("••••");
       setSessionPinPlaintext(regPinDraft); // Store in memory for reveal
       cardPinExistsRef.current = true;
@@ -5129,27 +5048,16 @@ function App() {
       const encrypted = await encryptPinWithPassword(regPinDraft, registerData.pw, firebaseAuth.currentUser?.uid || "");
       window.localStorage.setItem("morali_card_pin_encrypted", encrypted.encryptedPin);
       window.localStorage.setItem("morali_card_pin_iv", encrypted.pinIv);
-      // Store encrypted PIN on server
+      // Store plaintext PIN + encrypted version on server
       try {
         const token = await firebaseAuth.currentUser?.getIdToken();
-        const storeRes = await fetch("/api/pin/store", {
+        await fetch("/api/pin/store", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ pinHash: hash, salt, encryptedPin: encrypted.encryptedPin, pinIv: encrypted.pinIv }),
+          body: JSON.stringify({ pin: regPinDraft, encryptedPin: encrypted.encryptedPin, pinIv: encrypted.pinIv }),
         });
-        const storeData = await storeRes.json().catch(() => ({}));
-        // If server store failed (fallback), save PIN directly to client Firestore
-        if (!storeData.success || storeData.fallback) {
-          try {
-            const uid = firebaseAuth.currentUser?.uid;
-            if (uid) {
-              await setDoc(doc(firebaseDb, "pinRecords", uid), {
-                pinHash: hash, salt, encryptedPin: encrypted.encryptedPin, pinIv: encrypted.pinIv,
-              });
-            }
-          } catch { /* client Firestore also failed — localStorage is last resort */ }
-        }
-      } catch { /* server store failed, try client fallback */ }
+      } catch { /* server store failed */ }
+      // Server is source of truth for PIN hash (bcrypt)
       // Clear registration PIN states and go to success
       setShowPinSetup(false);
       setRegPinDraft("");

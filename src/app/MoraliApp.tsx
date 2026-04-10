@@ -56,6 +56,7 @@ import {
 } from "@/lib/helpers";
 import AuthView, { type ProfileFormData } from "@/components/bank/AuthView";
 import DashboardView from "@/components/bank/DashboardView";
+import NotificationsPanel from "@/components/bank/NotificationsPanel";
 
 // ── Local type aliases (sourced from @/types/morali) ──
 // AuthTab, ForgotStep, Screen, AdminTab, NavItem, TransactionType, RegisterData, etc.
@@ -11368,42 +11369,7 @@ function App() {
           </div>
         )}
 
-        {notificationsOpen && (
-          <div className={`notif-overlay ${notificationsOpen ? "open" : ""}`} onClick={() => setNotificationsOpen(false)}>
-            <div className="notif-panel" onClick={(event) => event.stopPropagation()}>
-              <div className="notif-panel-head">
-                <h3 className="notif-panel-title">Notifications</h3>
-                <button className="notif-panel-action" onClick={markAllNotificationsAsRead} disabled={unreadNotificationsCount === 0}>
-                  Tout lire
-                </button>
-              </div>
-
-              {notifications.length > 0 ? (
-                <div className="notif-panel-list">
-                  {notifications.map((item) => (
-                    <button key={item.id} className={`notif-panel-item ${item.read ? "read" : "unread"}`} onClick={() => markNotificationAsRead(item.id)}>
-                      <div className="notif-panel-ico" style={{ background: item.bg, color: item.icon === "morali" ? "#22c55e" : item.icon === "card" ? "#60a5fa" : item.icon === "shield" ? "#D4A437" : "#60a5fa" }}>
-                        <AppIcon name={item.icon} size={18} stroke="currentColor" />
-                      </div>
-                      <div className="notif-panel-body">
-                        <p className="notif-panel-item-title">{item.title}</p>
-                        <p className="notif-panel-item-time">{item.time}</p>
-                        <span className={`notif-panel-item-badge ${item.badgeClass}`}>{item.badge}</span>
-                      </div>
-                      {!item.read && <span className="notif-panel-unread" />}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="notif-panel-empty">Aucun message reçu.</div>
-              )}
-
-              <button className="notif-panel-close" onClick={() => setNotificationsOpen(false)}>
-                Fermer
-              </button>
-            </div>
-          </div>
-        )}
+        <NotificationsPanel notifications={notifications} open={notificationsOpen} unreadCount={unreadNotificationsCount} onClose={() => setNotificationsOpen(false)} onMarkAllRead={markAllNotificationsAsRead} onMarkRead={markNotificationAsRead} />
 
         {/* ── Device alert banner ── */}
         {deviceAlertShown && (

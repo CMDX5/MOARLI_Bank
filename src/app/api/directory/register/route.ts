@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ success: true, source: "admin" });
       } catch (adminErr) {
-        console.warn("[directory:register] Admin SDK failed, trying direct Firestore:", adminErr);
+        // Fallback: client will handle directory write directly
       }
     }
 

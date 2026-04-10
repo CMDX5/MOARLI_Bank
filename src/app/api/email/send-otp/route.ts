@@ -27,9 +27,7 @@ export async function POST(req: NextRequest) {
 
     if (DEMO_MODE) {
       // Demo mode: return code in response
-      if (process.env.NODE_ENV !== "production") {
-        console.log(`[EMAIL OTP DEMO] Email: ${email}, Code: ${code}`);
-      }
+      // SECURITY: OTP code never logged in any environment
       return NextResponse.json({
         success: true,
         message: "Code de test généré (mode démo)",

@@ -27,9 +27,7 @@ export async function POST(req: NextRequest) {
     setOtp(`reset:${email}`, code);
 
     if (DEMO_MODE) {
-      if (process.env.NODE_ENV !== "production") {
-        console.log(`[PASSWORD RESET DEMO] Email: ${email}, Code: ${code}`);
-      }
+      // SECURITY: OTP code never logged in any environment
       return NextResponse.json({
         success: true,
         message: "Code de test généré (mode démo)",

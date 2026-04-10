@@ -14,13 +14,15 @@ import { getAdminFirestore } from "@/lib/admin-firestore";
  * Returns 503 only if Admin SDK is not configured AND no cached result.
  */
 
-function formatResult(d: { uid: string; fullName?: string; pseudo?: string; moraliId?: string }) {
+function formatResult(d: { uid: string; fullName?: string; pseudo?: string; moraliId?: string; phone?: string }) {
   return {
     found: true,
     name: d.fullName || "Utilisateur",
     pseudo: d.pseudo?.startsWith("@") ? d.pseudo : `@${d.pseudo || ""}`,
     account: d.moraliId || "",
-    uid: d.uid,
+    // SECURITY: uid is NEVER exposed to client (prevents IDOR / user enumeration)
+    // SECURITY: phone is masked — only last 2 digits shown
+    ...(d.phone ? { phone: `******${String(d.phone).slice(-2)}` } : {}),
   };
 }
 
@@ -80,7 +82,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json(formatResult(lookupDoc.data()!));
       }
 
-      // Prefix search
+      // Prefix search — limited to 3 results max
       const prefixResults = await adminDb.collection("directoryLookup")
         .where("pseudo", ">=", normalizedPseudo)
         .where("pseudo", "<=", normalizedPseudo + "\uf8ff")
@@ -88,7 +90,9 @@ export async function GET(req: NextRequest) {
         .get();
 
       if (!prefixResults.empty) {
-        return NextResponse.json(formatResult(prefixResults.docs[0].data()!));
+        // SECURITY: return first match only — never expose full user list
+        const firstMatch = prefixResults.docs[0].data()!;
+        return NextResponse.json(formatResult(firstMatch));
       }
     }
 
@@ -123,11 +127,10 @@ export async function GET(req: NextRequest) {
             }
           }
 
-          return NextResponse.json(formatResult({ uid: d.uid, fullName: d.fullName, pseudo: d.pseudo, moraliId: d.moraliId }));
+          return NextResponse.json(formatResult({ uid: d.uid, fullName: d.fullName, pseudo: d.pseudo, moraliId: d.moraliId, phone: d.phone }));
         }
       }
-    } catch (fallbackErr) {
-      console.warn("[directory:search] moraliUsers fallback error:", fallbackErr);
+    } catch {
     }
 
     return NextResponse.json({ found: false });

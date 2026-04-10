@@ -2758,12 +2758,9 @@ function App() {
         if (pinDoc.exists()) {
           cardPinExistsRef.current = true;
           setSavedCardPinHash("server-stored");
-          console.log("[loadSettings] PIN found, cardPinExistsRef set to true");
-        } else {
-          console.log("[loadSettings] No PIN record found for", authUid);
         }
       } catch (pinErr) {
-        console.warn("[loadSettings] PIN check error:", pinErr);
+        console.error("[loadSettings] PIN check error:", pinErr);
       }
 
       try {
@@ -3365,7 +3362,6 @@ function App() {
         body: JSON.stringify(dirData),
       });
       if (!res.ok && retries > 0) {
-        console.warn(`[directory] Register failed (${res.status}), retrying... (${retries} left)`);
         await new Promise((r) => setTimeout(r, 1000));
         return publishDirectoryEntry(uid, data, retries - 1);
       }
@@ -3373,13 +3369,12 @@ function App() {
         const result = await res.json().catch(() => null);
         if (result?.source === "client_fallback" || !result?.success) {
           // Server told us to write directly — fall through to Method 2
-          console.warn("[directory] Server returned client_fallback, writing directly to Firestore");
         } else {
           return; // Success via Admin SDK
         }
       }
-    } catch (err) {
-      console.warn("[directory] API failed, writing directly to Firestore:", err);
+    } catch {
+      // API failed — falling back to direct Firestore write
     }
 
     // Method 2: Write directly to Firestore from client (guaranteed to work)
@@ -3400,7 +3395,6 @@ function App() {
         }, { merge: true }));
       }
       await Promise.all(batch);
-      console.log("[directory] Written directly to Firestore (client-side)");
     } catch (firestoreErr) {
       console.error("[directory] Firestore direct write failed:", firestoreErr);
     }
@@ -3475,7 +3469,6 @@ function App() {
     try {
       const lookupDoc = await getDoc(doc(firebaseDb, "directoryLookup", `morali_${moraliIdNorm}`));
       if (!lookupDoc.exists()) {
-        console.log("[directory] Repairing missing directoryLookup for", moraliIdNorm);
         await publishDirectoryEntry(uid, data);
       }
     } catch {
@@ -3534,7 +3527,7 @@ function App() {
         }
       }
     } catch (firestoreErr) {
-      console.warn("[directory] directoryLookup search failed:", firestoreErr);
+      console.error("[directory] directoryLookup search failed:", firestoreErr);
     }
 
     // Method 3: Fallback — search moraliUsers collection directly
@@ -3554,7 +3547,7 @@ function App() {
         }
       }
     } catch (err) {
-      console.warn("[directory] moraliUsers fallback search failed:", err);
+      console.error("[directory] moraliUsers fallback search failed:", err);
     }
 
     return { user: null, isSelf: false };
@@ -3668,7 +3661,6 @@ function App() {
 
       // FALLBACK: If Admin SDK was unavailable, write to serverNotifications (open read/write rules)
       if (usedFallback) {
-        console.warn("[createRealtimeNotification] Admin SDK fallback, writing to serverNotifications");
         await addDoc(collection(firebaseDb, "serverNotifications"), {
           ...item,
           targetUid,
@@ -3997,7 +3989,6 @@ function App() {
           }),
         });
         if (!creditRes.ok) {
-          console.warn("[transfer] API credit failed, client-side fallback");
           // Fallback 1: try direct Firestore (will fail if rules block it)
           try {
             const recipientRef = doc(firebaseDb, "moraliUsers", recipientUid);
@@ -4010,8 +4001,6 @@ function App() {
             });
           } catch {
             // Rules blocked — write pending credit directly via client Firestore
-            // (pendingCredits has open read/write rules: allow read, write: if request.auth != null)
-            console.warn("[transfer] Direct credit blocked by rules, creating pending credit");
             try {
               await addDoc(collection(firebaseDb, "pendingCredits"), {
                 recipientUid,
@@ -4114,7 +4103,6 @@ function App() {
         }
         if (res.status === 503 || !res.ok) {
           // Admin SDK unavailable — fall back to client-side verification
-          console.warn("[transferPin] Server unavailable, using client-side PIN verification");
           try {
             const pinDoc = await getDoc(doc(firebaseDb, "pinRecords", authUid));
             if (!pinDoc.exists()) {
@@ -6224,6 +6212,31 @@ function App() {
     setAdminLoginLoading(true);
     setAdminLoginError("");
     try {
+      // SECURITY: Step 0 — Server-side credential verification via API
+      // This adds a server-side gate: credentials are checked against ADMIN_EMAIL
+      // and ADMIN_PASSWORD_HASH env vars (bcrypt). Even if Firebase Auth is bypassed,
+      // the admin password must match the server-side hash.
+      try {
+        const loginRes = await fetch("/api/admin/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: adminLoginEmail, password: adminLoginPassword }),
+        });
+        const loginData = await loginRes.json();
+        if (!loginData.success) {
+          setAdminLoginError(loginData.error || "Identifiants incorrects.");
+          setAdminLoginLoading(false);
+          return;
+        }
+      } catch {
+        // API unreachable — allow fallback to Firebase Auth only in development
+        if (process.env.NODE_ENV === "production") {
+          setAdminLoginError("Service de connexion indisponible.");
+          setAdminLoginLoading(false);
+          return;
+        }
+      }
+
       // 1. Se connecter uniquement — jamais créer de compte
       const cred = await signInWithEmailAndPassword(firebaseAuth, adminLoginEmail, adminLoginPassword);
 
@@ -6563,7 +6576,6 @@ function App() {
       }
 
       // 2. Fallback: client-side Firestore deletion
-      console.warn("[adminDelete] API failed, using client-side fallback");
       await deleteDoc(doc(firebaseDb, "moraliUsers", uid));
       try { await deleteDoc(doc(firebaseDb, "pinRecords", uid)); } catch { }
       try { await deleteDoc(doc(firebaseDb, "kycRecords", uid)); } catch { }

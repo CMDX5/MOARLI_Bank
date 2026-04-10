@@ -23,6 +23,14 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <head>
+        {/* Sentry: inject client-side monitoring script */}
+        {process.env.NEXT_PUBLIC_SENTRY_DSN && (
+          <script
+            src="https://js.sentry-cdn.com/10.48.0/bundle.min.js"
+            crossOrigin="anonymous"
+            data-lazy="true"
+          />
+        )}
       </head>
       <body>
         {children}

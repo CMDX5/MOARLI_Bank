@@ -1,9 +1,10 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  // NOTE: Set to true because the 13K-line MoraliApp.tsx has some intentional `catch (err: any)` patterns.
-  // TODO: Remove when MoraliApp.tsx is split into modules and all types are strict.
+  // NOTE: Set to true because the MoraliApp.tsx has some intentional `catch (err: any)` patterns.
+  // TODO: Remove when all types are strict.
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -29,4 +30,13 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  // Disable automatic Sentry source map upload during development
+  silent: true,
+
+  // Disable automatic wrapping of API handlers (we do manual instrumentation)
+  automaticVercelMonitors: false,
+
+  // Only enable SentryWebpackPlugin in production builds
+  disableLogger: process.env.NODE_ENV !== "production",
+});

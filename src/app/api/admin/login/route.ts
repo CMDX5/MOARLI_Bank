@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
+import { captureError, captureSecurityEvent } from "@/lib/sentry";
 
 /**
  * Admin Login API — SERVER-SIDE CREDENTIAL VERIFICATION
@@ -63,8 +64,7 @@ export async function POST(req: NextRequest) {
     const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
 
     if (!adminEmail || !adminPasswordHash) {
-      // SECURITY: don't reveal that env vars are missing
-      console.error("[admin:login] ADMIN_EMAIL or ADMIN_PASSWORD_HASH not configured");
+      captureError(new Error("Admin credentials not configured"), { action: "admin:login", route: "/api/admin/login", level: "fatal" });
       return NextResponse.json(
         { success: false, error: "Service de connexion indisponible" },
         { status: 503 }
@@ -77,6 +77,7 @@ export async function POST(req: NextRequest) {
     const normalizedAdmin = adminEmail.toLowerCase().trim();
 
     if (normalizedInput !== normalizedAdmin) {
+      captureSecurityEvent("admin_login_email_mismatch", { ip: req.headers.get("x-forwarded-for") || undefined });
       return NextResponse.json(
         { success: false, error: "Identifiants incorrects" },
         { status: 401 }
@@ -88,6 +89,7 @@ export async function POST(req: NextRequest) {
     const isPasswordValid = await bcrypt.compare(password, adminPasswordHash);
 
     if (!isPasswordValid) {
+      captureSecurityEvent("admin_login_invalid_password", { ip: req.headers.get("x-forwarded-for") || undefined });
       return NextResponse.json(
         { success: false, error: "Identifiants incorrects" },
         { status: 401 }
@@ -99,7 +101,8 @@ export async function POST(req: NextRequest) {
       success: true,
       message: "Identifiants valides",
     });
-  } catch {
+  } catch (err) {
+    captureError(err, { action: "admin:login", route: "/api/admin/login" });
     return NextResponse.json(
       { success: false, error: "Erreur interne" },
       { status: 500 }

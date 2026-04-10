@@ -4,6 +4,7 @@ import { getAdminFirestore } from "@/lib/admin-firestore";
 import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
 import { validateBody, schemas } from "@/lib/validation";
+import { captureError, captureSecurityEvent } from "@/lib/sentry";
 
 export async function POST(req: NextRequest) {
   // Rate limit
@@ -39,6 +40,7 @@ export async function POST(req: NextRequest) {
       const callerDoc = await adminDb.collection("moraliUsers").doc(auth.uid).get();
       const callerRole = callerDoc.data()?.role;
       if (callerRole !== "admin") {
+        captureSecurityEvent("transaction_idor_attempt", { uid: auth.uid, details: { senderUid, recipientUid } });
         return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
       }
     }
@@ -79,10 +81,11 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({ success: true, id: docRef.id });
     } catch (err: unknown) {
-      console.error("[transactions/create] Error:", err);
+      captureError(err, { action: "transaction:create", route: "/api/transactions/create", uid: auth.uid, extra: { receiptId, senderUid, recipientUid, amount } });
       return NextResponse.json({ success: false, error: "Transaction failed" }, { status: 500 });
     }
-  } catch {
+  } catch (err) {
+    captureError(err, { action: "transaction:create:validation", route: "/api/transactions/create", uid: auth.uid });
     return NextResponse.json({ success: false, error: "Requête invalide" }, { status: 400 });
   }
 }

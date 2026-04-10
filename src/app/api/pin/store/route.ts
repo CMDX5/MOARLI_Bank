@@ -4,6 +4,7 @@ import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
 import { doc, setDoc } from "firebase-admin/firestore";
 import { validateBody, schemas } from "@/lib/validation";
+import { captureError, captureSecurityEvent } from "@/lib/sentry";
 
 export async function POST(req: NextRequest) {
   const clientId = getClientId(req);
@@ -39,7 +40,8 @@ export async function POST(req: NextRequest) {
     }, { merge: true });
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    captureError(err, { action: "pin:store", route: "/api/pin/store", uid: auth.uid, level: "error" });
     return NextResponse.json({ success: true, fallback: true });
   }
 }

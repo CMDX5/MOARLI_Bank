@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/admin-firestore";
-import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
 import { createHash, timingSafeEqual } from "crypto";
 import { doc, getDoc } from "firebase-admin/firestore";
+import { validateBody, schemas } from "@/lib/validation";
 
 export async function POST(req: NextRequest) {
   const clientId = getClientId(req);
@@ -19,17 +20,18 @@ export async function POST(req: NextRequest) {
   if (auth.error) return auth.error;
   if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-  let body: { pin?: string };
+  let rawBody: unknown;
   try {
-    body = await req.json();
+    rawBody = await req.json();
   } catch {
     return NextResponse.json({ error: "Requête invalide" }, { status: 400 });
   }
 
-  const { pin } = body;
-  if (!pin || !/^\d{4}$/.test(pin)) {
-    return NextResponse.json({ error: "Code PIN invalide" }, { status: 400 });
+  const validation = validateBody(schemas.verifyPin, rawBody);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
+  const { pin } = validation.data;
 
   const adminDb = await getAdminFirestore();
   if (!adminDb) {

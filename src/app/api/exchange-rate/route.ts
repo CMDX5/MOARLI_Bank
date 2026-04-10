@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 
 // TODO: Integrate real exchange rate API (e.g., Fixer.io, Open Exchange Rates, XE API)
 // For CFA (XAF) currencies: 1 XAF = fixed peg to EUR (1 EUR = 655.957 XAF)

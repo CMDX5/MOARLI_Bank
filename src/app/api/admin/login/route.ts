@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 
 /**
  * Admin Login API — SERVER-SIDE CREDENTIAL VERIFICATION

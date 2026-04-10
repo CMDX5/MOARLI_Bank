@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { verifyOtp } from "@/lib/otp-store";
+import { validateBody, schemas } from "@/lib/validation";
 
 export async function POST(req: NextRequest) {
   const clientId = getClientId(req);
@@ -10,12 +11,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
-    const { phone, code } = body;
-
-    if (!phone || !code || !/^\d{6}$/.test(code)) {
-      return NextResponse.json({ error: "Code invalide" }, { status: 400 });
+    const rawBody = await req.json();
+    const validation = validateBody(schemas.smsVerifyOtp, rawBody);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { phone, code } = validation.data;
 
     const result = verifyOtp(phone, code);
 

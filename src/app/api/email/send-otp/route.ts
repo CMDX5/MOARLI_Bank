@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomInt } from "crypto";
-import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { setOtp } from "@/lib/otp-store";
 
 // Set to true to enable demo mode (returns OTP in response for testing without Resend API)

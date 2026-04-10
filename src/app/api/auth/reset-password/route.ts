@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { getAdminAuth } from "@/lib/auth-verify";
+import { validateBody, schemas } from "@/lib/validation";
 
 /**
  * Reset the user's account password using Firebase Admin SDK.
@@ -15,16 +16,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
-    const { email, newPassword } = body;
-
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json({ error: "Email invalide" }, { status: 400 });
+    const rawBody = await req.json();
+    const validation = validateBody(schemas.authResetPassword, rawBody);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
-
-    if (!newPassword || newPassword.length < 8) {
-      return NextResponse.json({ error: "Le mot de passe doit contenir au moins 8 caractères" }, { status: 400 });
-    }
+    const { email, newPassword } = validation.data;
 
     const adminAuth = await getAdminAuth();
     if (!adminAuth) {

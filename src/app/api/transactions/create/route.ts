@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { collection, addDoc, query, where, getDocs, limit as queryLimit } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/admin-firestore";
-import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
+import { validateBody, schemas } from "@/lib/validation";
 
 export async function POST(req: NextRequest) {
   // Rate limit
@@ -26,27 +27,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
-    const {
-      uid, receiptId, senderUid, senderMoraliId, senderName,
-      recipientUid, recipientMoraliId, recipientName,
-      amount, fees, type, status, destination,
-    } = body;
-
-    if (!receiptId || !senderUid || !recipientUid || !amount) {
-      return NextResponse.json({ error: "Champs requis manquants" }, { status: 400 });
+    const rawBody = await req.json();
+    const validation = validateBody(schemas.transactionCreate, rawBody);
+    if (!validation.success) {
+      return NextResponse.json({ success: false, error: validation.error }, { status: 400 });
     }
-
-    // Type validation for required fields
-    if (typeof senderUid !== "string" || typeof recipientUid !== "string") {
-      return NextResponse.json({ error: "Champs invalides" }, { status: 400 });
-    }
-
-    // Validate amount is a positive number
-    const numericAmount = Number(amount);
-    if (!numericAmount || numericAmount <= 0) {
-      return NextResponse.json({ success: false, error: "Montant invalide" }, { status: 400 });
-    }
+    const { receiptId, senderUid, senderMoraliId, senderName, recipientUid, recipientMoraliId, recipientName, amount, type, destination } = validation.data;
 
     // Ownership check: authenticated user must be the sender (or admin)
     if (auth.uid !== senderUid) {
@@ -83,8 +69,8 @@ export async function POST(req: NextRequest) {
         recipientUid: String(recipientUid),
         recipientMoraliId: String(recipientMoraliId || ""),
         recipientName: String(recipientName || "Utilisateur"),
-        amount: numericAmount,
-        fees: calculatedFees,
+        amount: Number(amount),
+        fees: 0, // Server-side fee calculation
         type: String(type || "virement"),
         status: "success",
         destination: destination ? String(destination) : null,

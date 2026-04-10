@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { verifyOtp } from "@/lib/otp-store";
+import { validateBody, schemas } from "@/lib/validation";
 
 /**
  * Verify the reset code (OTP) sent by email.
@@ -14,12 +15,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
-    const { email, code } = body;
-
-    if (!email || !code || !/^\d{6}$/.test(code)) {
-      return NextResponse.json({ error: "Code invalide" }, { status: 400 });
+    const rawBody = await req.json();
+    const validation = validateBody(schemas.emailVerifyOtp, rawBody);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { email, code } = validation.data;
 
     const result = verifyOtp(`reset:${email}`, code);
 

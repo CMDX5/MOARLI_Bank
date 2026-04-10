@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/admin-firestore";
-import { rateLimitByIp, getClientId, rateLimit } from "@/lib/rate-limit";
+import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
 import { doc, setDoc } from "firebase-admin/firestore";
+import { validateBody, schemas } from "@/lib/validation";
 
 export async function POST(req: NextRequest) {
   const clientId = getClientId(req);
@@ -22,12 +23,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
-    const { encryptedPin, pinIv, pinHash, salt } = body;
-
-    if (!pinHash || !salt) {
-      return NextResponse.json({ error: "Données PIN manquantes" }, { status: 400 });
+    const rawBody = await req.json();
+    const validation = validateBody(schemas.pinStore, rawBody);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { encryptedPin, pinIv, pinHash, salt } = validation.data;
 
     const pinRef = doc(adminDb, "pinRecords", auth.uid);
     await setDoc(pinRef, {

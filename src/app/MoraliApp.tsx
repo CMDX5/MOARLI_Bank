@@ -4112,21 +4112,28 @@ function App() {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         });
-        const revealData = await revealRes.json();
-
-        if (revealData.success && revealData.pin && /^\d{4}$/.test(revealData.pin)) {
-          decrypted = revealData.pin;
-        } else if (revealData.encryptedPin) {
-          // Server returned the client-encrypted PIN — decrypt it with password
-          decrypted = await decryptPinWithPassword(revealData.encryptedPin, verifiedPw, uid);
+        if (revealRes.ok) {
+          const revealData = await revealRes.json();
+          if (revealData.success && revealData.pin && /^\d{4}$/.test(revealData.pin)) {
+            decrypted = revealData.pin;
+          } else if (revealData.encryptedPin) {
+            decrypted = await decryptPinWithPassword(revealData.encryptedPin, verifiedPw, uid);
+          }
         }
       } catch { /* server reveal failed, continue to fallback */ }
 
-      // 2b. Fallback: try localStorage encrypted PIN
+      // 2b. Fallback: try localStorage encrypted PIN (most reliable for fresh accounts)
       if (!decrypted) {
         const localEncrypted = window.localStorage.getItem("morali_card_pin_encrypted");
         if (localEncrypted) {
-          decrypted = await decryptPinWithPassword(localEncrypted, verifiedPw, uid);
+          try {
+            decrypted = await decryptPinWithPassword(localEncrypted, verifiedPw, uid);
+            if (decrypted) console.log("[PIN reveal] Decrypted from localStorage");
+          } catch (decErr) {
+            console.error("[PIN reveal] localStorage decrypt error:", decErr);
+          }
+        } else {
+          console.warn("[PIN reveal] No morali_card_pin_encrypted in localStorage");
         }
       }
 

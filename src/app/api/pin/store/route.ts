@@ -2,15 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/admin-firestore";
 import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
-// firebase-admin v13: doc/collection/query methods are on the Firestore instance (adminDb)
 import { validateBody, schemas } from "@/lib/validation";
 import { captureError } from "@/lib/sentry";
+import { encryptPinServerSide } from "@/lib/pin-server-crypto";
 
 /**
  * POST /api/pin/store
  *
  * Stores a PIN hash. The client sends a plaintext PIN; the server
  * hashes it with bcrypt (work factor 12) before storing.
+ * Also stores a server-side encrypted version for PIN reveal after auth.
  *
  * Accepts both new format (plaintext pin) and legacy format (pinHash+salt)
  * for backward compatibility during migration.
@@ -42,16 +43,20 @@ export async function POST(req: NextRequest) {
       const bcrypt = await import("bcryptjs");
       const pinBcrypt = await bcrypt.hash(rawBody.pin, 12);
 
+      // Also encrypt PIN server-side for reveal after auth
+      const serverEncryptedPin = encryptPinServerSide(rawBody.pin, auth.uid);
+
       const pinRef = adminDb.doc("pinRecords/" + auth.uid);
       await pinRef.set({
         pinBcrypt,
-        // Keep encrypted PIN fields if provided (for PIN reveal feature)
+        serverEncryptedPin,
+        // Keep client-encrypted PIN fields if provided (legacy)
         encryptedPin: rawBody.encryptedPin || null,
         pinIv: rawBody.pinIv || null,
         updatedAt: new Date().toISOString(),
       }, { merge: true });
 
-      return NextResponse.json({ success: true, bcrypt: true });
+      return NextResponse.json({ success: true, bcrypt: true, serverEncrypted: true });
     }
 
     // ── Legacy format: store as-is (SHA-256 hash from old client) ──

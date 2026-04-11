@@ -4037,52 +4037,87 @@ function App() {
     }
     setRevealVerifying(true);
     try {
-      // Use Firebase re-authentication (recommended over signInWithEmailAndPassword)
+      // Step 1: Firebase re-authentication
       const credential = EmailAuthProvider.credential(user.email, revealAccountPw.trim());
       await reauthenticateWithCredential(user, credential);
       const uid = user.uid;
-      let decrypted: string | null = null;
-      
-      // Try server first
+
+      // Step 2: Try server-side PIN reveal (encrypted with server key, no user password needed)
       try {
         const token = await user.getIdToken();
-        const res = await fetch("/api/pin/get-encrypted", {
+        const revealRes = await fetch("/api/pin/reveal", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         });
-        const data = await res.json();
-        if (data.hasEncrypted && data.encryptedPin) {
-          decrypted = await decryptPinWithPassword(data.encryptedPin, revealAccountPw.trim(), uid);
+        const revealData = await revealRes.json();
+
+        if (revealData.success && revealData.pin && /^\d{4}$/.test(revealData.pin)) {
+          // Server returned the PIN directly — show it immediately!
+          setRevealedPinDigits(revealData.pin.split("").join(" "));
+          setCardPinRevealed(true);
+          setRevealAttempts(0);
+          setRevealLockedUntil(0);
+          setRevealAccountPw("");
+          setRevealNeedsPin(false);
+          setRevealPinRaw("");
+          setRevealVerifiedPw("");
+          setSessionPinPlaintext(revealData.pin);
+          showToast("Code PIN affiché");
+          return;
         }
-      } catch { /* fallback to localStorage */ }
-      
-      // Fallback to localStorage
-      if (!decrypted) {
-        const localEncrypted = window.localStorage.getItem("morali_card_pin_encrypted");
-        if (localEncrypted) {
-          decrypted = await decryptPinWithPassword(localEncrypted, revealAccountPw.trim(), uid);
+
+        // If server has a password-encrypted version, try decrypting with user's password
+        if (revealData.needsPassword && revealData.encryptedPin) {
+          const decrypted = await decryptPinWithPassword(revealData.encryptedPin, revealAccountPw.trim(), uid);
+          if (decrypted && /^\d{4}$/.test(decrypted)) {
+            setRevealedPinDigits(decrypted.split("").join(" "));
+            setCardPinRevealed(true);
+            setRevealAttempts(0);
+            setRevealLockedUntil(0);
+            setRevealAccountPw("");
+            setRevealNeedsPin(false);
+            setRevealPinRaw("");
+            setRevealVerifiedPw("");
+            showToast("Code PIN affiché");
+            return;
+          }
+        }
+
+        // If PIN needs migration (created before encryption), ask user to enter PIN once
+        if (revealData.needsPinMigration) {
+          setRevealVerifiedPw(revealAccountPw.trim());
+          setRevealAccountPw("");
+          setRevealNeedsPin(true);
+          setRevealPinRaw("");
+          showToast("Saisissez votre PIN pour confirmer votre identité.");
+          return;
+        }
+      } catch { /* server reveal failed, continue to fallback */ }
+
+      // Step 3: Fallback — try localStorage encrypted PIN
+      const localEncrypted = window.localStorage.getItem("morali_card_pin_encrypted");
+      if (localEncrypted) {
+        const decrypted = await decryptPinWithPassword(localEncrypted, revealAccountPw.trim(), uid);
+        if (decrypted && /^\d{4}$/.test(decrypted)) {
+          setRevealedPinDigits(decrypted.split("").join(" "));
+          setCardPinRevealed(true);
+          setRevealAttempts(0);
+          setRevealLockedUntil(0);
+          setRevealAccountPw("");
+          setRevealNeedsPin(false);
+          setRevealPinRaw("");
+          setRevealVerifiedPw("");
+          showToast("Code PIN affiché");
+          return;
         }
       }
-      
-      if (decrypted && /^\d{4}$/.test(decrypted)) {
-        // PIN successfully decrypted from encrypted storage
-        setRevealedPinDigits(decrypted.split("").join(" "));
-        setCardPinRevealed(true);
-        setRevealAttempts(0);
-        setRevealLockedUntil(0);
-        setRevealAccountPw("");
-        setRevealNeedsPin(false);
-        setRevealPinRaw("");
-        setRevealVerifiedPw("");
-        showToast("Code PIN affiché");
-      } else {
-        // PIN not encrypted yet — ask user to enter their PIN to verify + encrypt
-        setRevealVerifiedPw(revealAccountPw.trim());
-        setRevealAccountPw("");
-        setRevealNeedsPin(true);
-        setRevealPinRaw("");
-        showToast("Saisissez votre PIN pour confirmer votre identité.");
-      }
+
+      // Step 4: Last resort — ask user to enter PIN for migration
+      setRevealVerifiedPw(revealAccountPw.trim());
+      setRevealAccountPw("");
+      setRevealNeedsPin(true);
+      setRevealPinRaw("");
+      showToast("Saisissez votre PIN pour confirmer votre identité.");
     } catch (err: unknown) {
       const code = err instanceof Error ? (err as { code?: string }).code || "" : "";
       const newAttempts = revealAttempts + 1;
@@ -4142,24 +4177,20 @@ function App() {
         setRevealPinVerifying(false);
         return;
       }
-      // PIN is correct — encrypt it with verified password
+      // PIN is correct — encrypt it with verified password + store server-side encrypted version
       const uid = user.uid;
       const encrypted = await encryptPinWithPassword(revealPinRaw, revealVerifiedPw, uid);
       window.localStorage.setItem("morali_card_pin_encrypted", encrypted.encryptedPin);
       window.localStorage.setItem("morali_card_pin_iv", encrypted.pinIv);
-      // Store encrypted PIN on server
+      // Store on server: bcrypt already exists, add server-encrypted + client-encrypted versions
       try {
         const token = await user.getIdToken();
         await fetch("/api/pin/store", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ encryptedPin: encrypted.encryptedPin, pinIv: encrypted.pinIv }),
+          body: JSON.stringify({ pin: revealPinRaw, encryptedPin: encrypted.encryptedPin, pinIv: encrypted.pinIv }),
         });
       } catch { /* server store failed, localStorage is enough */ }
-      // Also store in client Firestore as fallback
-      try {
-        await setDoc(doc(firebaseDb, "pinRecords", uid), { encryptedPin: encrypted.encryptedPin, pinIv: encrypted.pinIv }, { merge: true });
-      } catch { /* client Firestore also failed */ }
       // Show PIN
       setRevealedPinDigits(revealPinRaw.split("").join(" "));
       setCardPinRevealed(true);

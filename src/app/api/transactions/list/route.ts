@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, where, getDocs, limit as queryLimit, orderBy } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/admin-firestore";
-import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
+import { rateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
 
 /**
@@ -14,9 +14,15 @@ import { requireAuth } from "@/lib/auth-verify";
  * - Results capped at 50 per query
  */
 export async function GET(req: NextRequest) {
-  // ── Rate limit ──
-  const clientId = getClientId(req);
-  const rl = rateLimitByIp(`tx:list:${clientId}`, { maxRequests: 30, windowSec: 60 });
+  // ── Auth: extract uid from Firebase token ONLY ──
+  const auth = await requireAuth(req);
+  if (auth.error) return auth.error;
+  if (!auth.uid) {
+    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  }
+
+  // ── Rate limit (uid-based, after auth) ──
+  const rl = await rateLimit(auth.uid, "tx:list", { maxRequests: 30, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Trop de requêtes" },
@@ -25,13 +31,6 @@ export async function GET(req: NextRequest) {
         headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
       }
     );
-  }
-
-  // ── Auth: extract uid from Firebase token ONLY ──
-  const auth = await requireAuth(req);
-  if (auth.error) return auth.error;
-  if (!auth.uid) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
 
   const secureUid = auth.uid; // ONLY from verified token — never from body/query

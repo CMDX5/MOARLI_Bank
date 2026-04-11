@@ -1,23 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { collection, addDoc } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/admin-firestore";
-import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
+import { rateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
 
 export async function POST(req: NextRequest) {
-  // Rate limit
-  const clientId = getClientId(req);
-  const rl = rateLimitByIp(`notif:create:${clientId}`, { maxRequests: 30, windowSec: 60 });
+  // Auth
+  const auth = await requireAuth(req);
+  if (auth.error) return auth.error;
+
+  // Rate limit (uid-based, after auth)
+  const rl = await rateLimit(auth.uid, "notif:create", { maxRequests: 30, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Trop de requêtes. Réessayez plus tard." },
       { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
     );
   }
-
-  // Auth
-  const auth = await requireAuth(req);
-  if (auth.error) return auth.error;
 
   try {
     const body = await req.json();

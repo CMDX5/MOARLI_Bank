@@ -1,23 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
+import { rateLimit } from "@/lib/rate-limit";
 import { requireAdmin } from "@/lib/auth-verify";
 import { getAdminFirestore } from "@/lib/admin-firestore";
 
 export async function POST(req: NextRequest) {
-  // Rate limit — stricter for destructive operations
-  const clientId = getClientId(req);
-  const rl = rateLimitByIp(`admin:log:${clientId}`, { maxRequests: 10, windowSec: 60 });
+  // SECURITY: Firebase Custom Claims
+  const auth = await requireAdmin(req);
+  if (auth.error) return auth.error;
+  if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+  // Rate limit (uid-based, after auth) — stricter for destructive operations
+  const rl = await rateLimit(auth.uid, "admin:log:POST", { maxRequests: 10, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de requêtes" }, {
       status: 429,
       headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
     });
   }
-
-  // SECURITY: Firebase Custom Claims
-  const auth = await requireAdmin(req);
-  if (auth.error) return auth.error;
-  if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
   const adminDb = await getAdminFirestore();
   if (!adminDb) return NextResponse.json({ error: "Service indisponible" }, { status: 503 });
@@ -150,19 +149,19 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const clientId = getClientId(req);
-  const rl = rateLimitByIp(`admin:log:get:${clientId}`, { maxRequests: 60, windowSec: 60 });
+  // SECURITY: Firebase Custom Claims
+  const auth = await requireAdmin(req);
+  if (auth.error) return auth.error;
+  if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+  // Rate limit (uid-based, after auth)
+  const rl = await rateLimit(auth.uid, "admin:log:GET", { maxRequests: 60, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de requêtes" }, {
       status: 429,
       headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
     });
   }
-
-  // SECURITY: Firebase Custom Claims
-  const auth = await requireAdmin(req);
-  if (auth.error) return auth.error;
-  if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
   const adminDb = await getAdminFirestore();
   if (!adminDb) return NextResponse.json({ error: "Service indisponible" }, { status: 503 });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/admin-firestore";
-import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
+import { rateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
 import { doc, setDoc } from "firebase-admin/firestore";
 import { validateBody, schemas } from "@/lib/validation";
@@ -16,15 +16,15 @@ import { captureError } from "@/lib/sentry";
  * for backward compatibility during migration.
  */
 export async function POST(req: NextRequest) {
-  const clientId = getClientId(req);
-  const rl = rateLimitByIp(`pin:reset:${clientId}`, { maxRequests: 3, windowSec: 300 });
-  if (!rl.allowed) {
-    return NextResponse.json({ error: "Trop de tentatives. Réessayez dans 5 minutes." }, { status: 429 });
-  }
-
   const auth = await requireAuth(req);
   if (auth.error) return auth.error;
   if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+  // Rate limit (uid-based, after auth)
+  const rl = await rateLimit(auth.uid, "pin:reset", { maxRequests: 3, windowSec: 300 });
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Trop de tentatives. Réessayez dans 5 minutes." }, { status: 429 });
+  }
 
   const adminDb = await getAdminFirestore();
   if (!adminDb) {

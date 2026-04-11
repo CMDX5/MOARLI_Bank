@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { collection, addDoc, doc, getDoc, getDocs, deleteDoc, query, where, orderBy, limit as queryLimit } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/admin-firestore";
-import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
+import { rateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
 
 /**
@@ -16,19 +16,18 @@ import { requireAuth } from "@/lib/auth-verify";
 
 // GET: Fetch pending credits for a recipient
 export async function GET(req: NextRequest) {
-  // ── Rate limit: 60 reads/min ──
-  const clientId = getClientId(req);
-  const rl = rateLimitByIp(`pending-credit:GET:${clientId}`, { maxRequests: 60, windowSec: 60 });
+  const auth = await requireAuth(req);
+  if (auth.error) return auth.error;
+  if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+  // ── Rate limit (uid-based, after auth): 60 reads/min ──
+  const rl = await rateLimit(auth.uid, "pending-credit:GET", { maxRequests: 60, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de requêtes" }, {
       status: 429,
       headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
     });
   }
-
-  const auth = await requireAuth(req);
-  if (auth.error) return auth.error;
-  if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
   try {
     const uid = req.nextUrl.searchParams.get("uid");
@@ -74,19 +73,18 @@ export async function GET(req: NextRequest) {
 
 // POST: Create a new pending credit
 export async function POST(req: NextRequest) {
-  // ── Rate limit: 20 writes/min ──
-  const clientId = getClientId(req);
-  const rl = rateLimitByIp(`pending-credit:POST:${clientId}`, { maxRequests: 20, windowSec: 60 });
+  const auth = await requireAuth(req);
+  if (auth.error) return auth.error;
+  if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+  // ── Rate limit (uid-based, after auth): 20 writes/min ──
+  const rl = await rateLimit(auth.uid, "pending-credit:POST", { maxRequests: 20, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de requêtes" }, {
       status: 429,
       headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
     });
   }
-
-  const auth = await requireAuth(req);
-  if (auth.error) return auth.error;
-  if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
   try {
     let body: { recipientUid?: string; amount?: number; senderName?: string; senderMoraliId?: string; receiptId?: string };
@@ -158,19 +156,18 @@ export async function POST(req: NextRequest) {
 
 // DELETE: Delete a pending credit by id
 export async function DELETE(req: NextRequest) {
-  // ── Rate limit: 30 deletes/min ──
-  const clientId = getClientId(req);
-  const rl = rateLimitByIp(`pending-credit:DELETE:${clientId}`, { maxRequests: 30, windowSec: 60 });
+  const auth = await requireAuth(req);
+  if (auth.error) return auth.error;
+  if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+  // ── Rate limit (uid-based, after auth): 30 deletes/min ──
+  const rl = await rateLimit(auth.uid, "pending-credit:DELETE", { maxRequests: 30, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de requêtes" }, {
       status: 429,
       headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
     });
   }
-
-  const auth = await requireAuth(req);
-  if (auth.error) return auth.error;
-  if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
   try {
     let body: { id?: string };
@@ -221,18 +218,18 @@ export async function DELETE(req: NextRequest) {
 // - Amount comes from the Firestore document, NOT from the request body
 // - Uses Firestore runTransaction() for atomic balance credit + status update
 export async function PUT(req: NextRequest) {
-  const clientId = getClientId(req);
-  const rl = rateLimitByIp(`pending-credit:PUT:${clientId}`, { maxRequests: 10, windowSec: 60 });
+  const auth = await requireAuth(req);
+  if (auth.error) return auth.error;
+  if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+  // Rate limit (uid-based, after auth)
+  const rl = await rateLimit(auth.uid, "pending-credit:PUT", { maxRequests: 10, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de requêtes" }, {
       status: 429,
       headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
     });
   }
-
-  const auth = await requireAuth(req);
-  if (auth.error) return auth.error;
-  if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
   try {
     const body = await req.json();

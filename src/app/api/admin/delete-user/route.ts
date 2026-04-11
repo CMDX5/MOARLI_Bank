@@ -1,22 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
+import { rateLimit } from "@/lib/rate-limit";
 import { requireAdmin } from "@/lib/auth-verify";
 import { getAdminFirestore } from "@/lib/admin-firestore";
 
 export async function POST(req: NextRequest) {
-  // Rate limit
-  const clientId = getClientId(req);
-  const rl = rateLimitByIp(`admin:delete-user:${clientId}`, { maxRequests: 5, windowSec: 60 });
+  // SECURITY: Firebase Custom Claims
+  const auth = await requireAdmin(req);
+  if (auth.error) return auth.error;
+
+  // Rate limit (uid-based, after auth)
+  const rl = await rateLimit(auth.uid, "admin:delete-user", { maxRequests: 5, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Trop de requêtes. Réessayez plus tard." },
       { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
     );
   }
-
-  // SECURITY: Firebase Custom Claims
-  const auth = await requireAdmin(req);
-  if (auth.error) return auth.error;
 
   // Get Admin Firestore
   const adminDb = await getAdminFirestore();

@@ -1,25 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { collection, addDoc, query, where, getDocs, limit as queryLimit } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/admin-firestore";
-import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
+import { rateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
 import { validateBody, schemas } from "@/lib/validation";
 import { captureError, captureSecurityEvent } from "@/lib/sentry";
 
 export async function POST(req: NextRequest) {
-  // Rate limit
-  const clientId = getClientId(req);
-  const rl = rateLimitByIp(`tx:create:${clientId}`, { maxRequests: 30, windowSec: 60 });
+  // Auth
+  const auth = await requireAuth(req);
+  if (auth.error) return auth.error;
+
+  // Rate limit (uid-based, after auth)
+  const rl = await rateLimit(auth.uid, "tx:create", { maxRequests: 30, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json(
       { error: "Trop de requêtes. Réessayez plus tard." },
       { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } }
     );
   }
-
-  // Auth
-  const auth = await requireAuth(req);
-  if (auth.error) return auth.error;
 
   // Get Admin Firestore early (needed for ownership check + transaction write)
   const adminDb = await getAdminFirestore();

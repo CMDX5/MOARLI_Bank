@@ -32,21 +32,32 @@ export async function getAdminAuth(): Promise<import("firebase-admin/auth").Auth
     if (existsSync(localKeyPath)) {
       const keyData = JSON.parse(readFileSync(localKeyPath, "utf-8"));
       credential = cert(keyData);
+      console.log("[adminAuth] Loaded from local service-account-key.json");
     }
 
     if (!credential && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
       const envVal = process.env.GOOGLE_APPLICATION_CREDENTIALS;
       if (envVal.startsWith("{")) {
-        credential = cert(JSON.parse(envVal));
+        console.log("[adminAuth] Parsing GOOGLE_APPLICATION_CREDENTIALS as JSON (length:", envVal.length, ")");
+        const parsed = JSON.parse(envVal);
+        console.log("[adminAuth] Parsed. project_id:", parsed.project_id, "client_email:", parsed.client_email);
+        credential = cert(parsed);
+        console.log("[adminAuth] Credential created from env var");
       } else if (existsSync(envVal)) {
+        console.log("[adminAuth] Loading GOOGLE_APPLICATION_CREDENTIALS as file path:", envVal);
         const keyData = JSON.parse(readFileSync(envVal, "utf-8"));
         credential = cert(keyData);
+      } else {
+        console.warn("[adminAuth] GOOGLE_APPLICATION_CREDENTIALS set but doesn't start with '{' and file doesn't exist. Value starts with:", envVal.substring(0, 30));
       }
+    } else if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      console.warn("[adminAuth] GOOGLE_APPLICATION_CREDENTIALS env var is NOT set");
     }
 
     if (credential) {
       if (getApps().length === 0) {
         initializeApp({ credential });
+        console.log("[adminAuth] Firebase Admin initialized successfully");
       }
       adminAuth = getAuth();
       adminInitResult = true;
@@ -54,9 +65,11 @@ export async function getAdminAuth(): Promise<import("firebase-admin/auth").Auth
     }
 
     adminInitResult = false;
+    console.error("[adminAuth] No credential found — Admin SDK not initialized");
     return null;
-  } catch {
+  } catch (err) {
     adminInitResult = false;
+    console.error("[adminAuth] FAILED to initialize:", err instanceof Error ? err.message : err);
     return null;
   }
 }

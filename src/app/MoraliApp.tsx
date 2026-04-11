@@ -3965,16 +3965,38 @@ function App() {
     setCardManageOpen(false);
   };
 
-  const openPinModal = () => {
-    // PIN existence is tracked via cardPinExistsRef (set during registration/change or server check)
-    // No longer reading from localStorage — server is source of truth
+  const openPinModal = async () => {
+    // Always verify PIN existence from Firestore (source of truth) before deciding stage.
+    // This avoids race condition where cardPinExistsRef hasn't been set yet by the async useEffect.
     setCardPinOpen(true);
     setCardPinRevealed(false);
     setCardPinPassword("");
     setRevealAccountPw("");
     setCardPinDraft("");
     setCardPinConfirm("");
-    setCardPinStage(cardPinExistsRef.current ? "menu" : "setup");
+    setRevealNeedsPin(false);
+    setRevealPinRaw("");
+    setRevealVerifiedPw("");
+
+    if (cardPinExistsRef.current) {
+      // Already verified — skip Firestore round-trip
+      setCardPinStage("menu");
+      return;
+    }
+
+    const uid = firebaseAuth.currentUser?.uid;
+    if (uid) {
+      try {
+        const pinDoc = await getDoc(doc(firebaseDb, "pinRecords", uid));
+        if (pinDoc.exists()) {
+          cardPinExistsRef.current = true;
+          setSavedCardPinHash("server-stored");
+          setCardPinStage("menu");
+          return;
+        }
+      } catch { /* Firestore read failed — fall through to setup */ }
+    }
+    setCardPinStage("setup");
   };
 
   const closePinModal = () => {
@@ -3983,7 +4005,12 @@ function App() {
     setCardPinPassword("");
     setCardPinDraft("");
     setCardPinConfirm("");
-    setCardPinStage(savedCardPinHash ? "menu" : "setup");
+    setRevealNeedsPin(false);
+    setRevealPinRaw("");
+    setRevealVerifiedPw("");
+    setRevealAccountPw("");
+    // Use cardPinExistsRef as source of truth (consistent with openPinModal)
+    setCardPinStage(cardPinExistsRef.current ? "menu" : "setup");
   };
 
   const saveCardPinCode = async () => {

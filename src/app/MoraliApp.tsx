@@ -62,6 +62,8 @@ import QrScanner from "@/components/bank/QrScanner";
 import CardsView from "@/components/bank/CardsView";
 import TransactionsView from "@/components/bank/TransactionsView";
 import TransferView from "@/components/bank/TransferView";
+import LegalTerms from "@/components/bank/LegalTerms";
+import PrivacyPolicy from "@/components/bank/PrivacyPolicy";
 
 // ── All types are imported from @/types/morali ──
 // AuthTab, ForgotStep, Screen, AdminTab, NavItem, TransactionType, RegisterData, IconName,
@@ -717,6 +719,12 @@ body.lock-scroll{overflow:hidden;position:fixed}
 .bc-btn-full{width:100%;height:52px;border-radius:16px;font-size:14px;font-weight:800;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;border:none;background:linear-gradient(135deg,rgba(212,164,55,.2),rgba(212,164,55,.08));color:#D4A437;border:1px solid rgba(212,164,55,.25)}
 .bc-btn-full:active{transform:scale(.97)}
 .bc-btn-full:disabled{opacity:.5;cursor:not-allowed}
+.legal-modal{max-width:430px !important;padding:20px 18px calc(12px + env(safe-area-inset-bottom,0px)) !important;gap:0 !important}
+.legal-modal-close{position:absolute;top:16px;right:18px;z-index:10;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);color:#94a3b8;font-size:18px;cursor:pointer}
+.privacy-tabs{display:flex;gap:4px;background:rgba(255,255,255,.03);border-radius:12px;padding:4px;margin-bottom:4px}
+.privacy-tab{flex:1;padding:10px 8px;border:none;border-radius:10px;font-size:12px;font-weight:700;color:#64748b;background:transparent;cursor:pointer;transition:all .2s ease;font-family:inherit}
+.privacy-tab.active{background:rgba(59,130,246,.12);color:#60a5fa;border:1px solid rgba(59,130,246,.2)}
+.privacy-tab:not(.active){border:1px solid transparent}
 .bc-notice{padding:14px 16px;border-radius:16px;background:rgba(212,164,55,.04);border:1px solid rgba(212,164,55,.1);display:flex;align-items:flex-start;gap:10px}
 .bc-notice svg{flex-shrink:0;color:rgba(212,164,55,.7);margin-top:1px}
 .bc-notice-text{font-size:11px;color:#94a3b8;line-height:1.5}
@@ -1745,6 +1753,7 @@ function App() {
   const [changePwConfirm, setChangePwConfirm] = useState("");
   const [changePwLoading, setChangePwLoading] = useState(false);
   const [privacyModalOpen, setPrivacyModalOpen] = useState(false);
+  const [privacyTab, setPrivacyTab] = useState<"policy" | "settings">("policy");
   const [cameraScannerOpen, setCameraScannerOpen] = useState(false);
   const [scannerStatus, setScannerStatus] = useState<"idle" | "scanning" | "found" | "error">("idle");
   const [scannedData, setScannedData] = useState<string | null>(null);
@@ -9310,22 +9319,9 @@ function App() {
 
         {termsOpen && (
           <div className="card-modal-overlay" onClick={closeTermsModal}>
-            <div className="bc-modal" onClick={(event) => event.stopPropagation()}>
-              <div className="bc-head">
-                <div className="bc-head-left">
-                  <div className="bc-kicker">Légal</div>
-                  <div className="bc-title">Conditions d’utilisation</div>
-                  <div className="bc-subtitle">Cadre simplifié des engagements et responsabilités liés à l’usage de Morali Pay.</div>
-                </div>
-                <button className="bc-close" onClick={closeTermsModal} aria-label="Fermer">&times;</button>
-              </div>
-              <div className="card-manage-stack">
-                <div className="card-setting-row"><div><div className="card-setting-title">Accès au compte</div><div className="card-setting-copy">Vous êtes responsable de la confidentialité de vos identifiants, mots de passe et codes PIN.</div></div></div>
-                <div className="card-setting-row"><div><div className="card-setting-title">Validation des opérations</div><div className="card-setting-copy">Toute opération validée dans l’application est réputée initiée par le titulaire du compte.</div></div></div>
-                <div className="card-setting-row"><div><div className="card-setting-title">Conformité réglementaire</div><div className="card-setting-copy">Morali Pay applique un cadre de conformité aligné sur les obligations locales et sous-régionales (CEMAC).</div></div></div>
-                <div className="card-setting-row"><div><div className="card-setting-title">Disponibilité</div><div className="card-setting-copy">Le service peut être temporairement indisponible lors de maintenance, incident réseau ou obligations de sécurité.</div></div></div>
-              </div>
-              <button className="bc-btn-full" onClick={() => { closeTermsModal(); showToast("Conditions consultées"); }}>J’ai compris</button>
+            <div className="bc-modal legal-modal" onClick={(event) => event.stopPropagation()}>
+              <button className="bc-close legal-modal-close" onClick={closeTermsModal} aria-label="Fermer">&times;</button>
+              <LegalTerms mode="modal" onAccept={() => { closeTermsModal(); showToast("Conditions acceptées"); }} />
             </div>
           </div>
         )}
@@ -9770,16 +9766,23 @@ function App() {
 
         {privacyModalOpen && (
           <div className="card-modal-overlay" onClick={closePrivacyModal}>
-            <div className="bc-modal" onClick={(event) => event.stopPropagation()}>
-              <div className="bc-head">
-                <div className="bc-head-left">
-                  <div className="bc-kicker">Confidentialité</div>
-                  <div className="bc-title">Confidentialité</div>
-                  <div className="bc-subtitle">Gérez la visibilité de votre profil, le masquage des activités et vos préférences de partage de données.</div>
-                </div>
-                <button className="bc-close" onClick={closePrivacyModal} aria-label="Fermer">&times;</button>
+            <div className="bc-modal legal-modal" onClick={(event) => event.stopPropagation()}>
+              <button className="bc-close legal-modal-close" onClick={closePrivacyModal} aria-label="Fermer">&times;</button>
+              <div className="privacy-tabs">
+                <button className={`privacy-tab ${privacyTab === "policy" ? "active" : ""}`} onClick={() => setPrivacyTab("policy")}>Politique</button>
+                <button className={`privacy-tab ${privacyTab === "settings" ? "active" : ""}`} onClick={() => setPrivacyTab("settings")}>Paramètres</button>
               </div>
-
+              {privacyTab === "policy" ? (
+                <PrivacyPolicy mode="modal" />
+              ) : (
+                <>
+                  <div className="bc-head" style={{paddingTop: 0}}>
+                    <div className="bc-head-left">
+                      <div className="bc-kicker">Confidentialité</div>
+                      <div className="bc-title">Paramètres de confidentialité</div>
+                      <div className="bc-subtitle">Gérez la visibilité de votre profil et vos préférences de partage.</div>
+                    </div>
+                  </div>
               <div className="security-modal-grid">
                 <div className="security-feature">
                   <div>
@@ -9840,6 +9843,8 @@ function App() {
               <button className={`btn-save-elite ${privacySaveState === "saving" ? "saving ripple" : privacySaveState === "saved" ? "saved" : ""}`} onClick={savePrivacySettings} disabled={privacySaveState !== "idle"}>
                 {privacySaveState === "saving" ? "Enregistrement..." : privacySaveState === "saved" ? "Enregistré" : "Enregistrer la confidentialité"}
               </button>
+                </>
+              )}
             </div>
           </div>
         )}

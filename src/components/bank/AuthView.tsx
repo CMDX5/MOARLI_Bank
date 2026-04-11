@@ -869,7 +869,7 @@ export default function AuthView({
                   <svg viewBox="0 0 12 12" fill="none" stroke="white" strokeWidth="2.5" aria-hidden="true"><polyline points="1,6 4.5,9.5 11,2" /></svg>
                 </div>
                 <div className="check-label">
-                  J&apos;accepte les <span className="linkish">Conditions Générales</span> et la <span className="linkish">Politique de Confidentialité</span> de Morali Pay
+                  J&apos;accepte les <span className="linkish">Conditions Générales d&apos;Utilisation</span> et la <span className="linkish">Politique de Confidentialité</span> de Morali Pay — Conforme CEMAC, COBAC, BEAC (République du Congo)
                 </div>
               </div>
               <div style={{ display: "flex", gap: 10 }}>

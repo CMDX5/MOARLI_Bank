@@ -37,7 +37,11 @@ export async function POST(req: NextRequest) {
     // ALWAYS use Admin SDK to write to the TARGET user's notifications
     // (bypasses client rules that only allow write to own doc)
     const targetUid = String(uid);
-    const sanitize = (s: string) => String(s || "").slice(0, 200);
+    const sanitize = (s: string) => String(s || "")
+      .slice(0, 200)
+      .replace(/<[^>]*>/g, "")    // Strip HTML tags
+      .replace(/&[^;]+;/g, "")    // Strip HTML entities
+      .replace(/['"\\]/g, "");    // Strip quotes and backslashes
 
     await addDoc(collection(adminDb, "users", targetUid, "notifications"), {
       title: sanitize(title),

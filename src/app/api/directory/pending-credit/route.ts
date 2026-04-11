@@ -212,10 +212,17 @@ export async function DELETE(req: NextRequest) {
   }
 }
 
-// PUT: Credit recipient balance directly (uses Admin SDK to bypass client rules)
+// PUT: Apply a pending credit to recipient balance (SECURE — requires existing pending credit)
+//
+// SECURITY DESIGN (pentest fix):
+// - Requires a valid pendingCreditId (must exist in Firestore)
+// - Verifies creditData.recipientUid === authenticated user (only recipient can apply)
+// - Verifies creditData.status !== "applied" (prevents double-application)
+// - Amount comes from the Firestore document, NOT from the request body
+// - Uses Firestore runTransaction() for atomic balance credit + status update
 export async function PUT(req: NextRequest) {
   const clientId = getClientId(req);
-  const rl = rateLimitByIp(`pending-credit:PUT:${clientId}`, { maxRequests: 20, windowSec: 60 });
+  const rl = rateLimitByIp(`pending-credit:PUT:${clientId}`, { maxRequests: 10, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de requêtes" }, {
       status: 429,
@@ -229,22 +236,14 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { recipientUid, amount, senderName, senderMoraliId, receiptId } = body as {
-      recipientUid?: string; amount?: number; senderName?: string; senderMoraliId?: string; receiptId?: string;
-    };
+    const { pendingCreditId } = body as { pendingCreditId?: string };
 
-    if (!recipientUid || !amount) {
-      return NextResponse.json({ error: "Paramètres manquants" }, { status: 400 });
+    // ── 1. Require a valid pendingCreditId ──
+    if (!pendingCreditId || typeof pendingCreditId !== "string") {
+      return NextResponse.json({ error: "pendingCreditId requis" }, { status: 400 });
     }
-    if (!/^[a-zA-Z0-9_-]{1,128}$/.test(recipientUid)) {
+    if (!/^[a-zA-Z0-9_-]{1,128}$/.test(pendingCreditId)) {
       return NextResponse.json({ error: "Identifiant invalide" }, { status: 400 });
-    }
-    const numericAmount = Number(amount);
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      return NextResponse.json({ error: "Montant invalide" }, { status: 400 });
-    }
-    if (numericAmount > 1_000_000) {
-      return NextResponse.json({ error: "Montant dépasse la limite (1M FCFA)" }, { status: 400 });
     }
 
     const adminDb = await getAdminFirestore();
@@ -252,51 +251,103 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Service indisponible" }, { status: 503 });
     }
 
-    // Idempotency: check if this receiptId was already credited
-    if (receiptId) {
-      const existingTx = await adminDb.collection("serverTransactions")
-        .where("receiptId", "==", String(receiptId))
-        .limit(1).get();
-      if (!existingTx.empty) {
-        return NextResponse.json({ success: true, idempotent: true, credited: Math.round(numericAmount) });
+    const creditRef = adminDb.collection("pendingCredits").doc(pendingCreditId);
+
+    // ── 2. Atomic transaction: read credit → verify → credit balance → mark applied ──
+    const result = await adminDb.runTransaction(async (transaction) => {
+      const creditSnap = await transaction.get(creditRef);
+
+      // Credit must exist
+      if (!creditSnap.exists()) {
+        throw new Error("NOT_FOUND");
       }
-    }
 
-    // Credit recipient balance directly via Admin SDK
-    const recipientRef = adminDb.collection("moraliUsers").doc(recipientUid);
-    const recipientDoc = await recipientRef.get();
+      const creditData = creditSnap.data()!;
 
-    if (!recipientDoc.exists) {
-      return NextResponse.json({ error: "Destinataire introuvable" }, { status: 404 });
-    }
+      // ── 3. Only the recipient can apply the credit ──
+      if (creditData.recipientUid !== auth.uid) {
+        throw new Error("FORBIDDEN");
+      }
 
-    const currentBal = recipientDoc.data()?.balance || 0;
-    await recipientRef.update({
-      balance: currentBal + Math.round(numericAmount),
-      updatedAt: new Date(),
+      // ── 4. Prevent double-application ──
+      if (creditData.status === "applied") {
+        throw new Error("ALREADY_APPLIED");
+      }
+
+      // ── 5. Amount MUST come from the Firestore document, never from the body ──
+      const creditAmount = Number(creditData.amount);
+      if (!Number.isFinite(creditAmount) || creditAmount <= 0) {
+        throw new Error("INVALID_AMOUNT");
+      }
+
+      // ── 6. Atomically credit the recipient balance ──
+      const recipientRef = adminDb.collection("moraliUsers").doc(auth.uid);
+      const recipientSnap = await transaction.get(recipientRef);
+
+      if (!recipientSnap.exists()) {
+        throw new Error("RECIPIENT_NOT_FOUND");
+      }
+
+      const currentBal = Number(recipientSnap.data()?.balance) || 0;
+      const newBal = currentBal + Math.round(creditAmount);
+
+      transaction.update(recipientRef, {
+        balance: newBal,
+        updatedAt: new Date(),
+      });
+
+      // ── 7. Mark credit as applied ──
+      transaction.update(creditRef, {
+        status: "applied",
+        appliedAt: new Date(),
+        appliedBy: auth.uid,
+      });
+
+      return { credited: Math.round(creditAmount), newBalance: newBal };
     });
 
-    // Also create notification for recipient via server
+    // ── 8. Best-effort notification (non-blocking) ──
     const sanitize = (s: string, maxLen: number) =>
       String(s || "").slice(0, maxLen).replace(/[<>'"&]/g, "");
 
     try {
-      await adminDb.collection("users").doc(recipientUid).collection("notifications").add({
-        title: `Virement reçu — FCFA ${Math.round(numericAmount).toLocaleString("fr-FR")}`,
+      const creditSnap = await creditRef.get();
+      const creditData = creditSnap.data();
+      await adminDb.collection("users").doc(auth.uid).collection("notifications").add({
+        title: `Crédit reçu — FCFA ${result.credited.toLocaleString("fr-FR")}`,
         time: "À l'instant",
         badge: "Reçu", badgeClass: "nb-green", icon: "receive",
         bg: "rgba(34,197,94,0.12)", read: false,
         createdAt: new Date(),
-        senderName: sanitize(senderName || "", 100),
-        senderMoraliId: sanitize(senderMoraliId || "", 50),
-        receiptId: sanitize(receiptId || "", 50),
+        senderName: sanitize(creditData?.senderName || "", 100),
+        senderMoraliId: sanitize(creditData?.senderMoraliId || "", 50),
+        receiptId: sanitize(creditData?.receiptId || "", 50),
       });
     } catch {
-      // Notification best-effort
+      // Notification best-effort — don't fail the credit
     }
 
-    return NextResponse.json({ success: true, credited: Math.round(numericAmount) });
+    return NextResponse.json({ success: true, credited: result.credited, newBalance: result.newBalance });
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+
+    // Map transaction errors to appropriate HTTP responses
+    if (msg === "NOT_FOUND") {
+      return NextResponse.json({ error: "Crédit en attente introuvable" }, { status: 404 });
+    }
+    if (msg === "FORBIDDEN") {
+      return NextResponse.json({ error: "Accès refusé — seul le destinataire peut appliquer ce crédit" }, { status: 403 });
+    }
+    if (msg === "ALREADY_APPLIED") {
+      return NextResponse.json({ success: true, idempotent: true, message: "Crédit déjà appliqué" });
+    }
+    if (msg === "INVALID_AMOUNT") {
+      return NextResponse.json({ error: "Montant du crédit invalide" }, { status: 400 });
+    }
+    if (msg === "RECIPIENT_NOT_FOUND") {
+      return NextResponse.json({ error: "Destinataire introuvable" }, { status: 404 });
+    }
+
     console.error("[pending-credit:PUT] Operation failed:", err);
     return NextResponse.json({ error: "Erreur interne du serveur" }, { status: 500 });
   }

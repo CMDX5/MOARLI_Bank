@@ -35,6 +35,11 @@ export async function POST(req: NextRequest) {
     }
     const { receiptId, senderUid, senderMoraliId, senderName, recipientUid, recipientMoraliId, recipientName, amount, type, destination } = validation.data;
 
+    // Prevent self-transfer
+    if (senderUid === recipientUid) {
+      return NextResponse.json({ error: "Impossible d'envoyer à soi-même" }, { status: 400 });
+    }
+
     // Ownership check: authenticated user must be the sender (or admin)
     if (auth.uid !== senderUid) {
       const callerDoc = await adminDb.collection("moraliUsers").doc(auth.uid).get();

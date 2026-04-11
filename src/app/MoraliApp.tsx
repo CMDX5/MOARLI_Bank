@@ -4065,6 +4065,7 @@ function App() {
       }
       
       if (decrypted && /^\d{4}$/.test(decrypted)) {
+        // PIN successfully decrypted from encrypted storage
         setRevealedPinDigits(decrypted.split("").join(" "));
         setCardPinRevealed(true);
         setRevealAttempts(0);
@@ -4075,12 +4076,12 @@ function App() {
         setRevealVerifiedPw("");
         showToast("Code PIN affiché");
       } else {
-        // PIN not encrypted — ask user to enter their PIN so we can verify + encrypt it
+        // PIN not encrypted yet — ask user to enter their PIN to verify + encrypt
         setRevealVerifiedPw(revealAccountPw.trim());
         setRevealAccountPw("");
         setRevealNeedsPin(true);
         setRevealPinRaw("");
-        showToast("Entrez votre PIN pour le chiffrer et l'afficher.");
+        showToast("Saisissez votre PIN pour confirmer votre identité.");
       }
     } catch (err: unknown) {
       const code = err instanceof Error ? (err as { code?: string }).code || "" : "";
@@ -9089,11 +9090,17 @@ function App() {
                       </div>
                     </>
                   ) : revealNeedsPin ? (
-                    /* PIN not encrypted — ask user to enter their PIN to encrypt + reveal */
+                    /* PIN not encrypted yet — first-time verification needed */
                     <>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        <div style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>Chiffrer votre PIN</div>
-                        <div style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.5 }}>Mot de passe vérifié ✓. Entrez votre code PIN pour le chiffrer et l'afficher. Cette étape ne se fera qu'une seule fois.</div>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>Confirmez votre PIN</div>
+                        <div style={{ fontSize: 11.5, color: "#64748b", lineHeight: 1.5 }}>
+                          Pour des raisons de sécurité, saisissez votre code PIN à 4 chiffres. 
+                          <span style={{ color: "#fbbf24", fontWeight: 700 }}> Cette étape ne se fera qu'une seule fois.</span>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "center", padding: "8px 12px", borderRadius: 12, background: "rgba(34,197,94,.06)", border: "1px solid rgba(34,197,94,.12)" }}>
+                        <div style={{ fontSize: 11, color: "#34d399", fontWeight: 600 }}>✓ Mot de passe vérifié avec succès</div>
                       </div>
                       <div className="bc-form">
                         <div className="bc-field">
@@ -9117,7 +9124,7 @@ function App() {
                         disabled={revealPinRaw.length !== 4 || revealPinVerifying}
                         style={revealPinRaw.length !== 4 || revealPinVerifying ? { opacity: .4 } : {}}
                       >
-                        {revealPinVerifying ? <div className="btn-loader" /> : "Chiffrer et afficher"}
+                        {revealPinVerifying ? <div className="btn-loader" /> : "Vérifier et afficher"}
                       </button>
                       <button className="bc-btn bc-btn-secondary" onClick={() => { setRevealNeedsPin(false); setRevealPinRaw(""); setRevealVerifiedPw(""); setCardPinStage("menu"); }}>Annuler</button>
                     </>

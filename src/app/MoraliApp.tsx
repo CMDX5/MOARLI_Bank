@@ -2429,12 +2429,18 @@ function App() {
   useEffect(() => {
     if (!authUid) return;
     const loadSettings = async () => {
-      // ── PIN check: INDEPENDENT, runs even if other reads fail ──
+      // ── PIN check: use API endpoint (admin SDK bypasses Firestore rules) ──
       try {
-        const pinDoc = await getDoc(doc(firebaseDb, "pinRecords", authUid));
-        if (pinDoc.exists()) {
-          cardPinExistsRef.current = true;
-          setSavedCardPinHash("server-stored");
+        const token = await firebaseAuth.currentUser?.getIdToken();
+        if (token) {
+          const res = await fetch("/api/pin/exists", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          if (data.exists) {
+            cardPinExistsRef.current = true;
+            setSavedCardPinHash("server-stored");
+          }
         }
       } catch (pinErr) {
         console.error("[loadSettings] PIN check error:", pinErr);
@@ -3966,8 +3972,8 @@ function App() {
   };
 
   const openPinModal = async () => {
-    // Always verify PIN existence from Firestore (source of truth) before deciding stage.
-    // This avoids race condition where cardPinExistsRef hasn't been set yet by the async useEffect.
+    // Always verify PIN existence via API (admin SDK bypasses Firestore rules).
+    // Client SDK can't read pinRecords due to security rules — use server endpoint instead.
     setCardPinOpen(true);
     setCardPinRevealed(false);
     setCardPinPassword("");
@@ -3979,23 +3985,27 @@ function App() {
     setRevealVerifiedPw("");
 
     if (cardPinExistsRef.current) {
-      // Already verified — skip Firestore round-trip
+      // Already verified — skip API round-trip
       setCardPinStage("menu");
       return;
     }
 
-    const uid = firebaseAuth.currentUser?.uid;
-    if (uid) {
-      try {
-        const pinDoc = await getDoc(doc(firebaseDb, "pinRecords", uid));
-        if (pinDoc.exists()) {
+    // Use API endpoint (admin SDK) to check PIN existence — bypasses Firestore rules
+    try {
+      const token = await firebaseAuth.currentUser?.getIdToken();
+      if (token) {
+        const res = await fetch("/api/pin/exists", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (data.exists) {
           cardPinExistsRef.current = true;
           setSavedCardPinHash("server-stored");
           setCardPinStage("menu");
           return;
         }
-      } catch { /* Firestore read failed — fall through to setup */ }
-    }
+      }
+    } catch { /* API call failed — fall through to setup */ }
     setCardPinStage("setup");
   };
 

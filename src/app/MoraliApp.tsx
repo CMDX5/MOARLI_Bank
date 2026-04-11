@@ -8703,7 +8703,7 @@ function App() {
           />
           )}
 
-          {screen !== "auth" && (
+          {screen !== "auth" && screen !== "admin" && (
             <nav className="bottom-nav" role="tablist" aria-label="Navigation principale">
               {navItems.map((item) => {
                 const active = navActive === item;

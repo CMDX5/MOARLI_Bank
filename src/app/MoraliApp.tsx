@@ -63,204 +63,11 @@ import CardsView from "@/components/bank/CardsView";
 import TransactionsView from "@/components/bank/TransactionsView";
 import TransferView from "@/components/bank/TransferView";
 
-// ── Local type aliases (sourced from @/types/morali) ──
-// AuthTab, ForgotStep, Screen, AdminTab, NavItem, TransactionType, RegisterData, etc.
-// are imported from @/types/morali above.
-
-type RegisterData = {
-  prenom: string;
-  nom: string;
-  email: string;
-  tel: string;
-  prefix: string;
-  pw: string;
-};
-
-type IconName =
-  | "send"
-  | "receive"
-  | "card"
-  | "grid"
-  | "briefcase"
-  | "home"
-  | "bolt"
-  | "building"
-  | "phone"
-  | "cart"
-  | "user"
-  | "lock"
-  | "spark"
-  | "morali"
-  | "bank"
-  | "shield"
-  | "wallet"
-  | "service"
-  | "transfer"
-  | "bell"
-  | "search"
-  | "globe"
-  | "tv"
-  | "droplet"
-  | "qr"
-  | "piggy"
-  | "coins"
-  | "swap"
-  | "users"
-  | "flash"
-  | "crypto"
-  | "camera"
-  | "request"
-  | "pin"
-  | "snowflake"
-  | "receipt"
-  | "headset"
-  | "document"
-  | "chevronRight";
-
-type Transaction = {
-  icon: IconName;
-  bg: string;
-  name: string;
-  date: string;
-  dateTimestamp?: number;
-  amount: string;
-  type: "credit" | "debit";
-  category: string;
-  receiptId?: string;
-  status?: "success" | "pending" | "failed";
-  channel?: string;
-};
-
-type NotificationItem = {
-  id: string;
-  icon: IconName;
-  bg: string;
-  title: string;
-  time: string;
-  badge: string;
-  badgeClass: string;
-  read: boolean;
-};
-
-type PaymentContact = {
-  name: string;
-  tone: "grad-blue" | "grad-purple" | "grad-amber" | "grad-rose";
-};
-
-type SearchServiceItem = {
-  id: string;
-  name: string;
-  category: string;
-  icon: IconName;
-};
-
-type SearchContactItem = {
-  name: string;
-};
-
-type MoraliUser = {
-  name: string;
-  pseudo: string;
-  account: string;
-  uid: string;
-  tone: PaymentContact["tone"];
-};
-
-type FirestoreMoraliUser = {
-  uid: string;
-  fullName: string;
-  firstName: string;
-  lastName: string;
-  pseudo: string;
-  moraliId: string;
-  moraliIdNormalized?: string;
-  rib: string;
-  phone: string;
-  email: string;
-  balance?: number;
-  savingsBalance?: number;
-  eurWallet?: number;
-  usdWallet?: number;
-  tontineGroups?: { name: string; contributionAmount: string; members: { name: string; paid: boolean }[]; pot?: number }[];
-  passwordHint?: string;
-  accountStatus?: "active" | "suspended";
-  createdAt?: unknown;
-  updatedAt?: unknown;
-};
-
-type FirestoreTransfer = {
-  senderUid: string;
-  senderMoraliId: string;
-  senderName: string;
-  recipientUid: string;
-  recipientMoraliId: string;
-  recipientName: string;
-  amount: number;
-  fees: number;
-  type: "depot" | "retrait" | "virement" | "remboursement";
-  destination?: "cash" | "airtime" | "loan_request" | "loan_granted";
-  status: "success" | "contested" | "flagged" | "pending";
-  creditPending?: boolean;
-  createdAt?: unknown;
-  receiptId: string;
-  /** Loan-specific fields (only when destination is loan_request/loan_granted) */
-  loanType?: "micro" | "personal";
-  totalToRepay?: number;
-  duration?: number;
-  durationLabel?: string;
-};
-
-type AdminActivityLog = {
-  action: string;
-  detail: string;
-  timestamp: Date;
-};
-
-type AdminConfirmAction = {
-  type: "delete-user" | "refund-tx";
-  data?: unknown;
-  message: string;
-};
-
-type FirestoreNotification = {
-  title: string;
-  time: string;
-  badge: string;
-  badgeClass: string;
-  icon: IconName;
-  bg: string;
-  read: boolean;
-  createdAt?: unknown;
-};
-
-type VirtualCardDoc = {
-  number: string;
-  expiry: string;
-  cvv: string;
-  active: boolean;
-  onlineOnly: boolean;
-  frozen?: boolean;
-  alias?: string;
-  spendingLimit?: number;
-  provider?: string;
-  createdAt?: unknown;
-  updatedAt?: unknown;
-};
-
-type BlackCardDoc = {
-  tier: "black";
-  eligible: boolean;
-  status: "none" | "requested" | "approved";
-  provider: string;
-  spendingLimit: number;
-  monthlyLimit: number;
-  concierge: boolean;
-  loungeAccess: boolean;
-  prioritySupport: boolean;
-  cashbackRate: number;
-  requestedAt?: unknown;
-  updatedAt?: unknown;
-};
+// ── All types are imported from @/types/morali ──
+// AuthTab, ForgotStep, Screen, AdminTab, NavItem, TransactionType, RegisterData, IconName,
+// Transaction, NotificationItem, PaymentContact, SearchServiceItem, SearchContactItem,
+// MoraliUser, FirestoreMoraliUser, FirestoreTransfer, AdminActivityLog, AdminConfirmAction,
+// FirestoreNotification, VirtualCardDoc, BlackCardDoc, OperatorKey, TxActionKey
 
 const appStyles = `
 .transfer-overlay{z-index:10030 !important;display:flex !important;align-items:flex-start !important;justify-content:center !important;padding:60px 20px 20px !important;inset:0 !important;height:auto !important;overflow:hidden !important;}
@@ -1836,9 +1643,18 @@ function App() {
   const [resetDataLoading, setResetDataLoading] = useState(false);
   const [adminTab, setAdminTab] = useState<AdminTab>("overview");
   const [adminLoginEmail, setAdminLoginEmail] = useState("");
+  const [adminLoginEmailFetched, setAdminLoginEmailFetched] = useState(false);
   const [adminLoginPassword, setAdminLoginPassword] = useState("");
   const [adminLoginLoading, setAdminLoginLoading] = useState(false);
   const [adminLoginError, setAdminLoginError] = useState("");
+  const [adminForgotStep, setAdminForgotStep] = useState<"idle" | "email" | "code" | "newPassword" | "success">("idle");
+  const [adminForgotEmail, setAdminForgotEmail] = useState("");
+  const [adminForgotOtpCode, setAdminForgotOtpCode] = useState("");
+  const [adminForgotNewPw, setAdminForgotNewPw] = useState("");
+  const [adminForgotConfirmPw, setAdminForgotConfirmPw] = useState("");
+  const [adminForgotSending, setAdminForgotSending] = useState(false);
+  const [adminForgotVerifying, setAdminForgotVerifying] = useState(false);
+  const [adminForgotResetting, setAdminForgotResetting] = useState(false);
   const [adminUsers, setAdminUsers] = useState<FirestoreMoraliUser[]>([]);
   const [adminTransactions, setAdminTransactions] = useState<FirestoreTransfer[]>([]);
   const [adminSearchQuery, setAdminSearchQuery] = useState("");
@@ -5482,6 +5298,107 @@ function App() {
     }
   };
 
+  // ── Fetch admin email from server (frozen/readonly on the login form) ──
+  useEffect(() => {
+    if (screen !== "admin" || isAdminLoggedIn || adminLoginEmailFetched) return;
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/config");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.email) {
+            setAdminLoginEmail(data.email);
+            setAdminForgotEmail(data.email);
+          }
+        }
+      } catch {
+        // Fallback: leave empty, user can type manually
+      } finally {
+        setAdminLoginEmailFetched(true);
+      }
+    })();
+  }, [screen, isAdminLoggedIn, adminLoginEmailFetched]);
+
+  // ── Admin forgot password handlers ──
+  const adminForgotSendCode = async () => {
+    if (!adminForgotEmail.trim() || !adminForgotEmail.includes("@")) {
+      showToast("Email invalide");
+      return;
+    }
+    setAdminForgotSending(true);
+    try {
+      const res = await fetch("/api/auth/send-reset-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: adminForgotEmail.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAdminForgotStep("code");
+      } else {
+        showToast(data.error || "Erreur lors de l'envoi du code");
+      }
+    } catch {
+      showToast("Erreur réseau");
+    } finally {
+      setAdminForgotSending(false);
+    }
+  };
+
+  const adminForgotVerifyCode = async () => {
+    if (adminForgotOtpCode.length !== 6) {
+      showToast("Code à 6 chiffres requis");
+      return;
+    }
+    setAdminForgotVerifying(true);
+    try {
+      const res = await fetch("/api/auth/verify-reset-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: adminForgotEmail.trim(), code: adminForgotOtpCode }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAdminForgotStep("newPassword");
+      } else {
+        showToast(data.error || "Code invalide");
+      }
+    } catch {
+      showToast("Erreur réseau");
+    } finally {
+      setAdminForgotVerifying(false);
+    }
+  };
+
+  const adminForgotResetPassword = async () => {
+    if (adminForgotNewPw.length < 8) {
+      showToast("Minimum 8 caractères");
+      return;
+    }
+    if (adminForgotNewPw !== adminForgotConfirmPw) {
+      showToast("Les mots de passe ne correspondent pas");
+      return;
+    }
+    setAdminForgotResetting(true);
+    try {
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: adminForgotEmail.trim(), code: adminForgotOtpCode, newPassword: adminForgotNewPw }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAdminForgotStep("success");
+      } else {
+        showToast(data.error || "Erreur lors de la réinitialisation");
+      }
+    } catch {
+      showToast("Erreur réseau");
+    } finally {
+      setAdminForgotResetting(false);
+    }
+  };
+
   const handleAdminLogin = async () => {
     setAdminLoginLoading(true);
     setAdminLoginError("");
@@ -6644,6 +6561,7 @@ function App() {
       ) : (
       <div className="stage">
         <div className="app-viewport">
+          {screen === "auth" && (
           <AuthView
             showToast={showToast}
             setScreen={setScreen}
@@ -6657,6 +6575,7 @@ function App() {
             onAuthSuccess={() => {}}
             persistMoraliProfile={persistMoraliProfile}
           />
+          )}
           {screen === "transaction" && (
             <TransactionsView
               type={transactionType}
@@ -8742,6 +8661,7 @@ function App() {
             />
           )}
 
+          {screen === "dashboard" && (
           <DashboardView
             dashboardName={dashboardName}
             dashboardData={dashboardData}
@@ -8781,6 +8701,7 @@ function App() {
             openServices={openServices}
             openPaymentsTab={openPaymentsTab}
           />
+          )}
 
           {screen !== "auth" && (
             <nav className="bottom-nav" role="tablist" aria-label="Navigation principale">
@@ -10113,9 +10034,9 @@ function App() {
       )}
 
       {/* ── ADMIN SCREENS ── */}
-      {screen === "admin" && !isAdminLoggedIn && (
+      {screen === "admin" && !isAdminLoggedIn && adminForgotStep === "idle" && (
         <div className="admin-login-screen">
-          <button className="admin-login-back" onClick={() => setScreen("auth")}>
+          <button className="admin-login-back" onClick={() => { setScreen("auth"); setAdminForgotStep("idle"); }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
           </button>
           <div style={{ width: 72, height: 72, borderRadius: 20, background: "rgba(26,62,120,0.3)", border: "1px solid rgba(212,164,55,0.4)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 32px rgba(59,130,246,0.3)" }}>
@@ -10126,7 +10047,7 @@ function App() {
             <div className="admin-login-sub">Accès réservé aux administrateurs Morali Pay. Utilisez vos identifiants administrateur.</div>
             <div className="admin-login-field">
               <label className="admin-login-label">Email administrateur</label>
-              <input type="email" className="admin-login-input" placeholder="admin@morali.bank" value={adminLoginEmail} onChange={(e) => setAdminLoginEmail(e.target.value)} autoComplete="email" />
+              <input type="email" className="admin-login-input" placeholder="admin@morali.bank" value={adminLoginEmailFetched ? adminLoginEmail : "Chargement..."} readOnly style={{ opacity: adminLoginEmailFetched ? 0.7 : 0.5, cursor: "default" }} autoComplete="email" />
             </div>
             <div className="admin-login-field">
               <label className="admin-login-label">Mot de passe</label>
@@ -10136,6 +10057,120 @@ function App() {
               {adminLoginLoading ? <div className="btn-loader" /> : <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 1 1 10 0v4"/></svg> Connexion Admin</>}
             </button>
             <div className="admin-login-error">{adminLoginError || "\u00A0"}</div>
+            <div onClick={() => setAdminForgotStep("email")} style={{ textAlign: "center", marginTop: 14, fontSize: 12, color: "#64748b", cursor: "pointer" }}>
+              Mot de passe oublié ?
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── ADMIN FORGOT PASSWORD ── */}
+      {screen === "admin" && !isAdminLoggedIn && adminForgotStep !== "idle" && (
+        <div className="admin-login-screen">
+          <button className="admin-login-back" onClick={() => setAdminForgotStep("idle")}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+          </button>
+          <div style={{ width: 72, height: 72, borderRadius: 20, background: "rgba(26,62,120,0.3)", border: "1px solid rgba(212,164,55,0.4)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 32px rgba(59,130,246,0.3)" }}>
+            <MoraliShield />
+          </div>
+          <div className="admin-login-card">
+            <div className="admin-login-title">
+              {adminForgotStep === "email" && "Mot de passe oublié"}
+              {adminForgotStep === "code" && "Vérification du code"}
+              {adminForgotStep === "newPassword" && "Nouveau mot de passe"}
+              {adminForgotStep === "success" && "Succès"}
+            </div>
+            <div className="admin-login-sub">
+              {adminForgotStep === "email" && "Entrez l'email admin pour recevoir un code de vérification."}
+              {adminForgotStep === "code" && "Saisissez le code envoyé à votre email."}
+              {adminForgotStep === "newPassword" && "Choisissez votre nouveau mot de passe."}
+              {adminForgotStep === "success" && "Votre mot de passe a été modifié avec succès."}
+            </div>
+
+            {/* Step indicators */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0, marginBottom: 22 }}>
+              {(["email", "code", "newPassword"] as const).map((step, i) => (
+                <React.Fragment key={step}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 11, fontWeight: 800,
+                      background: adminForgotStep === step || (step === "email" && adminForgotStep === "code") || (step !== "newPassword" && adminForgotStep === "newPassword")
+                        ? "rgba(212,164,55,.15)" : "rgba(255,255,255,.04)",
+                      border: adminForgotStep === step || (step === "email" && adminForgotStep === "code") || (step !== "newPassword" && adminForgotStep === "newPassword")
+                        ? "1px solid rgba(212,164,55,.3)" : "1px solid rgba(255,255,255,.08)",
+                      color: adminForgotStep === step || (step === "email" && adminForgotStep === "code") || (step !== "newPassword" && adminForgotStep === "newPassword")
+                        ? "#d4a437" : "#475569",
+                    }}>
+                      {adminForgotStep === "success" || (step !== "newPassword" && adminForgotStep === "newPassword") || (step === "email" && adminForgotStep !== "email") ? "✓" : i + 1}
+                    </div>
+                    <span style={{ fontSize: 9, color: "#475569", fontWeight: 700 }}>{["Email", "Code", "Mot de passe"][i]}</span>
+                  </div>
+                  {i < 2 && (
+                    <div style={{ width: 32, height: 2, margin: "0 4px", marginBottom: 16, borderRadius: 1,
+                      background: (step === "email" && adminForgotStep !== "email") || (step === "code" && adminForgotStep === "newPassword") || adminForgotStep === "success"
+                        ? "#d4a437" : "rgba(255,255,255,.08)" }} />
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+
+            {adminForgotStep === "email" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div className="admin-login-field">
+                  <label className="admin-login-label">Email administrateur</label>
+                  <input type="email" className="admin-login-input" placeholder="admin@morali.bank" value={adminForgotEmail} onChange={(e) => setAdminForgotEmail(e.target.value)} autoFocus />
+                </div>
+                <button className="admin-login-btn" onClick={adminForgotSendCode} disabled={adminForgotSending || !adminForgotEmail.trim() || !adminForgotEmail.includes("@")} style={adminForgotSending || !adminForgotEmail.trim() ? { opacity: 0.4 } : {}}>
+                  {adminForgotSending ? <div className="btn-loader" /> : "Envoyer le code"}
+                </button>
+              </div>
+            )}
+
+            {adminForgotStep === "code" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div className="admin-login-field">
+                  <label className="admin-login-label">Code de vérification</label>
+                  <input type="text" className="admin-login-input" inputMode="numeric" maxLength={6} placeholder="000000" value={adminForgotOtpCode} onChange={(e) => setAdminForgotOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))} style={{ textAlign: "center", fontSize: 20, letterSpacing: ".3em", fontWeight: 900 }} autoFocus />
+                </div>
+                <button className="admin-login-btn" onClick={adminForgotVerifyCode} disabled={adminForgotOtpCode.length !== 6 || adminForgotVerifying} style={adminForgotOtpCode.length !== 6 ? { opacity: 0.4 } : {}}>
+                  {adminForgotVerifying ? <div className="btn-loader" /> : "Vérifier le code"}
+                </button>
+                <div onClick={adminForgotSendCode} style={{ textAlign: "center", fontSize: 11, color: "#64748b", cursor: "pointer" }}>
+                  Renvoyer le code
+                </div>
+              </div>
+            )}
+
+            {adminForgotStep === "newPassword" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div className="admin-login-field">
+                  <label className="admin-login-label">Nouveau mot de passe</label>
+                  <input type="password" className="admin-login-input" placeholder="Minimum 8 caractères" value={adminForgotNewPw} onChange={(e) => setAdminForgotNewPw(e.target.value)} autoFocus />
+                </div>
+                <div className="admin-login-field">
+                  <label className="admin-login-label">Confirmer le mot de passe</label>
+                  <input type="password" className="admin-login-input" placeholder="Confirmez" value={adminForgotConfirmPw} onChange={(e) => setAdminForgotConfirmPw(e.target.value)} />
+                </div>
+                <button className="admin-login-btn" onClick={adminForgotResetPassword} disabled={adminForgotNewPw.length < 8 || adminForgotNewPw !== adminForgotConfirmPw || adminForgotResetting} style={adminForgotNewPw.length < 8 || adminForgotNewPw !== adminForgotConfirmPw ? { opacity: 0.4 } : {}}>
+                  {adminForgotResetting ? <div className="btn-loader" /> : "Réinitialiser le mot de passe"}
+                </button>
+              </div>
+            )}
+
+            {adminForgotStep === "success" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 14, alignItems: "center", textAlign: "center", padding: "20px 0" }}>
+                <div style={{ width: 64, height: 64, borderRadius: "50%", background: "rgba(34,197,94,.1)", border: "2px solid rgba(34,197,94,.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <div style={{ fontSize: 14, color: "#e2e8f0", fontWeight: 600, lineHeight: 1.6 }}>
+                  Mot de passe modifié avec succès.<br />Vous pouvez maintenant vous connecter.
+                </div>
+                <button className="admin-login-btn" onClick={() => { setAdminForgotStep("idle"); setAdminLoginPassword(""); setAdminForgotOtpCode(""); setAdminForgotNewPw(""); setAdminForgotConfirmPw(""); }} style={{ marginTop: 4 }}>
+                  Retour à la connexion
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

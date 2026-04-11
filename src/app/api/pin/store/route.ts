@@ -43,20 +43,25 @@ export async function POST(req: NextRequest) {
       const bcrypt = await import("bcryptjs");
       const pinBcrypt = await bcrypt.hash(rawBody.pin, 12);
 
-      // Also encrypt PIN server-side for reveal after auth
-      const serverEncryptedPin = encryptPinServerSide(rawBody.pin, auth.uid);
+      // Try server-side encryption (may fail on some environments)
+      let serverEncryptedPin: string | null = null;
+      try {
+        serverEncryptedPin = encryptPinServerSide(rawBody.pin, auth.uid);
+      } catch (cryptoErr) {
+        console.error("[pin:store] Server encryption failed, continuing without it:", cryptoErr);
+      }
 
       const pinRef = adminDb.doc("pinRecords/" + auth.uid);
       await pinRef.set({
         pinBcrypt,
         serverEncryptedPin,
-        // Keep client-encrypted PIN fields if provided (legacy)
+        // Client-encrypted PIN (for password-based reveal fallback)
         encryptedPin: rawBody.encryptedPin || null,
         pinIv: rawBody.pinIv || null,
         updatedAt: new Date().toISOString(),
       }, { merge: true });
 
-      return NextResponse.json({ success: true, bcrypt: true, serverEncrypted: true });
+      return NextResponse.json({ success: true, bcrypt: true, serverEncrypted: !!serverEncryptedPin });
     }
 
     // ── Legacy format: store as-is (SHA-256 hash from old client) ──

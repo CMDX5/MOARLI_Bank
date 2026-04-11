@@ -4041,8 +4041,12 @@ function App() {
       const credential = EmailAuthProvider.credential(user.email, revealAccountPw.trim());
       await reauthenticateWithCredential(user, credential);
       const uid = user.uid;
+      const verifiedPw = revealAccountPw.trim();
 
-      // Step 2: Try server-side PIN reveal (encrypted with server key, no user password needed)
+      // Step 2: Try to decrypt PIN — try all available sources
+      let decrypted: string | null = null;
+
+      // 2a. Try server-side PIN reveal (new format — encrypted with server key)
       try {
         const token = await user.getIdToken();
         const revealRes = await fetch("/api/pin/reveal", {
@@ -4052,68 +4056,62 @@ function App() {
         const revealData = await revealRes.json();
 
         if (revealData.success && revealData.pin && /^\d{4}$/.test(revealData.pin)) {
-          // Server returned the PIN directly — show it immediately!
-          setRevealedPinDigits(revealData.pin.split("").join(" "));
-          setCardPinRevealed(true);
-          setRevealAttempts(0);
-          setRevealLockedUntil(0);
-          setRevealAccountPw("");
-          setRevealNeedsPin(false);
-          setRevealPinRaw("");
-          setRevealVerifiedPw("");
-          setSessionPinPlaintext(revealData.pin);
-          showToast("Code PIN affiché");
-          return;
-        }
-
-        // If server has a password-encrypted version, try decrypting with user's password
-        if (revealData.needsPassword && revealData.encryptedPin) {
-          const decrypted = await decryptPinWithPassword(revealData.encryptedPin, revealAccountPw.trim(), uid);
-          if (decrypted && /^\d{4}$/.test(decrypted)) {
-            setRevealedPinDigits(decrypted.split("").join(" "));
-            setCardPinRevealed(true);
-            setRevealAttempts(0);
-            setRevealLockedUntil(0);
-            setRevealAccountPw("");
-            setRevealNeedsPin(false);
-            setRevealPinRaw("");
-            setRevealVerifiedPw("");
-            showToast("Code PIN affiché");
-            return;
-          }
-        }
-
-        // If PIN needs migration (created before encryption), ask user to enter PIN once
-        if (revealData.needsPinMigration) {
-          setRevealVerifiedPw(revealAccountPw.trim());
-          setRevealAccountPw("");
-          setRevealNeedsPin(true);
-          setRevealPinRaw("");
-          showToast("Saisissez votre PIN pour confirmer votre identité.");
-          return;
+          decrypted = revealData.pin;
+        } else if (revealData.encryptedPin) {
+          // Server returned the client-encrypted PIN — decrypt it with password
+          decrypted = await decryptPinWithPassword(revealData.encryptedPin, verifiedPw, uid);
         }
       } catch { /* server reveal failed, continue to fallback */ }
 
-      // Step 3: Fallback — try localStorage encrypted PIN
-      const localEncrypted = window.localStorage.getItem("morali_card_pin_encrypted");
-      if (localEncrypted) {
-        const decrypted = await decryptPinWithPassword(localEncrypted, revealAccountPw.trim(), uid);
-        if (decrypted && /^\d{4}$/.test(decrypted)) {
-          setRevealedPinDigits(decrypted.split("").join(" "));
-          setCardPinRevealed(true);
-          setRevealAttempts(0);
-          setRevealLockedUntil(0);
-          setRevealAccountPw("");
-          setRevealNeedsPin(false);
-          setRevealPinRaw("");
-          setRevealVerifiedPw("");
-          showToast("Code PIN affiché");
-          return;
+      // 2b. Fallback: try localStorage encrypted PIN
+      if (!decrypted) {
+        const localEncrypted = window.localStorage.getItem("morali_card_pin_encrypted");
+        if (localEncrypted) {
+          decrypted = await decryptPinWithPassword(localEncrypted, verifiedPw, uid);
         }
       }
 
-      // Step 4: Last resort — ask user to enter PIN for migration
-      setRevealVerifiedPw(revealAccountPw.trim());
+      // 2c. Fallback: try get-encrypted endpoint
+      if (!decrypted) {
+        try {
+          const token = await user.getIdToken();
+          const res = await fetch("/api/pin/get-encrypted", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          if (data.hasEncrypted && data.encryptedPin) {
+            decrypted = await decryptPinWithPassword(data.encryptedPin, verifiedPw, uid);
+          }
+        } catch { /* all server methods failed */ }
+      }
+
+      if (decrypted && /^\d{4}$/.test(decrypted)) {
+        // PIN successfully decrypted — show it!
+        setRevealedPinDigits(decrypted.split("").join(" "));
+        setCardPinRevealed(true);
+        setRevealAttempts(0);
+        setRevealLockedUntil(0);
+        setRevealAccountPw("");
+        setRevealNeedsPin(false);
+        setRevealPinRaw("");
+        setRevealVerifiedPw("");
+        setSessionPinPlaintext(decrypted);
+        // Also store server-encrypted version for future fast reveals
+        try {
+          const token = await user.getIdToken();
+          await fetch("/api/pin/store", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ pin: decrypted }),
+          });
+        } catch { /* non-critical */ }
+        showToast("Code PIN affiché");
+        return;
+      }
+
+      // Step 3: Last resort — ask user to enter PIN for one-time migration
+      setRevealVerifiedPw(verifiedPw);
       setRevealAccountPw("");
       setRevealNeedsPin(true);
       setRevealPinRaw("");

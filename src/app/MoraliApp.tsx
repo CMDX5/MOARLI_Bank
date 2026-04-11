@@ -3982,8 +3982,15 @@ function App() {
   };
 
   const openPinModal = async () => {
-    // Always verify PIN existence via API (admin SDK bypasses Firestore rules).
-    // Client SDK can't read pinRecords due to security rules — use server endpoint instead.
+    // ── ALWAYS re-sync localStorage → ref (fixes same-session PIN creation race) ──
+    // The ref is initialized false and only set true in useEffect([],) which runs at mount
+    // BEFORE the user creates a PIN during registration.  So after registration the ref
+    // stays false even though localStorage was written.  Re-reading localStorage here
+    // guarantees correctness for both fresh-page loads AND same-session flows.
+    if (typeof window !== "undefined" && window.localStorage.getItem("morali_pin_exists") === "true") {
+      cardPinExistsRef.current = true;
+    }
+
     setCardPinOpen(true);
     setCardPinRevealed(false);
     setCardPinPassword("");
@@ -3995,12 +4002,12 @@ function App() {
     setRevealVerifiedPw("");
 
     if (cardPinExistsRef.current) {
-      // Already verified — skip API round-trip
+      // Already verified — show menu immediately
       setCardPinStage("menu");
       return;
     }
 
-    // Use API endpoint (admin SDK) to check PIN existence — bypasses Firestore rules
+    // Fallback: use API endpoint (admin SDK) to check PIN existence — bypasses Firestore rules
     try {
       const token = await firebaseAuth.currentUser?.getIdToken();
       if (token) {
@@ -4030,7 +4037,10 @@ function App() {
     setRevealPinRaw("");
     setRevealVerifiedPw("");
     setRevealAccountPw("");
-    // Use cardPinExistsRef as source of truth (consistent with openPinModal)
+    // Re-sync localStorage → ref before reading (same-session fix)
+    if (typeof window !== "undefined" && window.localStorage.getItem("morali_pin_exists") === "true") {
+      cardPinExistsRef.current = true;
+    }
     setCardPinStage(cardPinExistsRef.current ? "menu" : "setup");
   };
 

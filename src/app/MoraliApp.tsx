@@ -5,6 +5,9 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import {
   getRedirectResult,
   onAuthStateChanged,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+  signInWithEmailAndPassword,
   signOut,
   updatePassword,
 } from "firebase/auth";
@@ -3617,8 +3620,9 @@ function App() {
     }
     setChangePwLoading(true);
     try {
-      // Re-authenticate with old password
-      await signInWithEmailAndPassword(firebaseAuth, user.email, changePwOld.trim());
+      // Re-authenticate with old password (using recommended Firebase method)
+      const credential = EmailAuthProvider.credential(user.email, changePwOld.trim());
+      await reauthenticateWithCredential(user, credential);
       // Update password
       await updatePassword(user, changePwNew.trim());
       showToast("Mot de passe mis à jour avec succès");
@@ -4025,7 +4029,9 @@ function App() {
     }
     setRevealVerifying(true);
     try {
-      await signInWithEmailAndPassword(firebaseAuth, user.email, revealAccountPw.trim());
+      // Use Firebase re-authentication (recommended over signInWithEmailAndPassword)
+      const credential = EmailAuthProvider.credential(user.email, revealAccountPw.trim());
+      await reauthenticateWithCredential(user, credential);
       const uid = user.uid;
       let decrypted: string | null = null;
       
@@ -4068,14 +4074,24 @@ function App() {
         setRevealPinRaw("");
         showToast("Entrez votre PIN pour le chiffrer et l'afficher.");
       }
-    } catch {
+    } catch (err: unknown) {
+      const code = err instanceof Error ? (err as { code?: string }).code || "" : "";
       const newAttempts = revealAttempts + 1;
       setRevealAttempts(newAttempts);
-      if (newAttempts >= 3) {
-        setRevealLockedUntil(Date.now() + 5 * 60 * 1000); // 5 minutes
-        showToast("Trop de tentatives. Verrouillé pendant 5 minutes.");
+      if (code === "auth/too-many-requests") {
+        setRevealLockedUntil(Date.now() + 5 * 60 * 1000);
+        showToast("Trop de requêtes Firebase. Verrouillé pendant 5 minutes.");
+      } else if (code === "auth/wrong-password" || code === "auth/invalid-credential") {
+        if (newAttempts >= 3) {
+          setRevealLockedUntil(Date.now() + 5 * 60 * 1000);
+          showToast("Trop de tentatives. Verrouillé pendant 5 minutes.");
+        } else {
+          showToast(`Mot de passe incorrect (${3 - newAttempts} tentative(s) restante(s))`);
+        }
+      } else if (code === "auth/network-request-failed") {
+        showToast("Erreur réseau. Vérifiez votre connexion et réessayez.");
       } else {
-        showToast(`Mot de passe incorrect (${3 - newAttempts} tentative(s) restante(s))`);
+        showToast(`Erreur de vérification. ${code ? `[${code}]` : ""} Réessayez.`);
       }
       setRevealAccountPw("");
     } finally {
@@ -8670,7 +8686,7 @@ function App() {
             />
           )}
 
-          {screen === "dashboard" && (
+          {(screen === "dashboard" || historyModalOpen) && (
           <DashboardView
             dashboardName={dashboardName}
             dashboardData={dashboardData}

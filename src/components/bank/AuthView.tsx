@@ -524,6 +524,8 @@ export default function AuthView({
           body: JSON.stringify({ pin: regPinDraft, encryptedPin: encrypted.encryptedPin, pinIv: encrypted.pinIv }),
         });
       } catch { /* server store failed — localStorage encrypted PIN is fallback */ }
+      // Persist PIN existence flag so openPinModal knows PIN exists on reload
+      window.localStorage.setItem("morali_pin_exists", "true");
       setShowPinSetup(false);
       setRegPinDraft("");
       setRegPinConfirm("");

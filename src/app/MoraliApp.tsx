@@ -2422,28 +2422,38 @@ function App() {
     window.localStorage.removeItem("morali_card_pin");
     window.localStorage.removeItem("morali_card_pin_hash");
     window.localStorage.removeItem("morali_card_pin_salt");
-    // PIN existence check runs AFTER auth (see authUid-dependent useEffect below)
+    // Restore PIN existence from localStorage (set during registration/creation)
+    // This avoids needing an API call or Firestore read on every page load
+    if (window.localStorage.getItem("morali_pin_exists") === "true") {
+      cardPinExistsRef.current = true;
+      setSavedCardPinHash("server-stored");
+    }
+    // PIN existence API check runs AFTER auth (see authUid-dependent useEffect below)
   }, []);
 
   // Load card & security settings from Firestore on auth
   useEffect(() => {
     if (!authUid) return;
     const loadSettings = async () => {
-      // ── PIN check: use API endpoint (admin SDK bypasses Firestore rules) ──
-      try {
-        const token = await firebaseAuth.currentUser?.getIdToken();
-        if (token) {
-          const res = await fetch("/api/pin/exists", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const data = await res.json();
-          if (data.exists) {
-            cardPinExistsRef.current = true;
-            setSavedCardPinHash("server-stored");
+      // ── PIN check: localStorage first (instant), API as secondary verification ──
+      // Skip if already known from localStorage (set in initial useEffect)
+      if (!cardPinExistsRef.current) {
+        try {
+          const token = await firebaseAuth.currentUser?.getIdToken();
+          if (token) {
+            const res = await fetch("/api/pin/exists", {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json();
+            if (data.exists) {
+              cardPinExistsRef.current = true;
+              setSavedCardPinHash("server-stored");
+              window.localStorage.setItem("morali_pin_exists", "true");
+            }
           }
+        } catch (pinErr) {
+          console.error("[loadSettings] PIN check error:", pinErr);
         }
-      } catch (pinErr) {
-        console.error("[loadSettings] PIN check error:", pinErr);
       }
 
       try {
@@ -4001,6 +4011,7 @@ function App() {
         if (data.exists) {
           cardPinExistsRef.current = true;
           setSavedCardPinHash("server-stored");
+          window.localStorage.setItem("morali_pin_exists", "true");
           setCardPinStage("menu");
           return;
         }
@@ -4037,6 +4048,7 @@ function App() {
       setSavedCardPin("••••");
       setSessionPinPlaintext(cardPinDraft);
       cardPinExistsRef.current = true;
+      window.localStorage.setItem("morali_pin_exists", "true");
       setCardPinRevealed(false);
       setCardPinPassword("");
       // Store on server (source of truth — bcrypt)
@@ -4260,9 +4272,10 @@ function App() {
         return;
       }
       // Save new PIN (server hashes with bcrypt)
-      setSavedCardPin("\u2022\u2022\u2022\u2022");
+      setSavedCardPin("••••");
       setSessionPinPlaintext(cardPinDraft);
       cardPinExistsRef.current = true;
+      window.localStorage.setItem("morali_pin_exists", "true");
       // Encrypt new PIN with account password if provided (for future reveal)
       if (changePinAccountPw.trim() && firebaseAuth.currentUser?.uid) {
         try {
@@ -4380,9 +4393,10 @@ function App() {
       const data = await res.json();
       if (data.success) {
         // Update local state
-        setSavedCardPin("\u2022\u2022\u2022\u2022");
+        setSavedCardPin("••••");
         setSessionPinPlaintext(pinResetNewPin);
         cardPinExistsRef.current = true;
+        window.localStorage.setItem("morali_pin_exists", "true");
         // Server is source of truth for PIN hash (bcrypt)
         // Reset state and go to menu
         resetPinResetState();
@@ -4464,6 +4478,7 @@ function App() {
       setSavedCardPin("••••");
       setSessionPinPlaintext(regPinDraft); // Store in memory for reveal
       cardPinExistsRef.current = true;
+      window.localStorage.setItem("morali_pin_exists", "true");
       // Encrypt PIN with account password for later reveal
       const encrypted = await encryptPinWithPassword(regPinDraft, registerData.pw, firebaseAuth.currentUser?.uid || "");
       window.localStorage.setItem("morali_card_pin_encrypted", encrypted.encryptedPin);

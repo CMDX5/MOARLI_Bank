@@ -1653,11 +1653,19 @@ function App() {
   const [resetDataConfirm, setResetDataConfirm] = useState<false | string>(false);
   const [resetDataLoading, setResetDataLoading] = useState(false);
   const [adminTab, setAdminTab] = useState<AdminTab>("overview");
+  const [adminAuthTab, setAdminAuthTab] = useState<"login" | "register">("login");
+  const [adminExistsChecked, setAdminExistsChecked] = useState(false);
+  const [adminExists, setAdminExists] = useState(false);
   const [adminLoginEmail, setAdminLoginEmail] = useState("");
   const [adminLoginEmailFetched, setAdminLoginEmailFetched] = useState(false);
   const [adminLoginPassword, setAdminLoginPassword] = useState("");
   const [adminLoginLoading, setAdminLoginLoading] = useState(false);
   const [adminLoginError, setAdminLoginError] = useState("");
+  const [adminRegName, setAdminRegName] = useState("");
+  const [adminRegEmail, setAdminRegEmail] = useState("");
+  const [adminRegPassword, setAdminRegPassword] = useState("");
+  const [adminRegConfirm, setAdminRegConfirm] = useState("");
+  const [adminRegLoading, setAdminRegLoading] = useState(false);
   const [adminForgotStep, setAdminForgotStep] = useState<"idle" | "email" | "code" | "newPassword" | "success">("idle");
   const [adminForgotEmail, setAdminForgotEmail] = useState("");
   const [adminForgotOtpCode, setAdminForgotOtpCode] = useState("");
@@ -5325,24 +5333,45 @@ function App() {
 
   // ── Fetch admin email from server (frozen/readonly on the login form) ──
   useEffect(() => {
-    if (screen !== "admin" || isAdminLoggedIn || adminLoginEmailFetched) return;
+    if (screen !== "admin" || isAdminLoggedIn || adminExistsChecked) return;
     (async () => {
       try {
-        const res = await fetch("/api/admin/config");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.email) {
-            setAdminLoginEmail(data.email);
-            setAdminForgotEmail(data.email);
+        // Check if an admin exists (dynamic onboarding)
+        const checkRes = await fetch("/api/admin/check-exists");
+        if (checkRes.ok) {
+          const checkData = await checkRes.json();
+          setAdminExists(checkData.adminExists);
+          if (checkData.adminEmail) {
+            setAdminLoginEmail(checkData.adminEmail);
+            setAdminForgotEmail(checkData.adminEmail);
+          }
+          // If admin exists, force login tab
+          if (checkData.adminExists) {
+            setAdminAuthTab("login");
           }
         }
       } catch {
-        // Fallback: leave empty, user can type manually
+        // Fallback: try legacy config endpoint
+        try {
+          const res = await fetch("/api/admin/config");
+          if (res.ok) {
+            const data = await res.json();
+            if (data.email) {
+              setAdminExists(true);
+              setAdminLoginEmail(data.email);
+              setAdminForgotEmail(data.email);
+              setAdminAuthTab("login");
+            }
+          }
+        } catch {
+          // No admin configured at all — allow registration
+        }
       } finally {
+        setAdminExistsChecked(true);
         setAdminLoginEmailFetched(true);
       }
     })();
-  }, [screen, isAdminLoggedIn, adminLoginEmailFetched]);
+  }, [screen, isAdminLoggedIn, adminExistsChecked]);
 
   // ── Admin forgot password handlers ──
   const adminForgotSendCode = async () => {
@@ -5489,6 +5518,65 @@ function App() {
       }
     } finally {
       setAdminLoginLoading(false);
+    }
+  };
+
+  // ── Handle admin first-time registration ──
+  const handleAdminRegister = async () => {
+    setAdminRegLoading(true);
+    try {
+      if (!adminRegEmail.trim() || !adminRegPassword) {
+        showToast("Email et mot de passe requis");
+        setAdminRegLoading(false);
+        return;
+      }
+      if (!adminRegEmail.includes("@")) {
+        showToast("Email invalide");
+        setAdminRegLoading(false);
+        return;
+      }
+      if (adminRegPassword.length < 8) {
+        showToast("Mot de passe trop court (8 caractères min)");
+        setAdminRegLoading(false);
+        return;
+      }
+      if (adminRegPassword !== adminRegConfirm) {
+        showToast("Les mots de passe ne correspondent pas");
+        setAdminRegLoading(false);
+        return;
+      }
+
+      const res = await fetch("/api/admin/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: adminRegEmail.trim().toLowerCase(),
+          password: adminRegPassword,
+          name: adminRegName.trim() || "Admin Morali Pay",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        showToast(data.error || "Erreur lors de la création");
+        setAdminRegLoading(false);
+        return;
+      }
+
+      // Admin created — switch to login tab, pre-fill email
+      setAdminExists(true);
+      setAdminAuthTab("login");
+      setAdminLoginEmail(adminRegEmail.trim().toLowerCase());
+      setAdminForgotEmail(adminRegEmail.trim().toLowerCase());
+      setAdminRegName("");
+      setAdminRegEmail("");
+      setAdminRegPassword("");
+      setAdminRegConfirm("");
+      showToast("Compte administrateur créé avec succès ! Connectez-vous.");
+    } catch {
+      showToast("Erreur lors de la création du compte");
+    } finally {
+      setAdminRegLoading(false);
     }
   };
 
@@ -10065,22 +10153,137 @@ function App() {
           </div>
           <div className="admin-login-card">
             <div className="admin-login-title">Administration</div>
-            <div className="admin-login-sub">Accès réservé aux administrateurs Morali Pay. Utilisez vos identifiants administrateur.</div>
-            <div className="admin-login-field">
-              <label className="admin-login-label">Email administrateur</label>
-              <input type="email" className="admin-login-input" placeholder="admin@morali.bank" value={adminLoginEmailFetched ? adminLoginEmail : "Chargement..."} readOnly style={{ opacity: adminLoginEmailFetched ? 0.7 : 0.5, cursor: "default" }} autoComplete="email" />
+            <div className="admin-login-sub">
+              {adminExists
+                ? "Accès réservé aux administrateurs Morali Pay."
+                : "Premier lancement ? Créez votre compte administrateur."}
             </div>
-            <div className="admin-login-field">
-              <label className="admin-login-label">Mot de passe</label>
-              <input type="password" className="admin-login-input" placeholder="••••••••" value={adminLoginPassword} onChange={(e) => setAdminLoginPassword(e.target.value)} autoComplete="current-password" onKeyDown={(e) => { if (e.key === "Enter") handleAdminLogin(); }} />
+
+            {/* ── Dynamic tabs: Register + Login (or Login only) ── */}
+            <div style={{ display: "flex", gap: 0, background: "rgba(255,255,255,0.04)", borderRadius: 12, padding: 3, marginBottom: 4 }}>
+              {!adminExists && (
+                <button
+                  onClick={() => setAdminAuthTab("register")}
+                  style={{
+                    flex: 1, padding: "10px 0", borderRadius: 10, border: "none",
+                    background: adminAuthTab === "register" ? "rgba(212,164,55,0.15)" : "transparent",
+                    color: adminAuthTab === "register" ? "#d4a437" : "#64748b",
+                    fontWeight: 700, fontSize: 13, cursor: "pointer", transition: "all .2s",
+                  }}
+                >
+                  Inscription
+                </button>
+              )}
+              <button
+                onClick={() => setAdminAuthTab("login")}
+                style={{
+                  flex: 1, padding: "10px 0", borderRadius: 10, border: "none",
+                  background: adminAuthTab === "login" ? "rgba(212,164,55,0.15)" : "transparent",
+                  color: adminAuthTab === "login" ? "#d4a437" : "#64748b",
+                  fontWeight: 700, fontSize: 13, cursor: "pointer", transition: "all .2s",
+                }}
+              >
+                Connexion
+              </button>
             </div>
-            <button className="admin-login-btn" onClick={handleAdminLogin} disabled={adminLoginLoading || !adminLoginEmail || !adminLoginPassword}>
-              {adminLoginLoading ? <div className="btn-loader" /> : <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 1 1 10 0v4"/></svg> Connexion Admin</>}
-            </button>
-            <div className="admin-login-error">{adminLoginError || "\u00A0"}</div>
-            <div onClick={() => setAdminForgotStep("email")} style={{ textAlign: "center", marginTop: 14, fontSize: 12, color: "#64748b", cursor: "pointer" }}>
-              Mot de passe oublié ?
-            </div>
+
+            {/* ── LOGIN TAB ── */}
+            {adminAuthTab === "login" && (
+              <>
+                <div className="admin-login-field">
+                  <label className="admin-login-label">Email administrateur</label>
+                  <input
+                    type="email"
+                    className="admin-login-input"
+                    placeholder="admin@morali.bank"
+                    value={adminLoginEmailFetched && adminExists ? adminLoginEmail : adminLoginEmail}
+                    onChange={(e) => setAdminLoginEmail(e.target.value)}
+                    readOnly={adminExists && adminLoginEmailFetched}
+                    style={{
+                      opacity: adminExists && adminLoginEmailFetched ? 0.7 : 1,
+                      cursor: adminExists && adminLoginEmailFetched ? "default" : "text",
+                    }}
+                    autoComplete="email"
+                  />
+                </div>
+                <div className="admin-login-field">
+                  <label className="admin-login-label">Mot de passe</label>
+                  <input
+                    type="password"
+                    className="admin-login-input"
+                    placeholder="••••••••"
+                    value={adminLoginPassword}
+                    onChange={(e) => setAdminLoginPassword(e.target.value)}
+                    autoComplete="current-password"
+                    onKeyDown={(e) => { if (e.key === "Enter") handleAdminLogin(); }}
+                  />
+                </div>
+                <button className="admin-login-btn" onClick={handleAdminLogin} disabled={adminLoginLoading || !adminLoginEmail || !adminLoginPassword}>
+                  {adminLoginLoading ? <div className="btn-loader" /> : <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 1 1 10 0v4"/></svg> Connexion Admin</>}
+                </button>
+                <div className="admin-login-error">{adminLoginError || "\u00A0"}</div>
+                <div onClick={() => setAdminForgotStep("email")} style={{ textAlign: "center", marginTop: 14, fontSize: 12, color: "#64748b", cursor: "pointer" }}>
+                  Mot de passe oublié ?
+                </div>
+              </>
+            )}
+
+            {/* ── REGISTER TAB (only when no admin exists) ── */}
+            {adminAuthTab === "register" && !adminExists && (
+              <>
+                <div className="admin-login-field">
+                  <label className="admin-login-label">Nom complet</label>
+                  <input
+                    type="text"
+                    className="admin-login-input"
+                    placeholder="Votre nom"
+                    value={adminRegName}
+                    onChange={(e) => setAdminRegName(e.target.value)}
+                    autoComplete="name"
+                  />
+                </div>
+                <div className="admin-login-field">
+                  <label className="admin-login-label">Email administrateur</label>
+                  <input
+                    type="email"
+                    className="admin-login-input"
+                    placeholder="admin@morali.bank"
+                    value={adminRegEmail}
+                    onChange={(e) => setAdminRegEmail(e.target.value)}
+                    autoComplete="email"
+                  />
+                </div>
+                <div className="admin-login-field">
+                  <label className="admin-login-label">Mot de passe</label>
+                  <input
+                    type="password"
+                    className="admin-login-input"
+                    placeholder="Minimum 8 caractères"
+                    value={adminRegPassword}
+                    onChange={(e) => setAdminRegPassword(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div className="admin-login-field">
+                  <label className="admin-login-label">Confirmer le mot de passe</label>
+                  <input
+                    type="password"
+                    className="admin-login-input"
+                    placeholder="Retapez le mot de passe"
+                    value={adminRegConfirm}
+                    onChange={(e) => setAdminRegConfirm(e.target.value)}
+                    autoComplete="new-password"
+                    onKeyDown={(e) => { if (e.key === "Enter") handleAdminRegister(); }}
+                  />
+                </div>
+                <button className="admin-login-btn" onClick={handleAdminRegister} disabled={adminRegLoading || !adminRegEmail || !adminRegPassword || !adminRegConfirm} style={{ background: "linear-gradient(135deg, #D4A437, #b8860b)" }}>
+                  {adminRegLoading ? <div className="btn-loader" /> : <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg> Créer le compte Admin</>}
+                </button>
+                <div style={{ textAlign: "center", marginTop: 12, fontSize: 11, color: "#475569", lineHeight: 1.5 }}>
+                  ⚠️ Un seul compte administrateur peut être créé. Choisissez un mot de passe fort.
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -216,6 +216,11 @@ export const schemas = {
     details: z.string().max(500).optional().default(""),
   }),
 
+  /** POST /api/sms/send-otp */
+  smsSendOtp: z.object({
+    phone: z.string().min(1, "Numéro requis"),
+  }),
+
   /** POST /api/sms/verify-otp */
   smsVerifyOtp: z.object({
     phone: z.string().min(1, "Numéro requis"),

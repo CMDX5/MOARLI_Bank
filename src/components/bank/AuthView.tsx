@@ -9,7 +9,6 @@ import {
 } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { firebaseAuth, firebaseDb } from "@/lib/firebase";
-import { encryptPinWithPassword } from "@/lib/pin-utils";
 import {
   firebaseAuthMessage,
   getIdentitySeed,
@@ -87,13 +86,6 @@ export default function AuthView({
   const [currentStep, setCurrentStep] = useState(1);
   const [showRegisterSuccess, setShowRegisterSuccess] = useState(false);
 
-  // ── Registration PIN setup state ──
-  const [showPinSetup, setShowPinSetup] = useState(false);
-  const [regPinDraft, setRegPinDraft] = useState("");
-  const [regPinConfirm, setRegPinConfirm] = useState("");
-  const [regPinStep, setRegPinStep] = useState<"create" | "confirm">("create");
-  const [regPinSaving, setRegPinSaving] = useState(false);
-
   // ── Forgot password state ──
   const [forgotStep, setForgotStep] = useState<ForgotStep>("email");
   const [forgotEmail, setForgotEmail] = useState("");
@@ -112,7 +104,7 @@ export default function AuthView({
   const passwordStrength = useMemo(() => getStrength(registerData.pw), [registerData.pw]);
 
   const stepDot = (step: number) => {
-    if (showRegisterSuccess || showPinSetup || currentStep > step) return "done";
+    if (showRegisterSuccess || currentStep > step) return "done";
     if (currentStep === step) return "active";
     return "";
   };
@@ -134,10 +126,6 @@ export default function AuthView({
     if (tab === "register") {
       setCurrentStep(1);
       setShowRegisterSuccess(false);
-      setShowPinSetup(false);
-      setRegPinDraft("");
-      setRegPinConfirm("");
-      setRegPinStep("create");
       setOtpValue("");
     }
   };
@@ -249,7 +237,7 @@ export default function AuthView({
         showToast("Compte créé. Synchronisation du profil en attente.");
       }
 
-      setShowPinSetup(true);
+      setShowRegisterSuccess(true);
       onAuthSuccess(cred.user.uid, cred.user.email || "");
     } catch (error) {
       const message = firebaseAuthMessage(error);
@@ -487,66 +475,6 @@ export default function AuthView({
     window.setTimeout(() => otpInputRef.current?.focus(), 150);
   };
 
-  // ── Registration PIN handlers ──
-  const handleRegPinBack = () => {
-    setRegPinStep("create");
-    setRegPinDraft("");
-    setRegPinConfirm("");
-  };
-
-  const handleRegPinSave = async () => {
-    if (regPinDraft.length !== 4 || regPinConfirm.length !== 4) {
-      showToast("Entrez un code PIN à 4 chiffres");
-      return;
-    }
-    if (regPinDraft !== regPinConfirm) {
-      showToast("Les codes PIN ne correspondent pas. Réessayez.");
-      setRegPinStep("create");
-      setRegPinDraft("");
-      setRegPinConfirm("");
-      return;
-    }
-    setRegPinSaving(true);
-    try {
-      window.localStorage.removeItem("morali_card_pin");
-      window.localStorage.removeItem("morali_card_pin_hash");
-      window.localStorage.removeItem("morali_card_pin_salt");
-      // Encrypt PIN with account password for later reveal
-      const encrypted = await encryptPinWithPassword(regPinDraft, registerData.pw, firebaseAuth.currentUser?.uid || "");
-      window.localStorage.setItem("morali_card_pin_encrypted", encrypted.encryptedPin);
-      window.localStorage.setItem("morali_card_pin_iv", encrypted.pinIv);
-      // Store PIN on server (server bcrypt-hashes the plaintext PIN)
-      try {
-        const token = await firebaseAuth.currentUser?.getIdToken();
-        await fetch("/api/pin/store", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ pin: regPinDraft, encryptedPin: encrypted.encryptedPin, pinIv: encrypted.pinIv }),
-        });
-      } catch { /* server store failed — localStorage encrypted PIN is fallback */ }
-      // Persist PIN existence flag so openPinModal knows PIN exists on reload
-      window.localStorage.setItem("morali_pin_exists", "true");
-      setShowPinSetup(false);
-      setRegPinDraft("");
-      setRegPinConfirm("");
-      setRegPinStep("create");
-      setShowRegisterSuccess(true);
-      showToast("Code PIN créé avec succès");
-    } catch {
-      showToast("Erreur lors de la création du PIN");
-    } finally {
-      setRegPinSaving(false);
-    }
-  };
-
-  const handleSkipPinSetup = () => {
-    setShowPinSetup(false);
-    setRegPinDraft("");
-    setRegPinConfirm("");
-    setRegPinStep("create");
-    setShowRegisterSuccess(true);
-  };
-
   // ────────────────────────────────────────────
   // RENDER
   // ────────────────────────────────────────────
@@ -732,76 +660,23 @@ export default function AuthView({
 
         {/* ── Register Panel ── */}
         <div className={`auth-panel ${authTab === "register" ? "active" : ""}`}>
-          {!showRegisterSuccess && !showPinSetup && (
+          {!showRegisterSuccess && (
             <div className="step-row">
               {[1, 2, 3].map((step, index) => (
                 <React.Fragment key={step}>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
                     <div className={`step-dot ${stepDot(step)}`}>
-                      {showPinSetup || currentStep > step ? "✓" : step}
+                      {currentStep > step ? "✓" : step}
                     </div>
                     <div className="step-label">{step === 1 ? "Identité" : step === 2 ? "Sécurité" : "Code OTP"}</div>
                   </div>
-                  {index < 2 && <div className={`step-line ${currentStep > step || showPinSetup ? "done" : ""}`} />}
+                  {index < 2 && <div className={`step-line ${currentStep > step ? "done" : ""}`} />}
                 </React.Fragment>
               ))}
             </div>
           )}
-
-          {/* PIN Setup */}
-          {showPinSetup && (
-            <div className="pin-setup-wrap">
-              <div className="pin-setup-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="32" height="32">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
-              </div>
-              <div className="pin-setup-title">
-                {regPinStep === "create" ? "Créez votre code PIN" : "Confirmez votre code PIN"}
-              </div>
-              <div className="pin-setup-desc">
-                {regPinStep === "create"
-                  ? "Ce code à 4 chiffres sécurisera vos transactions et l'accès à vos cartes."
-                  : "Entrez à nouveau votre code PIN pour confirmer."
-                }
-              </div>
-              <div className="pin-dots-row">
-                {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className={`pin-dot ${(regPinStep === "create" ? regPinDraft : regPinConfirm).length > i ? "filled" : ""}`} />
-                ))}
-              </div>
-              <input
-                type="password" inputMode="numeric" maxLength={4}
-                value={regPinStep === "create" ? regPinDraft : regPinConfirm}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, "").slice(0, 4);
-                  if (regPinStep === "create") setRegPinDraft(val);
-                  else setRegPinConfirm(val);
-                }}
-                placeholder="••••" autoFocus className="reg-pin-input" data-needs-scroll
-              />
-              {regPinStep === "create" && regPinDraft.length === 4 && (
-                <button className="btn-primary pin-confirm-btn" onClick={() => { setRegPinStep("confirm"); setRegPinConfirm(""); }} style={{ width: "100%", marginTop: 20 }}>
-                  Continuer
-                </button>
-              )}
-              {regPinStep === "confirm" && (
-                <button className="pin-back-link" onClick={handleRegPinBack}>Modifier le code PIN</button>
-              )}
-              {regPinStep === "confirm" && regPinConfirm.length === 4 && (
-                <button className="btn-primary pin-confirm-btn" onClick={handleRegPinSave} disabled={regPinSaving} style={{ width: "100%", marginTop: 20 }}>
-                  {regPinSaving ? <div className="btn-loader" /> : "Confirmer le code PIN"}
-                </button>
-              )}
-              {regPinStep === "confirm" && regPinConfirm.length === 4 && regPinDraft !== regPinConfirm && (
-                <div className="pin-error-msg">Les codes PIN ne correspondent pas</div>
-              )}
-            </div>
-          )}
-
           {/* Register Step 1: Identity */}
-          {!showRegisterSuccess && !showPinSetup && currentStep === 1 && (
+          {!showRegisterSuccess && currentStep === 1 && (
             <div>
               <div className="form-section-title">Vos informations</div>
               <div className="fields-row">
@@ -836,7 +711,7 @@ export default function AuthView({
           )}
 
           {/* Register Step 2: Security */}
-          {!showRegisterSuccess && !showPinSetup && currentStep === 2 && (
+          {!showRegisterSuccess && currentStep === 2 && (
             <div>
               <div className="form-section-title">Sécurité du compte</div>
               <div className="field">
@@ -887,7 +762,7 @@ export default function AuthView({
           )}
 
           {/* Register Step 3: OTP Verification */}
-          {!showRegisterSuccess && !showPinSetup && currentStep === 3 && (
+          {!showRegisterSuccess && currentStep === 3 && (
             <div>
               <div className="form-section-title">Vérification OTP</div>
               <div className="info-box">

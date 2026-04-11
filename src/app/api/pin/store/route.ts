@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/admin-firestore";
 import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
-import { doc, setDoc } from "firebase-admin/firestore";
+// firebase-admin v13: doc/collection/query methods are on the Firestore instance (adminDb)
 import { validateBody, schemas } from "@/lib/validation";
 import { captureError } from "@/lib/sentry";
 
@@ -42,8 +42,8 @@ export async function POST(req: NextRequest) {
       const bcrypt = await import("bcryptjs");
       const pinBcrypt = await bcrypt.hash(rawBody.pin, 12);
 
-      const pinRef = doc(adminDb, "pinRecords", auth.uid);
-      await setDoc(pinRef, {
+      const pinRef = adminDb.doc("pinRecords/" + auth.uid);
+      await pinRef.set({
         pinBcrypt,
         // Keep encrypted PIN fields if provided (for PIN reveal feature)
         encryptedPin: rawBody.encryptedPin || null,
@@ -61,8 +61,8 @@ export async function POST(req: NextRequest) {
     }
     const { encryptedPin, pinIv, pinHash, salt } = validation.data;
 
-    const pinRef = doc(adminDb, "pinRecords", auth.uid);
-    await setDoc(pinRef, {
+    const pinRef = adminDb.doc("pinRecords/" + auth.uid);
+    await pinRef.set({
       pinHash,
       salt,
       encryptedPin: encryptedPin || null,

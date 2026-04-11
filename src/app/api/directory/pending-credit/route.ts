@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { collection, addDoc, doc, getDoc, getDocs, deleteDoc, query, where, orderBy, limit as queryLimit } from "firebase-admin/firestore";
+// firebase-admin v13: doc/collection/query methods are on the Firestore instance (adminDb)
 import { getAdminFirestore } from "@/lib/admin-firestore";
 import { rateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
@@ -50,13 +50,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Service indisponible" }, { status: 503 });
     }
 
-    const q = query(
-      collection(adminDb, "pendingCredits"),
-      where("recipientUid", "==", uid),
-      orderBy("createdAt", "asc"),
-      queryLimit(100)
-    );
-    const snapshot = await getDocs(q);
+    const q = adminDb.collection("pendingCredits")
+      .where("recipientUid", "==", uid)
+      .orderBy("createdAt", "asc")
+      .limit(100);
+    const snapshot = await q.get();
 
     const credits = snapshot.docs.map((d) => ({
       id: d.id,
@@ -124,7 +122,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Service indisponible" }, { status: 503 });
     }
 
-    const docRef = await addDoc(collection(adminDb, "pendingCredits"), {
+    const docRef = await adminDb.collection("pendingCredits").add({
       recipientUid,
       senderUid: auth.uid,
       amount: Math.round(numericAmount),
@@ -193,14 +191,14 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Ownership check: can only delete own pending credits
-    const docRef = doc(adminDb, "pendingCredits", id);
-    const docSnap = await getDoc(docRef);
+    const docRef = adminDb.doc("pendingCredits/" + id);
+    const docSnap = await docRef.get();
 
-    if (!docSnap.exists() || docSnap.data()?.recipientUid !== auth.uid) {
+    if (!docSnap.exists || docSnap.data()?.recipientUid !== auth.uid) {
       return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
     }
 
-    await deleteDoc(docRef);
+    await docRef.delete();
 
     return NextResponse.json({ success: true });
   } catch (err) {
@@ -255,7 +253,7 @@ export async function PUT(req: NextRequest) {
       const creditSnap = await transaction.get(creditRef);
 
       // Credit must exist
-      if (!creditSnap.exists()) {
+      if (!creditSnap.exists) {
         throw new Error("NOT_FOUND");
       }
 
@@ -281,7 +279,7 @@ export async function PUT(req: NextRequest) {
       const recipientRef = adminDb.collection("moraliUsers").doc(auth.uid);
       const recipientSnap = await transaction.get(recipientRef);
 
-      if (!recipientSnap.exists()) {
+      if (!recipientSnap.exists) {
         throw new Error("RECIPIENT_NOT_FOUND");
       }
 

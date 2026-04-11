@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/admin-firestore";
 import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
-import { doc, getDoc } from "firebase-admin/firestore";
+// firebase-admin v13: doc/collection/query methods are on the Firestore instance (adminDb)
 
 export async function POST(req: NextRequest) {
   const clientId = getClientId(req);
@@ -21,10 +21,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const pinRef = doc(adminDb, "pinRecords", auth.uid);
-    const snap = await getDoc(pinRef);
+    const pinRef = adminDb.doc("pinRecords/" + auth.uid);
+    const snap = await pinRef.get();
 
-    if (!snap.exists()) {
+    if (!snap.exists) {
       return NextResponse.json(
         { hasEncrypted: false, message: "Code PIN créé avant la mise à jour. Veuillez le modifier." },
         { status: 200 }

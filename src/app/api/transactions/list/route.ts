@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { query, where, getDocs, limit as queryLimit, orderBy } from "firebase-admin/firestore";
+// firebase-admin v13: doc/collection/query methods are on the Firestore instance (adminDb)
 import { getAdminFirestore } from "@/lib/admin-firestore";
 import { rateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
@@ -50,22 +50,16 @@ export async function GET(req: NextRequest) {
     // Query serverTransactions where user is sender OR recipient
     // Security: uid comes from token, NOT from request parameters
     const [sentSnap, receivedSnap] = await Promise.all([
-      getDocs(
-        query(
-          adminDb.collection("serverTransactions"),
-          where("senderUid", "==", secureUid),
-          orderBy("createdAt", "desc"),
-          queryLimit(perPage)
-        )
-      ),
-      getDocs(
-        query(
-          adminDb.collection("serverTransactions"),
-          where("recipientUid", "==", secureUid),
-          orderBy("createdAt", "desc"),
-          queryLimit(perPage)
-        )
-      ),
+      adminDb.collection("serverTransactions")
+        .where("senderUid", "==", secureUid)
+        .orderBy("createdAt", "desc")
+        .limit(perPage)
+        .get(),
+      adminDb.collection("serverTransactions")
+        .where("recipientUid", "==", secureUid)
+        .orderBy("createdAt", "desc")
+        .limit(perPage)
+        .get(),
     ]);
 
     // Merge and deduplicate by document ID

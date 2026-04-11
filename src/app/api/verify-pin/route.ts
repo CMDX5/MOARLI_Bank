@@ -3,7 +3,7 @@ import { getAdminFirestore } from "@/lib/admin-firestore";
 import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
 import { createHash, timingSafeEqual } from "crypto";
-import { doc, getDoc, updateDoc } from "firebase-admin/firestore";
+// firebase-admin v13: doc/collection/query methods are on the Firestore instance (adminDb)
 import { validateBody, schemas } from "@/lib/validation";
 import { captureError } from "@/lib/sentry";
 
@@ -53,14 +53,14 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const pinRef = doc(adminDb, "pinRecords", auth.uid);
-    const snap = await getDoc(pinRef);
+    const pinRef = adminDb.doc("pinRecords/" + auth.uid);
+    const snap = await pinRef.get();
 
     // Random delay to prevent timing attacks (regardless of record existence)
     const delay = 100 + Math.floor(Math.random() * 200);
     await new Promise((resolve) => setTimeout(resolve, delay));
 
-    if (!snap.exists()) {
+    if (!snap.exists) {
       return NextResponse.json({ valid: false }, { status: 200 });
     }
 
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
           try {
             const bcrypt = await import("bcryptjs");
             const bcryptHash = await bcrypt.hash(pin, 12);
-            await updateDoc(pinRef, {
+            await pinRef.update({
               pinBcrypt: bcryptHash,
               migratedAt: new Date().toISOString(),
             });

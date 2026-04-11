@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { collection, addDoc } from "firebase-admin/firestore";
+// firebase-admin v13: doc/collection/query methods are on the Firestore instance (adminDb)
 import { getAdminFirestore } from "@/lib/admin-firestore";
 import { rateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       .replace(/&[^;]+;/g, "")    // Strip HTML entities
       .replace(/['"\\]/g, "");    // Strip quotes and backslashes
 
-    await addDoc(collection(adminDb, "users", targetUid, "notifications"), {
+    await adminDb.collection("users/" + targetUid + "/notifications").add({
       title: sanitize(title),
       time: sanitize(time || "À l'instant"),
       badge: sanitize(badge || "Info"),

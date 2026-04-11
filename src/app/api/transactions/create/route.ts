@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { collection, addDoc, query, where, getDocs, limit as queryLimit } from "firebase-admin/firestore";
+// firebase-admin v13: doc/collection/query methods are on the Firestore instance (adminDb)
 import { getAdminFirestore } from "@/lib/admin-firestore";
 import { rateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
@@ -55,19 +55,17 @@ export async function POST(req: NextRequest) {
 
     try {
       // Duplicate detection: check if receiptId already exists
-      const existingQuery = query(
-        collection(adminDb, "serverTransactions"),
-        where("receiptId", "==", String(receiptId)),
-        queryLimit(1)
-      );
-      const existingSnap = await getDocs(existingQuery);
+      const existingQuery = adminDb.collection("serverTransactions")
+        .where("receiptId", "==", String(receiptId))
+        .limit(1);
+      const existingSnap = await existingQuery.get();
 
       if (!existingSnap.empty) {
         const existingDoc = existingSnap.docs[0];
         return NextResponse.json({ success: true, id: existingDoc.id, duplicate: true });
       }
 
-      const docRef = await addDoc(collection(adminDb, "serverTransactions"), {
+      const docRef = await adminDb.collection("serverTransactions").add({
         receiptId: String(receiptId),
         senderUid: String(senderUid),
         senderMoraliId: String(senderMoraliId || ""),

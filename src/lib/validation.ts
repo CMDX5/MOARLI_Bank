@@ -26,7 +26,9 @@ export const firebaseUid = z.string()
 
 /** Sanitized string: HTML entities and dangerous chars removed */
 export const sanitizedString = z.string()
-  .transform((s) => String(s || "").replace(/<[^>]*>/g, "").replace(/&[^;]+;/g, "").replace(/['"\\]/g, "").trim());
+  .transform((s) => String(s || "").replace(/<[^>]*>/g, "").replace(/&[^;]+;/g, "").replace(/['"\\]/g, "").trim())
+  // Note: in Zod v4, .max() must be called BEFORE .transform()
+  // Usage: sanitizedString.pipe(z.string().max(N))
 
 /** Email format */
 export const email = z.string()
@@ -77,11 +79,11 @@ export const schemas = {
   transactionCreate: z.object({
     receiptId: z.string().min(1, "Reçu requis"),
     senderUid: firebaseUid,
-    senderMoraliId: sanitizedString.max(50).optional().default(""),
-    senderName: sanitizedString.max(100).optional().default("Utilisateur"),
+    senderMoraliId: sanitizedString.pipe(z.string().max(50)).optional().default(""),
+    senderName: sanitizedString.pipe(z.string().max(100)).optional().default("Utilisateur"),
     recipientUid: firebaseUid,
-    recipientMoraliId: sanitizedString.max(50).optional().default(""),
-    recipientName: sanitizedString.max(100).optional().default("Utilisateur"),
+    recipientMoraliId: sanitizedString.pipe(z.string().max(50)).optional().default(""),
+    recipientName: sanitizedString.pipe(z.string().max(100)).optional().default("Utilisateur"),
     amount: txAmount,
     fees: z.number().min(0).optional().default(0),
     type: z.enum(["depot", "retrait", "virement", "remboursement"]).optional().default("virement"),
@@ -127,12 +129,12 @@ export const schemas = {
   /** POST /api/notifications/create */
   notificationCreate: z.object({
     uid: firebaseUid,
-    title: sanitizedString.max(200),
-    time: sanitizedString.max(50).optional().default("À l'instant"),
-    badge: sanitizedString.max(50).optional().default("Info"),
-    badgeClass: sanitizedString.max(50).optional().default("nb-blue"),
-    icon: sanitizedString.max(50).optional().default("bell"),
-    bg: sanitizedString.max(100).optional().default("rgba(59,130,246,0.12)"),
+    title: sanitizedString.pipe(z.string().max(200)),
+    time: sanitizedString.pipe(z.string().max(50)).optional().default("À l'instant"),
+    badge: sanitizedString.pipe(z.string().max(50)).optional().default("Info"),
+    badgeClass: sanitizedString.pipe(z.string().max(50)).optional().default("nb-blue"),
+    icon: sanitizedString.pipe(z.string().max(50)).optional().default("bell"),
+    bg: sanitizedString.pipe(z.string().max(100)).optional().default("rgba(59,130,246,0.12)"),
   }),
 
   /** POST /api/kyc */
@@ -141,9 +143,9 @@ export const schemas = {
     documentFront: base64Image,
     documentBack: base64Image.nullable().optional(),
     selfiePhoto: base64Image.nullable().optional(),
-    fullName: sanitizedString.max(100),
+    fullName: sanitizedString.pipe(z.string().max(100)),
     dateOfBirth: z.string().max(20).nullable().optional(),
-    documentNumber: sanitizedString.max(50).nullable().optional(),
+    documentNumber: sanitizedString.pipe(z.string().max(50)).nullable().optional(),
   }),
 
   /** GET /api/directory/search — query param "q" */
@@ -155,19 +157,19 @@ export const schemas = {
   directoryRegister: z.object({
     uid: firebaseUid,
     moraliId: moraliId,
-    pseudo: sanitizedString.max(20).optional().default(""),
-    fullName: sanitizedString.max(100).optional().default("Utilisateur"),
-    firstName: sanitizedString.max(50).optional(),
-    lastName: sanitizedString.max(50).optional(),
+    pseudo: sanitizedString.pipe(z.string().max(20)).optional().default(""),
+    fullName: sanitizedString.pipe(z.string().max(100)).optional().default("Utilisateur"),
+    firstName: sanitizedString.pipe(z.string().max(50)).optional(),
+    lastName: sanitizedString.pipe(z.string().max(50)).optional(),
   }),
 
   /** POST /api/directory/pending-credit */
   pendingCreditCreate: z.object({
     recipientUid: firebaseUid,
     amount: txAmount,
-    senderName: sanitizedString.max(100).optional().default(""),
-    senderMoraliId: sanitizedString.max(50).optional().default(""),
-    receiptId: sanitizedString.max(50).optional().default(""),
+    senderName: sanitizedString.pipe(z.string().max(100)).optional().default(""),
+    senderMoraliId: sanitizedString.pipe(z.string().max(50)).optional().default(""),
+    receiptId: sanitizedString.pipe(z.string().max(50)).optional().default(""),
   }),
 
   /** DELETE /api/directory/pending-credit */
@@ -179,9 +181,9 @@ export const schemas = {
   pendingCreditApply: z.object({
     recipientUid: firebaseUid,
     amount: creditAmount,
-    senderName: sanitizedString.max(100).optional().default(""),
-    senderMoraliId: sanitizedString.max(50).optional().default(""),
-    receiptId: sanitizedString.max(50).optional().default(""),
+    senderName: sanitizedString.pipe(z.string().max(100)).optional().default(""),
+    senderMoraliId: sanitizedString.pipe(z.string().max(50)).optional().default(""),
+    receiptId: sanitizedString.pipe(z.string().max(50)).optional().default(""),
   }),
 
   /** POST /api/admin/login */

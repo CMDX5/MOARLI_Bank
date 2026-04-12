@@ -1307,6 +1307,7 @@ const profileGroups = [
     items: [
       { icon: "user" as IconName, label: "Informations Personnelles" },
       { icon: "shield" as IconName, label: "Sécurité & Biométrie", badge: "Activé" },
+      { icon: "lock" as IconName, label: "Confidentialité" },
       { icon: "receipt" as IconName, label: "Historique des Reçus" },
       { icon: "headset" as IconName, label: "Support Client", sub: "Réponse en 5min" },
     ],
@@ -1315,7 +1316,7 @@ const profileGroups = [
     title: "Légal",
     items: [
       { icon: "document" as IconName, label: "Conditions d'utilisation" },
-      { icon: "lock" as IconName, label: "Confidentialité" },
+      { icon: "eye-off" as IconName, label: "Politique de confidentialité" },
     ],
   },
 ];
@@ -8866,7 +8867,8 @@ function App() {
                 else if (label === "Historique des Reçus") openReceiptsModal();
                 else if (label === "Support Client") openSupportModal();
                 else if (label === "Conditions d'utilisation") openTermsModal();
-                else if (label === "Confidentialité") openPrivacyModal();
+                else if (label === "Confidentialité") { setPrivacySaveState("idle"); setPrivacyAccessLogOpen(false); setPrivacyTab("settings"); setPrivacyModalOpen(true); }
+                else if (label === "Politique de confidentialité") { setPrivacyTab("policy"); setPrivacyModalOpen(true); }
                 else showToast(label);
               }}
               onLogout={() => setLogoutModalOpen(true)}
@@ -9975,12 +9977,8 @@ function App() {
 
         {privacyModalOpen && (
           <div className="card-modal-overlay" onClick={closePrivacyModal}>
-            <div className="bc-modal legal-modal" onClick={(event) => event.stopPropagation()}>
+            <div className={`bc-modal ${privacyTab === "policy" ? "legal-modal" : ""}`} onClick={(event) => event.stopPropagation()}>
               <button className="bc-close legal-modal-close" onClick={closePrivacyModal} aria-label="Fermer">&times;</button>
-              <div className="privacy-tabs">
-                <button className={`privacy-tab ${privacyTab === "policy" ? "active" : ""}`} onClick={() => setPrivacyTab("policy")}>Politique</button>
-                <button className={`privacy-tab ${privacyTab === "settings" ? "active" : ""}`} onClick={() => setPrivacyTab("settings")}>Paramètres</button>
-              </div>
               {privacyTab === "policy" ? (
                 <PrivacyPolicy mode="modal" />
               ) : (

@@ -1,17 +1,19 @@
 /**
- * Dual-write OTP store — Always writes to BOTH memory and Firestore.
+ * Dual-write OTP store — Memory + Firebase Client SDK Firestore.
  *
  * Why dual-write?
- * - Firestore: Works across serverless instances (Vercel production)
- * - Memory: Works when Firestore is slow/unavailable
- * - Verify: Checks Firestore first (authoritative), then memory (fallback)
+ * - Firebase Client SDK Firestore: Works across ALL serverless instances (Vercel production)
+ *   because it uses NEXT_PUBLIC_* env vars that ARE configured on Vercel.
+ * - Memory: Fast local cache, works when Firestore is temporarily unavailable
  *
- * This eliminates the race condition where:
- * - setOtp writes to Firestore only → verify fails if Firestore read is slow
- * - setOtp writes to memory only → verify fails on different server instance
+ * Verify order: Firestore first (authoritative), then memory (fallback).
+ * This fixes the Vercel serverless issue where Admin SDK returns null (no credentials)
+ * and in-memory Map doesn't persist between instances.
  */
 
 import { timingSafeEqual } from "crypto";
+import { doc, setDoc, getDoc, deleteDoc, updateDoc } from "firebase/firestore";
+import { firebaseDb } from "@/lib/firebase";
 
 type OtpEntry = {
   code: string;
@@ -27,7 +29,7 @@ export const MAX_OTP_ATTEMPTS = 3;
 /** Firestore collection name for OTPs */
 const OTP_COLLECTION = "otpStore";
 
-// ── In-memory store (always available) ──
+// ── In-memory store (local cache, always available) ──
 const memoryStore = new Map<string, OtpEntry>();
 
 // Cleanup expired entries every 5 minutes
@@ -78,57 +80,56 @@ function memoryVerifyOtp(phone: string, code: string): string {
   return "valid";
 }
 
-// ── Firestore store (for distributed serverless) ──
-async function firestoreSetOtp(phone: string, code: string): Promise<void> {
-  try {
-    const { getAdminFirestore } = await import("@/lib/admin-firestore");
-    const adminDb = await getAdminFirestore();
-    if (!adminDb) return;
+// ── Firestore store using Firebase Client SDK (works on Vercel!) ──
 
-    await adminDb.collection(OTP_COLLECTION).doc(normalizeKey(phone)).set({
+async function firestoreSetOtp(phone: string, code: string): Promise<boolean> {
+  try {
+    const key = normalizeKey(phone);
+    const docRef = doc(firebaseDb, OTP_COLLECTION, key);
+    await setDoc(docRef, {
       code,
       expiresAt: Date.now() + OTP_EXPIRY_MS,
       attempts: 0,
       createdAt: new Date().toISOString(),
     });
-  } catch {
-    // Non-critical — memory store has the OTP
+    return true;
+  } catch (err) {
+    console.error("[otp-store] Firestore setOtp failed:", err);
+    return false;
   }
 }
 
 async function firestoreVerifyOtp(phone: string, code: string): Promise<string | null> {
   try {
-    const { getAdminFirestore } = await import("@/lib/admin-firestore");
-    const adminDb = await getAdminFirestore();
-    if (!adminDb) return null;
+    const key = normalizeKey(phone);
+    const docRef = doc(firebaseDb, OTP_COLLECTION, key);
+    const docSnap = await getDoc(docRef);
 
-    const docRef = adminDb.collection(OTP_COLLECTION).doc(normalizeKey(phone));
-    const docSnap = await docRef.get();
-
-    if (!docSnap.exists) return null;
+    if (!docSnap.exists()) return null;
 
     const entry = docSnap.data() as OtpEntry;
 
     if (Date.now() > entry.expiresAt) {
-      await docRef.delete().catch(() => {});
+      await deleteDoc(docRef).catch(() => {});
       return "expired";
     }
 
     if (entry.attempts >= MAX_OTP_ATTEMPTS) {
-      await docRef.delete().catch(() => {});
+      await deleteDoc(docRef).catch(() => {});
       return "max_attempts";
     }
 
     const expected = Buffer.from(entry.code, "utf-8");
     const provided = Buffer.from(code, "utf-8");
     if (expected.length !== provided.length || !timingSafeEqual(expected, provided)) {
-      await docRef.update({ attempts: entry.attempts + 1 }).catch(() => {});
+      await updateDoc(docRef, { attempts: entry.attempts + 1 }).catch(() => {});
       return "invalid";
     }
 
-    await docRef.delete().catch(() => {});
+    await deleteDoc(docRef).catch(() => {});
     return "valid";
-  } catch {
+  } catch (err) {
+    console.error("[otp-store] Firestore verifyOtp failed:", err);
     return null;
   }
 }
@@ -137,40 +138,36 @@ async function firestoreVerifyOtp(phone: string, code: string): Promise<string |
 
 /**
  * Store an OTP for a phone number.
- * DUAL-WRITE: Always stores in memory + tries Firestore.
+ * DUAL-WRITE: Always stores in memory + Firestore (Client SDK).
  */
 export async function setOtp(phone: string, code: string): Promise<void> {
-  // 1. Always store in memory (instant, reliable)
+  // 1. Always store in memory (instant local cache)
   memorySetOtp(phone, code);
 
-  // 2. Also try Firestore (for cross-instance support)
-  // Fire-and-forget — don't block the response
-  firestoreSetOtp(phone, code).catch(() => {});
+  // 2. Also store in Firestore via Client SDK (authoritative, cross-instance)
+  // This MUST succeed for Vercel serverless to work
+  await firestoreSetOtp(phone, code);
 }
 
 /**
  * Verify an OTP for a phone number.
- * Checks memory first (fast), then Firestore (authoritative).
+ * Checks Firestore first (authoritative), then memory (fallback).
  */
 export async function verifyOtp(phone: string, code: string): Promise<string> {
-  // 1. Check memory first (instant, works on same instance)
-  const memResult = memoryVerifyOtp(phone, code);
-  if (memResult === "valid" || memResult === "invalid" || memResult === "expired" || memResult === "max_attempts") {
-    // Also clean up Firestore if we verified via memory
-    if (memResult === "valid") {
-      firestoreVerifyOtp(phone, code).catch(() => {});
-    }
-    return memResult;
-  }
-
-  // 2. Check Firestore (for cross-instance OTPs)
+  // 1. Check Firestore first (authoritative — works across all instances)
   const fsResult = await firestoreVerifyOtp(phone, code);
   if (fsResult !== null) {
-    // If valid in Firestore, also remove from memory
+    // If valid in Firestore, also clean up memory
     if (fsResult === "valid") {
       memoryStore.delete(normalizeKey(phone));
     }
     return fsResult;
+  }
+
+  // 2. Fallback to memory (same-instance cache)
+  const memResult = memoryVerifyOtp(phone, code);
+  if (memResult !== "not_found") {
+    return memResult;
   }
 
   // 3. Not found anywhere

@@ -1,8 +1,16 @@
+# Morali Pay — robots.txt
+# Autorise l'indexation des pages publiques uniquement.
+# Les routes API, admin et internes sont interdites aux bots.
+
 User-agent: Googlebot
 Allow: /
+Disallow: /api/
+Disallow: /.well-known/
 
 User-agent: Bingbot
 Allow: /
+Disallow: /api/
+Disallow: /.well-known/
 
 User-agent: Twitterbot
 Allow: /
@@ -12,3 +20,8 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /api/
+Disallow: /.well-known/
+Crawl-delay: 10
+
+Sitemap: https://moarli-bank.vercel.app/sitemap.xml

@@ -6,6 +6,7 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
+  updateProfile,
 } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { firebaseAuth, firebaseDb } from "@/lib/firebase";
@@ -214,6 +215,14 @@ export default function AuthView({
     try {
       const cred = await createUserWithEmailAndPassword(firebaseAuth, registerData.email.trim(), registerData.pw);
       const normalizedFullName = `${registerData.prenom} ${registerData.nom}`.trim();
+
+      // Fix displayName in Firebase Auth so it persists across sessions
+      try {
+        await updateProfile(cred.user, { displayName: normalizedFullName });
+      } catch {
+        /* non-critical — name is saved in Firestore anyway */
+      }
+
       const immediateIdentity = generateMoraliIdentity(getIdentitySeed(cred.user.email, cred.user.uid));
       setBankingIdentity(immediateIdentity);
       cacheIdentityForUid(cred.user.uid, immediateIdentity);
@@ -264,19 +273,35 @@ export default function AuthView({
         const profileSnap = await getDoc(doc(firebaseDb, "moraliUsers", cred.user.uid));
         if (profileSnap.exists()) {
           const data = profileSnap.data() as FirestoreMoraliUser;
-          const fullName = data.fullName || `${data.firstName} ${data.lastName}`.trim() || "";
+          const firestoreName = data.fullName || `${data.firstName} ${data.lastName}`.trim() || "";
+          const firebaseName = cred.user.displayName || "";
+          const emailName = loginEmail ? loginEmail.split("@")[0] : "";
+          const emailCapitalized = emailName ? `${emailName.charAt(0).toUpperCase()}${emailName.slice(1)}` : "";
+          const fullName = firestoreName || firebaseName || emailCapitalized || "";
           if (fullName) {
             window.localStorage.setItem("morali_profile_full_name", fullName);
             setProfileForm((prev) => ({ ...prev, fullName }));
+            // Auto-repair: sync displayName to Firebase Auth if missing
+            if (!cred.user.displayName && fullName) {
+              updateProfile(cred.user, { displayName: fullName }).catch(() => {});
+            }
             enterDashboard(fullName);
           } else {
             enterDashboard();
           }
         } else {
-          enterDashboard();
+          // No Firestore doc — use Firebase displayName or email-based name
+          const firebaseName = cred.user.displayName || "";
+          const emailName = loginEmail ? loginEmail.split("@")[0] : "";
+          const emailCapitalized = emailName ? `${emailName.charAt(0).toUpperCase()}${emailName.slice(1)}` : "";
+          enterDashboard(firebaseName || emailCapitalized || undefined);
         }
       } catch {
-        enterDashboard();
+        // Firestore error — still try Firebase displayName or email fallback
+        const firebaseName = cred.user.displayName || "";
+        const emailName = loginEmail ? loginEmail.split("@")[0] : "";
+        const emailCapitalized = emailName ? `${emailName.charAt(0).toUpperCase()}${emailName.slice(1)}` : "";
+        enterDashboard(firebaseName || emailCapitalized || undefined);
       }
       onAuthSuccess(cred.user.uid, cred.user.email || "");
     } catch (error) {

@@ -10,6 +10,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
   updatePassword,
+  updateProfile,
 } from "firebase/auth";
 import {
   addDoc,
@@ -2033,6 +2034,10 @@ function App() {
           setDashboardName(fullName);
           if (typeof window !== "undefined") {
             window.localStorage.setItem("morali_profile_full_name", fullName);
+          }
+          // Auto-repair: sync displayName to Firebase Auth if missing
+          if (!user.displayName && fullName && fullName !== "Utilisateur") {
+            updateProfile(user, { displayName: fullName }).catch(() => {});
           }
           // Auto-repair: if Firestore has no name but we derived one, save it back
           if (!data.fullName && !data.firstName && fullName !== "Utilisateur") {

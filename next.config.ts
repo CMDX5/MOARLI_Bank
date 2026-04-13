@@ -43,20 +43,15 @@ const nextConfig: NextConfig = {
             //   - Sentry (error monitoring, CDN)
             //   - Google Fonts (typography)
             // ═══════════════════════════════════════════════════════
+            // Each directive MUST be a single string — .join("; ") separates directives.
+            // All domains within a directive (e.g. connect-src) must be space-separated.
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' https://js.sentry-cdn.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https:",
-              "connect-src 'self'",
-              "  https://*.firebaseio.com",
-              "  https://firestore.googleapis.com",
-              "  https://identitytoolkit.googleapis.com",
-              "  https://securetoken.googleapis.com",
-              "  https://firebaseinstallations.googleapis.com",
-              "  https://sentry.io",
-              "  https://*.ingest.sentry.io",
+              "connect-src 'self' https://*.firebaseio.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebaseinstallations.googleapis.com https://www.googleapis.com https://sentry.io https://*.ingest.sentry.io",
               "object-src 'none'",
               "frame-ancestors 'none'",
               "base-uri 'self'",

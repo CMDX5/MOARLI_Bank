@@ -722,7 +722,7 @@ body.lock-scroll{overflow:hidden;position:fixed}
 .bc-btn-full{width:100%;height:52px;border-radius:16px;font-size:14px;font-weight:800;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;border:none;background:linear-gradient(135deg,rgba(212,164,55,.2),rgba(212,164,55,.08));color:#D4A437;border:1px solid rgba(212,164,55,.25)}
 .bc-btn-full:active{transform:scale(.97)}
 .bc-btn-full:disabled{opacity:.5;cursor:not-allowed}
-.legal-modal{max-width:430px !important;padding:20px 18px calc(12px + env(safe-area-inset-bottom,0px)) !important;gap:0 !important}
+.legal-modal{max-width:430px !important;padding:20px 18px calc(12px + env(safe-area-inset-bottom,0px)) !important;gap:0 !important;border:1px solid rgba(212,164,55,.18) !important;box-shadow:0 30px 80px rgba(0,0,0,.55),0 0 40px rgba(212,164,55,.06),inset 0 1px 0 rgba(255,255,255,.05) !important;backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4)}
 .legal-modal-close{position:absolute;top:16px;right:18px;z-index:10;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);color:#94a3b8;font-size:18px;cursor:pointer}
 .privacy-tabs{display:flex;gap:4px;background:rgba(255,255,255,.03);border-radius:12px;padding:4px;margin-bottom:4px}
 .privacy-tab{flex:1;padding:10px 8px;border:none;border-radius:10px;font-size:12px;font-weight:700;color:#64748b;background:transparent;cursor:pointer;transition:all .2s ease;font-family:inherit}
@@ -3796,6 +3796,36 @@ function App() {
 
   const closeTermsModal = () => {
     setTermsOpen(false);
+  };
+
+  /** Enregistre l'acceptation d'un document légal dans Firestore */
+  const recordLegalAcceptance = async (type: "terms" | "privacy", version?: string) => {
+    try {
+      const token = await firebaseAuth.currentUser?.getIdToken();
+      if (!token) return;
+      await fetch("/api/legal/accept", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ type, version }),
+      });
+    } catch {
+      // Silent — l'acceptation est un best-effort, on ne bloque pas l'utilisateur
+    }
+  };
+
+  const handleAcceptTerms = () => {
+    recordLegalAcceptance("terms", "2.0");
+    closeTermsModal();
+    showToast("Conditions acceptées ✓");
+  };
+
+  const handleAcceptPrivacy = () => {
+    recordLegalAcceptance("privacy", "2.0");
+    closePrivacyModal();
+    showToast("Politique de confidentialité acceptée ✓");
   };
 
   const openVirtualCardModal = async () => {
@@ -9532,7 +9562,7 @@ function App() {
           <div className="card-modal-overlay" onClick={closeTermsModal}>
             <div className="bc-modal legal-modal" onClick={(event) => event.stopPropagation()}>
               <button className="bc-close legal-modal-close" onClick={closeTermsModal} aria-label="Fermer">&times;</button>
-              <LegalTerms mode="modal" onAccept={() => { closeTermsModal(); showToast("Conditions acceptées"); }} />
+              <LegalTerms mode="modal" onAccept={handleAcceptTerms} />
             </div>
           </div>
         )}
@@ -9980,7 +10010,7 @@ function App() {
             <div className={`bc-modal ${privacyTab === "policy" ? "legal-modal" : ""}`} onClick={(event) => event.stopPropagation()}>
               <button className="bc-close legal-modal-close" onClick={closePrivacyModal} aria-label="Fermer">&times;</button>
               {privacyTab === "policy" ? (
-                <PrivacyPolicy mode="modal" />
+                <PrivacyPolicy mode="modal" onAccept={handleAcceptPrivacy} />
               ) : (
                 <>
                   <div className="bc-head" style={{paddingTop: 0}}>

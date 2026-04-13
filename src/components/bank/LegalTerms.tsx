@@ -158,6 +158,11 @@ export default function LegalTerms({ onAccept, onClose, mode = "modal" }: LegalT
           display: flex;
           flex-direction: column;
           gap: 0;
+          animation: legalDocFadeIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        @keyframes legalDocFadeIn {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
         }
         .legal-doc-header {
           display: flex;
@@ -177,12 +182,13 @@ export default function LegalTerms({ onAccept, onClose, mode = "modal" }: LegalT
           padding: 6px 12px;
           display: inline-block;
           align-self: flex-start;
+          box-shadow: 0 0 12px rgba(212, 164, 55, 0.06);
         }
         .legal-doc-title {
           font-size: 20px;
           font-weight: 900;
           color: #fff;
-          font-family: 'Montserrat', sans-serif;
+          font-family: 'Inter', 'Montserrat', -apple-system, sans-serif;
           letter-spacing: -0.02em;
           margin: 0;
         }
@@ -191,10 +197,11 @@ export default function LegalTerms({ onAccept, onClose, mode = "modal" }: LegalT
           color: #94a3b8;
           line-height: 1.5;
           margin: 0;
+          font-family: 'Inter', -apple-system, sans-serif;
         }
         .legal-doc-line {
           height: 1px;
-          background: linear-gradient(90deg, rgba(212, 164, 55, 0.3), transparent);
+          background: linear-gradient(90deg, rgba(212, 164, 55, 0.3), rgba(212, 164, 55, 0.05), transparent);
           margin: 12px 0;
         }
         .legal-doc-preamble {
@@ -203,12 +210,14 @@ export default function LegalTerms({ onAccept, onClose, mode = "modal" }: LegalT
           border-radius: 16px;
           padding: 16px;
           margin-bottom: 16px;
+          box-shadow: 0 0 20px rgba(212, 164, 55, 0.03);
         }
         .legal-doc-preamble p {
           font-size: 12px;
           color: #94a3b8;
           line-height: 1.6;
           margin: 0 0 8px 0;
+          font-family: 'Inter', -apple-system, sans-serif;
         }
         .legal-doc-preamble p:last-child {
           margin-bottom: 0;
@@ -230,11 +239,12 @@ export default function LegalTerms({ onAccept, onClose, mode = "modal" }: LegalT
           background: rgba(255, 255, 255, 0.02);
           border: 1px solid rgba(255, 255, 255, 0.05);
           overflow: hidden;
-          transition: border-color 0.2s ease;
+          transition: all 0.3s ease;
         }
         .legal-section:has(.expanded) {
           border-color: rgba(212, 164, 55, 0.15);
           background: rgba(212, 164, 55, 0.02);
+          box-shadow: 0 0 15px rgba(212, 164, 55, 0.06);
         }
         .legal-section-header {
           display: flex;
@@ -248,18 +258,23 @@ export default function LegalTerms({ onAccept, onClose, mode = "modal" }: LegalT
           cursor: pointer;
           width: 100%;
           text-align: left;
-          font-family: inherit;
+          font-family: 'Inter', 'Montserrat', -apple-system, sans-serif;
+          transition: background 0.2s ease;
+        }
+        .legal-section-header:hover {
+          background: rgba(255, 255, 255, 0.02);
         }
         .legal-section-title {
           font-size: 12px;
           font-weight: 700;
           color: #e2e8f0;
           line-height: 1.4;
+          font-family: 'Inter', 'Montserrat', -apple-system, sans-serif;
         }
         .legal-section-arrow {
           font-size: 14px;
           color: #64748b;
-          transition: transform 0.25s ease;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
           flex-shrink: 0;
         }
         .legal-section-arrow.rotated {
@@ -268,7 +283,7 @@ export default function LegalTerms({ onAccept, onClose, mode = "modal" }: LegalT
         }
         .legal-section-content {
           padding: 0 16px 14px 16px;
-          animation: legalFadeIn 0.25s ease;
+          animation: legalFadeIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
         }
         @keyframes legalFadeIn {
           from { opacity: 0; transform: translateY(-6px); }
@@ -279,6 +294,7 @@ export default function LegalTerms({ onAccept, onClose, mode = "modal" }: LegalT
           color: #94a3b8;
           line-height: 1.65;
           margin: 0 0 10px 0;
+          font-family: 'Inter', -apple-system, sans-serif;
         }
         .legal-section-content p:last-child {
           margin-bottom: 0;
@@ -296,6 +312,7 @@ export default function LegalTerms({ onAccept, onClose, mode = "modal" }: LegalT
           text-align: center;
           line-height: 1.6;
           margin: 0;
+          font-family: 'Inter', -apple-system, sans-serif;
         }
         .legal-doc-accept {
           width: 100%;
@@ -308,16 +325,35 @@ export default function LegalTerms({ onAccept, onClose, mode = "modal" }: LegalT
           align-items: center;
           justify-content: center;
           gap: 8px;
-          border: none;
           background: linear-gradient(135deg, rgba(212, 164, 55, 0.2), rgba(212, 164, 55, 0.08));
           color: #D4A437;
           border: 1px solid rgba(212, 164, 55, 0.25);
-          transition: all 0.2s ease;
-          font-family: 'Montserrat', sans-serif;
+          box-shadow: 0 0 20px rgba(212, 164, 55, 0.08);
+          transition: all 0.3s ease;
+          font-family: 'Inter', 'Montserrat', -apple-system, sans-serif;
           margin-top: 8px;
+          position: relative;
+          overflow: hidden;
+        }
+        .legal-doc-accept:hover {
+          box-shadow: 0 0 30px rgba(212, 164, 55, 0.15);
+          border-color: rgba(212, 164, 55, 0.4);
         }
         .legal-doc-accept:active {
           transform: scale(0.97);
+        }
+        .legal-doc-accept::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(212, 164, 55, 0.1), transparent);
+          transition: left 0.5s ease;
+        }
+        .legal-doc-accept:hover::before {
+          left: 100%;
         }
       `}</style>
     </div>

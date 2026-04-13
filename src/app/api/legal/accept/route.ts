@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuth } from "firebase-admin/auth";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { adminApp } from "@/lib/firebase-admin";
+import { requireAuth } from "@/lib/auth-verify";
+import { getAdminFirestore } from "@/lib/admin-firestore";
 
 /**
  * POST /api/legal/accept
  * Enregistre l'acceptation d'un document légal (CGU ou Politique de confidentialité)
  * avec la version et un horodatage dans Firestore.
  *
- * Body:
- *   { type: "terms" | "privacy", version: string }
+ * Body: { type: "terms" | "privacy", version?: string }
  *
- * Sécurité : Vérification Firebase Admin SDK (token utilisateur)
+ * Sécurité : Vérification Firebase Admin SDK via requireAuth
  */
 
 const POLICY_VERSIONS = {
@@ -21,19 +19,10 @@ const POLICY_VERSIONS = {
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = getAuth(adminApp);
-    const authorization = req.headers.get("authorization");
-
-    if (!authorization?.startsWith("Bearer ")) {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+    if (!auth.uid) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
-    let uid: string;
-    try {
-      const decoded = await auth.verifyIdToken(authorization.slice(7));
-      uid = decoded.uid;
-    } catch {
-      return NextResponse.json({ error: "Token invalide" }, { status: 401 });
     }
 
     const body = await req.json();
@@ -45,15 +34,20 @@ export async function POST(req: NextRequest) {
 
     const acceptedVersion = version || POLICY_VERSIONS[type as keyof typeof POLICY_VERSIONS];
 
-    const db = getFirestore(adminApp);
+    const adminDb = await getAdminFirestore();
+    if (!adminDb) {
+      return NextResponse.json({ error: "Service indisponible" }, { status: 503 });
+    }
 
-    await db.collection("users").doc(uid).set({
+    const fieldName = type === "terms" ? "termsOfService" : "privacyPolicy";
+
+    await adminDb.collection("users").doc(auth.uid).set({
       legalAcceptances: {
-        [type === "terms" ? "termsOfService" : "privacyPolicy"]: {
+        [fieldName]: {
           version: acceptedVersion,
-          acceptedAt: FieldValue.serverTimestamp(),
+          acceptedAt: new Date().toISOString(),
           ip: req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || null,
-          userAgent: req.headers.get("user-agent") || null,
+          userAgent: req.headers.get("user-agent") ? req.headers.get("user-agent")!.substring(0, 200) : null,
         },
       },
     }, { merge: true });
@@ -62,7 +56,7 @@ export async function POST(req: NextRequest) {
       success: true,
       type,
       version: acceptedVersion,
-      message: `Acceptation enregistrée avec succès`,
+      message: "Acceptation enregistrée avec succès",
     });
   } catch (error) {
     console.error("[legal/accept] Error:", error);
@@ -76,19 +70,10 @@ export async function POST(req: NextRequest) {
  */
 export async function GET(req: NextRequest) {
   try {
-    const auth = getAuth(adminApp);
-    const authorization = req.headers.get("authorization");
-
-    if (!authorization?.startsWith("Bearer ")) {
+    const auth = await requireAuth(req);
+    if (auth.error) return auth.error;
+    if (!auth.uid) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-    }
-
-    let uid: string;
-    try {
-      const decoded = await auth.verifyIdToken(authorization.slice(7));
-      uid = decoded.uid;
-    } catch {
-      return NextResponse.json({ error: "Token invalide" }, { status: 401 });
     }
 
     const type = req.nextUrl.searchParams.get("type");
@@ -96,10 +81,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Type invalide" }, { status: 400 });
     }
 
-    const db = getFirestore(adminApp);
-    const doc = await db.collection("users").doc(uid).get();
-    const data = doc.data();
+    const adminDb = await getAdminFirestore();
+    if (!adminDb) {
+      return NextResponse.json({ error: "Service indisponible" }, { status: 503 });
+    }
+
     const fieldName = type === "terms" ? "termsOfService" : "privacyPolicy";
+    const doc = await adminDb.collection("users").doc(auth.uid).get();
+    const data = doc.data();
     const acceptance = data?.legalAcceptances?.[fieldName];
 
     return NextResponse.json({

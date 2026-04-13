@@ -146,18 +146,18 @@ export default function PrivacyPolicy({ onAccept, onClose, mode = "modal" }: Pri
 
       <style>{`
         .privacy-badge {
-          background: rgba(59, 130, 246, 0.1) !important;
-          border-color: rgba(59, 130, 246, 0.2) !important;
-          color: #60a5fa !important;
+          background: rgba(212, 164, 55, 0.1) !important;
+          border-color: rgba(212, 164, 55, 0.2) !important;
+          color: #D4A437 !important;
         }
         .privacy-preamble {
-          background: rgba(59, 130, 246, 0.04) !important;
-          border-color: rgba(59, 130, 246, 0.1) !important;
+          background: rgba(212, 164, 55, 0.04) !important;
+          border-color: rgba(212, 164, 55, 0.1) !important;
         }
         .privacy-accept {
-          background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.08)) !important;
-          color: #60a5fa !important;
-          border-color: rgba(59, 130, 246, 0.25) !important;
+          background: linear-gradient(135deg, rgba(212, 164, 55, 0.2), rgba(212, 164, 55, 0.08)) !important;
+          color: #D4A437 !important;
+          border-color: rgba(212, 164, 55, 0.25) !important;
         }
       `}</style>
     </div>

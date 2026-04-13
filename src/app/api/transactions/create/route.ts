@@ -49,39 +49,104 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Validate amount is a positive finite number
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return NextResponse.json({ success: false, error: "Montant invalide" }, { status: 400 });
+    }
+
     // Server-side fee calculation
     // TODO: Calculate fees server-side based on transaction type and amount
     const calculatedFees = 0; // Will be replaced by real fee calculation when payment APIs are integrated
 
     try {
-      // Duplicate detection: check if receiptId already exists
-      const existingQuery = adminDb.collection("serverTransactions")
-        .where("receiptId", "==", String(receiptId))
-        .limit(1);
-      const existingSnap = await existingQuery.get();
+      // ── ATOMIC TRANSACTION: duplicate check + balance debit + credit + record ──
+      // Prevents race conditions: two simultaneous transfers cannot both succeed
+      const result = await adminDb.runTransaction(async (transaction) => {
+        // 1. Duplicate detection by receiptId
+        const existingQuery = adminDb.collection("serverTransactions")
+          .where("receiptId", "==", String(receiptId))
+          .limit(1);
+        const existingSnap = await transaction.get(existingQuery);
 
-      if (!existingSnap.empty) {
-        const existingDoc = existingSnap.docs[0];
-        return NextResponse.json({ success: true, id: existingDoc.id, duplicate: true });
-      }
+        if (!existingSnap.empty) {
+          return { duplicate: true, existingId: existingSnap.docs[0].id };
+        }
 
-      const docRef = await adminDb.collection("serverTransactions").add({
-        receiptId: String(receiptId),
-        senderUid: String(senderUid),
-        senderMoraliId: String(senderMoraliId || ""),
-        senderName: String(senderName || "Utilisateur"),
-        recipientUid: String(recipientUid),
-        recipientMoraliId: String(recipientMoraliId || ""),
-        recipientName: String(recipientName || "Utilisateur"),
-        amount: Number(amount),
-        fees: 0, // Server-side fee calculation
-        type: String(type || "virement"),
-        status: "success",
-        destination: destination ? String(destination) : null,
-        createdAt: new Date(),
+        // 2. Read sender balance for atomic check
+        const senderRef = adminDb.collection("moraliUsers").doc(String(senderUid));
+        const senderDoc = await transaction.get(senderRef);
+
+        if (!senderDoc.exists) {
+          return { error: "Émetteur introuvable", code: 404 };
+        }
+
+        const senderData = senderDoc.data();
+        const currentBalance = Number(senderData?.balance) || 0;
+        const totalDebit = numericAmount + calculatedFees;
+
+        // 3. Insufficient balance check (atomic — no race condition possible)
+        if (currentBalance < totalDebit) {
+          return { error: "Solde insuffisant", code: 422, currentBalance };
+        }
+
+        // 4. Read recipient for atomic credit
+        const recipientRef = adminDb.collection("moraliUsers").doc(String(recipientUid));
+        const recipientDoc = await transaction.get(recipientRef);
+
+        if (!recipientDoc.exists) {
+          return { error: "Destinataire introuvable", code: 404 };
+        }
+
+        const recipientBalance = Number(recipientDoc.data()?.balance) || 0;
+
+        // 5. Debit sender
+        transaction.update(senderRef, {
+          balance: currentBalance - totalDebit,
+          updatedAt: new Date(),
+        });
+
+        // 6. Credit recipient
+        transaction.update(recipientRef, {
+          balance: recipientBalance + numericAmount,
+          updatedAt: new Date(),
+        });
+
+        // 7. Create transaction record
+        const txDocRef = adminDb.collection("serverTransactions").doc();
+        transaction.set(txDocRef, {
+          receiptId: String(receiptId),
+          senderUid: String(senderUid),
+          senderMoraliId: String(senderMoraliId || ""),
+          senderName: String(senderName || "Utilisateur"),
+          recipientUid: String(recipientUid),
+          recipientMoraliId: String(recipientMoraliId || ""),
+          recipientName: String(recipientName || "Utilisateur"),
+          amount: numericAmount,
+          fees: calculatedFees,
+          type: String(type || "virement"),
+          status: "success",
+          destination: destination ? String(destination) : null,
+          createdAt: new Date(),
+        });
+
+        return { success: true, id: txDocRef.id, newSenderBalance: currentBalance - totalDebit };
       });
 
-      return NextResponse.json({ success: true, id: docRef.id });
+      // Handle transaction results
+      if (result.duplicate) {
+        return NextResponse.json({ success: true, id: result.existingId, duplicate: true });
+      }
+
+      if (result.error) {
+        const statusCode = result.code || 400;
+        return NextResponse.json(
+          { success: false, error: result.error, ...(result.currentBalance !== undefined && { currentBalance: result.currentBalance }) },
+          { status: statusCode }
+        );
+      }
+
+      return NextResponse.json({ success: true, id: result.id });
     } catch (err: unknown) {
       captureError(err, { action: "transaction:create", route: "/api/transactions/create", uid: auth.uid, extra: { receiptId, senderUid, recipientUid, amount } });
       return NextResponse.json({ success: false, error: "Transaction failed" }, { status: 500 });

@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     // Generate 6-digit code
     const code = String(randomInt(100000, 1000000));
     // Key by "reset:" prefix to separate from PIN OTPs
-    setOtp(`reset:${email}`, code);
+    await setOtp(`reset:${email}`, code);
 
     if (DEMO_MODE) {
       // SECURITY: OTP code never logged in any environment

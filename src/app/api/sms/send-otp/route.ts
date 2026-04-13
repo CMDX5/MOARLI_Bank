@@ -24,11 +24,12 @@ export async function POST(req: NextRequest) {
 
     // Generate cryptographically secure 6-digit code
     const code = String(randomInt(100000, 1000000));
-    setOtp(phone, code);
+
+    // Store OTP in Firestore (async — works across serverless instances)
+    await setOtp(phone, code);
 
     if (DEMO_MODE) {
       // Demo mode: return code in response for testing
-      // SECURITY: OTP code never logged in any environment
       return NextResponse.json({
         success: true,
         message: "Code de test généré (mode démo)",
@@ -38,15 +39,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Production: send via SMS provider (e.g., Twilio, Vonage)
-    // Example with Twilio:
-    // const twilio = require("twilio")(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-    // await twilio.messages.create({
-    //   body: `Votre code Morali est: ${code}. Il expire dans 5 minutes.`,
-    //   from: process.env.TWILIO_PHONE_NUMBER,
-    //   to: phone,
-    // });
-
-    // Placeholder for production SMS integration
     return NextResponse.json({
       success: true,
       message: "Code envoyé par SMS",

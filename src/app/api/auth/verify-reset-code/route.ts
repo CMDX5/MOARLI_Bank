@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     }
     const { email, code } = validation.data;
 
-    const result = verifyOtp(`reset:${email}`, code);
+    const result = await verifyOtp(`reset:${email}`, code);
 
     switch (result) {
       case "valid":

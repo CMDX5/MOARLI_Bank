@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 
     // Generate cryptographically secure 6-digit code
     const code = String(randomInt(100000, 1000000));
-    setOtp(`email:${email}`, code);
+    await setOtp(`email:${email}`, code);
 
     if (DEMO_MODE) {
       // Demo mode: return code in response

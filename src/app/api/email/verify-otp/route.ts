@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     const { email, code } = validation.data;
 
     // Key OTP by email prefix to distinguish from SMS OTPs
-    const result = verifyOtp(`email:${email}`, code);
+    const result = await verifyOtp(`email:${email}`, code);
 
     switch (result) {
       case "valid":

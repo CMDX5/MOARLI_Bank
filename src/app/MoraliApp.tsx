@@ -2024,10 +2024,20 @@ function App() {
           setAccountSuspended(false);
           setSuspensionMessage("");
 
-          const fullName = data.fullName || `${data.firstName} ${data.lastName}`.trim() || "Utilisateur";
+          const firestoreName = data.fullName || `${data.firstName} ${data.lastName}`.trim() || "";
+          // Fallback: Firebase Auth displayName, then email-based name
+          const firebaseName = user.displayName || "";
+          const emailName = user.email ? user.email.split("@")[0] : "";
+          const emailCapitalized = emailName ? `${emailName.charAt(0).toUpperCase()}${emailName.slice(1)}` : "";
+          const fullName = firestoreName || firebaseName || emailCapitalized || "Utilisateur";
           setDashboardName(fullName);
           if (typeof window !== "undefined") {
             window.localStorage.setItem("morali_profile_full_name", fullName);
+          }
+          // Auto-repair: if Firestore has no name but we derived one, save it back
+          if (!data.fullName && !data.firstName && fullName !== "Utilisateur") {
+            const repaired = { firstName: fullName.split(" ")[0] || "", lastName: fullName.split(" ").slice(1).join(" ") || "", fullName };
+            updateDoc(doc(firebaseDb, "moraliUsers", user.uid), repaired).catch(() => {});
           }
           setProfileForm({
             fullName,
@@ -4773,7 +4783,11 @@ function App() {
         const profileSnap = await getDoc(doc(firebaseDb, "moraliUsers", cred.user.uid));
         if (profileSnap.exists()) {
           const data = profileSnap.data() as FirestoreMoraliUser;
-          const fullName = data.fullName || `${data.firstName} ${data.lastName}`.trim() || "";
+          const firestoreName = data.fullName || `${data.firstName} ${data.lastName}`.trim() || "";
+          const firebaseName = cred.user.displayName || "";
+          const emailName = loginEmail ? loginEmail.split("@")[0] : "";
+          const emailCapitalized = emailName ? `${emailName.charAt(0).toUpperCase()}${emailName.slice(1)}` : "";
+          const fullName = firestoreName || firebaseName || emailCapitalized || "";
           if (fullName) {
             window.localStorage.setItem("morali_profile_full_name", fullName);
             setProfileForm((prev) => ({ ...prev, fullName }));
@@ -4781,8 +4795,19 @@ function App() {
           } else {
             enterDashboard();
           }
+          // Auto-repair: save derived name to Firestore if missing
+          if (!data.fullName && !data.firstName && fullName) {
+            updateDoc(doc(firebaseDb, "moraliUsers", cred.user.uid), {
+              firstName: fullName.split(" ")[0] || "",
+              lastName: fullName.split(" ").slice(1).join(" ") || "",
+              fullName,
+            }).catch(() => {});
+          }
         } else {
-          enterDashboard();
+          // No Firestore doc yet — use email-based name
+          const emailName = loginEmail ? loginEmail.split("@")[0] : "";
+          const emailCapitalized = emailName ? `${emailName.charAt(0).toUpperCase()}${emailName.slice(1)}` : "";
+          enterDashboard(emailCapitalized || undefined);
         }
       } catch {
         enterDashboard();

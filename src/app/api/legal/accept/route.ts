@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth-verify";
 import { getAdminFirestore } from "@/lib/admin-firestore";
+import { validateBody } from "@/lib/validation";
+import { z } from "zod";
 
 /**
  * POST /api/legal/accept
@@ -9,8 +11,13 @@ import { getAdminFirestore } from "@/lib/admin-firestore";
  *
  * Body: { type: "terms" | "privacy", version?: string }
  *
- * Sécurité : Vérification Firebase Admin SDK via requireAuth
+ * Sécurité : Vérification Firebase Admin SDK via requireAuth + Zod validation
  */
+
+const legalAcceptSchema = z.object({
+  type: z.enum(["terms", "privacy"], "Type invalide : doit être 'terms' ou 'privacy'"),
+  version: z.string().max(20).optional(),
+});
 
 const POLICY_VERSIONS = {
   terms: "2.0",
@@ -26,11 +33,11 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { type, version } = body as { type?: string; version?: string };
-
-    if (!type || !["terms", "privacy"].includes(type)) {
-      return NextResponse.json({ error: "Type invalide" }, { status: 400 });
+    const validation = validateBody(legalAcceptSchema, body);
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
     }
+    const { type, version } = validation.data;
 
     const acceptedVersion = version || POLICY_VERSIONS[type as keyof typeof POLICY_VERSIONS];
 

@@ -47,12 +47,12 @@ export const moraliId = z.string()
   .transform((s) => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, ""))
   .pipe(z.string().regex(/^MORALI\d{1,20}$/, "Format identifiant Morali invalide"));
 
-/** Transaction amount: positive number, max 50M FCFA */
+/** Transaction amount: positive number, max 5M FCFA */
 export const txAmount = z.number()
   .positive("Le montant doit être positif")
-  .max(50_000_000, "Montant maximum: 50 000 000 FCFA")
+  .max(5_000_000, "Montant maximum: 5 000 000 FCFA")
   .or(z.string().transform((s) => Number(s)).pipe(
-    z.number().positive().max(50_000_000)
+    z.number().positive().max(5_000_000)
   ));
 
 /** Small amount for direct credits: max 1M FCFA */
@@ -216,9 +216,9 @@ export const schemas = {
     details: z.string().max(500).optional().default(""),
   }),
 
-  /** POST /api/sms/send-otp */
+  /** POST /api/sms/send-otp — Congo phone number required */
   smsSendOtp: z.object({
-    phone: z.string().min(1, "Numéro requis"),
+    phone: z.string().regex(/^\+242/, "Le numéro doit commencer par +242"),
   }),
 
   /** POST /api/sms/verify-otp */

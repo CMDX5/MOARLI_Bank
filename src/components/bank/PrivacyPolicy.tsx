@@ -145,6 +145,237 @@ export default function PrivacyPolicy({ onAccept, onClose, mode = "modal" }: Pri
       </div>
 
       <style>{`
+        /* ── Base Legal Document CSS (self-contained) ── */
+        .legal-doc {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          width: 100%;
+          box-sizing: border-box;
+          gap: 0;
+          animation: legalDocFadeIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        @keyframes legalDocFadeIn {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .legal-doc-header {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 8px;
+          margin-bottom: 16px;
+          width: 100%;
+        }
+        .legal-doc-badge {
+          font-size: 9px;
+          font-weight: 800;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          color: #D4A437;
+          background: rgba(212, 164, 55, 0.1);
+          border: 1px solid rgba(212, 164, 55, 0.2);
+          border-radius: 8px;
+          padding: 6px 12px;
+          display: inline-block;
+          align-self: flex-start;
+          box-shadow: 0 0 12px rgba(212, 164, 55, 0.06);
+        }
+        .legal-doc-title {
+          font-size: 20px;
+          font-weight: 900;
+          color: #fff;
+          font-family: 'Inter', 'Montserrat', -apple-system, sans-serif;
+          letter-spacing: -0.02em;
+          margin: 0;
+        }
+        .legal-doc-subtitle {
+          font-size: 12px;
+          color: #94a3b8;
+          line-height: 1.5;
+          margin: 0;
+          font-family: 'Inter', -apple-system, sans-serif;
+        }
+        .legal-doc-line {
+          height: 1px;
+          background: linear-gradient(90deg, rgba(212, 164, 55, 0.3), rgba(212, 164, 55, 0.05), transparent);
+          margin: 12px 0;
+          width: 100%;
+        }
+        .legal-doc-preamble {
+          background: rgba(212, 164, 55, 0.04);
+          border: 1px solid rgba(212, 164, 55, 0.1);
+          border-radius: 16px;
+          padding: 16px;
+          margin-bottom: 16px;
+          width: 100%;
+          box-sizing: border-box;
+          box-shadow: 0 0 20px rgba(212, 164, 55, 0.03);
+        }
+        .legal-doc-preamble p {
+          font-size: 12px;
+          color: #94a3b8;
+          line-height: 1.6;
+          margin: 0 0 8px 0;
+          text-align: left;
+          font-family: 'Inter', -apple-system, sans-serif;
+        }
+        .legal-doc-preamble p:last-child {
+          margin-bottom: 0;
+        }
+        .legal-doc-preamble strong {
+          color: #D4A437;
+          font-size: 10px;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+
+        /* ── Sections container — forces left alignment, no cascade indent ── */
+        .legal-doc-sections {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 8px;
+          margin-bottom: 16px;
+          margin-left: 0 !important;
+          padding-left: 0;
+          width: 100%;
+          box-sizing: border-box;
+        }
+        .legal-section {
+          border-radius: 14px;
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          overflow: hidden;
+          transition: all 0.3s ease;
+          margin-left: 0 !important;
+          width: 100%;
+          box-sizing: border-box;
+        }
+        .legal-section:has(.expanded) {
+          border-color: rgba(212, 164, 55, 0.15);
+          background: rgba(212, 164, 55, 0.02);
+          box-shadow: 0 0 15px rgba(212, 164, 55, 0.06);
+        }
+        .legal-section-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 14px 16px;
+          border: none;
+          background: transparent;
+          color: #fff;
+          cursor: pointer;
+          width: 100%;
+          text-align: left;
+          font-family: 'Inter', 'Montserrat', -apple-system, sans-serif;
+          transition: background 0.2s ease;
+          box-sizing: border-box;
+        }
+        .legal-section-header:hover {
+          background: rgba(255, 255, 255, 0.02);
+        }
+        .legal-section-title {
+          font-size: 12px;
+          font-weight: 700;
+          color: #e2e8f0;
+          line-height: 1.4;
+          font-family: 'Inter', 'Montserrat', -apple-system, sans-serif;
+        }
+        .legal-section-arrow {
+          font-size: 14px;
+          color: #64748b;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+          flex-shrink: 0;
+        }
+        .legal-section-arrow.rotated {
+          transform: rotate(180deg);
+          color: #D4A437;
+        }
+        .legal-section-content {
+          padding: 0 16px 14px 16px;
+          animation: legalFadeIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+          width: 100%;
+          box-sizing: border-box;
+          margin-left: 0;
+        }
+        @keyframes legalFadeIn {
+          from { opacity: 0; transform: translateY(-6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .legal-section-content p {
+          font-size: 11px;
+          color: #94a3b8;
+          line-height: 1.65;
+          margin: 0 0 10px 0;
+          text-align: left;
+          font-family: 'Inter', -apple-system, sans-serif;
+        }
+        .legal-section-content p:last-child {
+          margin-bottom: 0;
+        }
+
+        /* ── Footer ── */
+        .legal-doc-footer {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          align-items: center;
+          padding-top: 8px;
+          width: 100%;
+        }
+        .legal-doc-gov {
+          font-size: 10px;
+          color: #64748b;
+          text-align: center;
+          line-height: 1.6;
+          margin: 0;
+          font-family: 'Inter', -apple-system, sans-serif;
+        }
+        .legal-doc-accept {
+          width: 100%;
+          height: 52px;
+          border-radius: 16px;
+          font-size: 14px;
+          font-weight: 800;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          background: linear-gradient(135deg, rgba(212, 164, 55, 0.2), rgba(212, 164, 55, 0.08));
+          color: #D4A437;
+          border: 1px solid rgba(212, 164, 55, 0.25);
+          box-shadow: 0 0 20px rgba(212, 164, 55, 0.08);
+          transition: all 0.3s ease;
+          font-family: 'Inter', 'Montserrat', -apple-system, sans-serif;
+          margin-top: 8px;
+          position: relative;
+          overflow: hidden;
+        }
+        .legal-doc-accept:hover {
+          box-shadow: 0 0 30px rgba(212, 164, 55, 0.15);
+          border-color: rgba(212, 164, 55, 0.4);
+        }
+        .legal-doc-accept:active {
+          transform: scale(0.97);
+        }
+        .legal-doc-accept::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(212, 164, 55, 0.1), transparent);
+          transition: left 0.5s ease;
+        }
+        .legal-doc-accept:hover::before {
+          left: 100%;
+        }
+
+        /* ── Privacy-specific overrides ── */
         .privacy-badge {
           background: rgba(212, 164, 55, 0.1) !important;
           border-color: rgba(212, 164, 55, 0.2) !important;
@@ -158,6 +389,30 @@ export default function PrivacyPolicy({ onAccept, onClose, mode = "modal" }: Pri
           background: linear-gradient(135deg, rgba(212, 164, 55, 0.2), rgba(212, 164, 55, 0.08)) !important;
           color: #D4A437 !important;
           border-color: rgba(212, 164, 55, 0.25) !important;
+        }
+
+        /* ── Custom gold scrollbar for legal modals ── */
+        .bc-modal::-webkit-scrollbar,
+        .legal-modal::-webkit-scrollbar {
+          width: 4px;
+        }
+        .bc-modal::-webkit-scrollbar-track,
+        .legal-modal::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .bc-modal::-webkit-scrollbar-thumb,
+        .legal-modal::-webkit-scrollbar-thumb {
+          background: rgba(212, 164, 55, 0.3);
+          border-radius: 10px;
+        }
+        .bc-modal::-webkit-scrollbar-thumb:hover,
+        .legal-modal::-webkit-scrollbar-thumb:hover {
+          background: rgba(212, 164, 55, 0.5);
+        }
+        .bc-modal,
+        .legal-modal {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(212, 164, 55, 0.3) transparent;
         }
       `}</style>
     </div>

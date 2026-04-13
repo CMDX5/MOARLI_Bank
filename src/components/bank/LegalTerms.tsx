@@ -231,8 +231,13 @@ export default function LegalTerms({ onAccept, onClose, mode = "modal" }: LegalT
         .legal-doc-sections {
           display: flex;
           flex-direction: column;
+          align-items: flex-start;
           gap: 8px;
           margin-bottom: 16px;
+          margin-left: 0 !important;
+          padding-left: 0;
+          width: 100%;
+          box-sizing: border-box;
         }
         .legal-section {
           border-radius: 14px;
@@ -240,6 +245,9 @@ export default function LegalTerms({ onAccept, onClose, mode = "modal" }: LegalT
           border: 1px solid rgba(255, 255, 255, 0.05);
           overflow: hidden;
           transition: all 0.3s ease;
+          margin-left: 0 !important;
+          width: 100%;
+          box-sizing: border-box;
         }
         .legal-section:has(.expanded) {
           border-color: rgba(212, 164, 55, 0.15);
@@ -284,6 +292,9 @@ export default function LegalTerms({ onAccept, onClose, mode = "modal" }: LegalT
         .legal-section-content {
           padding: 0 16px 14px 16px;
           animation: legalFadeIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+          width: 100%;
+          box-sizing: border-box;
+          margin-left: 0;
         }
         @keyframes legalFadeIn {
           from { opacity: 0; transform: translateY(-6px); }
@@ -294,6 +305,7 @@ export default function LegalTerms({ onAccept, onClose, mode = "modal" }: LegalT
           color: #94a3b8;
           line-height: 1.65;
           margin: 0 0 10px 0;
+          text-align: left;
           font-family: 'Inter', -apple-system, sans-serif;
         }
         .legal-section-content p:last-child {
@@ -354,6 +366,30 @@ export default function LegalTerms({ onAccept, onClose, mode = "modal" }: LegalT
         }
         .legal-doc-accept:hover::before {
           left: 100%;
+        }
+
+        /* ── Custom gold scrollbar for legal modals ── */
+        .bc-modal::-webkit-scrollbar,
+        .legal-modal::-webkit-scrollbar {
+          width: 4px;
+        }
+        .bc-modal::-webkit-scrollbar-track,
+        .legal-modal::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .bc-modal::-webkit-scrollbar-thumb,
+        .legal-modal::-webkit-scrollbar-thumb {
+          background: rgba(212, 164, 55, 0.3);
+          border-radius: 10px;
+        }
+        .bc-modal::-webkit-scrollbar-thumb:hover,
+        .legal-modal::-webkit-scrollbar-thumb:hover {
+          background: rgba(212, 164, 55, 0.5);
+        }
+        .bc-modal,
+        .legal-modal {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(212, 164, 55, 0.3) transparent;
         }
       `}</style>
     </div>

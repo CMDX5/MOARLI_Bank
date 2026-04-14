@@ -34,17 +34,23 @@ export async function POST(req: NextRequest) {
     }
     const { receiptId, senderUid, senderMoraliId, senderName, recipientUid, recipientMoraliId, recipientName, amount, type, destination } = validation.data;
 
+    // Guard: uid must be present after auth
+    const callerUid = auth.uid;
+    if (!callerUid) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
     // Prevent self-transfer
     if (senderUid === recipientUid) {
       return NextResponse.json({ error: "Impossible d'envoyer à soi-même" }, { status: 400 });
     }
 
     // Ownership check: authenticated user must be the sender (or admin)
-    if (auth.uid !== senderUid) {
-      const callerDoc = await adminDb.collection("moraliUsers").doc(auth.uid).get();
+    if (callerUid !== senderUid) {
+      const callerDoc = await adminDb.collection("moraliUsers").doc(callerUid).get();
       const callerRole = callerDoc.data()?.role;
       if (callerRole !== "admin") {
-        captureSecurityEvent("transaction_idor_attempt", { uid: auth.uid, details: { senderUid, recipientUid } });
+        captureSecurityEvent("transaction_idor_attempt", { uid: callerUid, details: { senderUid, recipientUid } });
         return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
       }
     }
@@ -111,11 +117,11 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json(result);
     } catch (err: unknown) {
-      captureError(err, { action: "transaction:create", route: "/api/transactions/create", uid: auth.uid, extra: { receiptId, senderUid, recipientUid, amount } });
+      captureError(err, { action: "transaction:create", route: "/api/transactions/create", uid: callerUid, extra: { receiptId, senderUid, recipientUid, amount } });
       return NextResponse.json({ success: false, error: "Transaction failed" }, { status: 500 });
     }
   } catch (err) {
-    captureError(err, { action: "transaction:create:validation", route: "/api/transactions/create", uid: auth.uid });
+    captureError(err, { action: "transaction:create:validation", route: "/api/transactions/create", uid: auth.uid ?? "unknown" });
     return NextResponse.json({ success: false, error: "Requête invalide" }, { status: 400 });
   }
 }

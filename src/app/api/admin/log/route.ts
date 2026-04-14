@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
         let count = 0;
         for (const userDoc of usersSnap.docs) {
           try {
-            const notifs = await adminDb.collection("users", userDoc.id, "notifications").get();
+            const notifs = await adminDb.collection(`users/${userDoc.id}/notifications`).get();
             const batch = adminDb.batch();
             notifs.docs.forEach((d: any) => { batch.delete(d.ref); count++; });
             if (notifs.size > 0) await batch.commit();
@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
           let notifCount = 0;
           for (const userDoc of allDocs) {
             try {
-              const notifs = await adminDb.collection("users", userDoc.id, "notifications").get();
+              const notifs = await adminDb.collection(`users/${userDoc.id}/notifications`).get();
               const batch = adminDb.batch();
               notifs.docs.forEach((d: any) => { batch.delete(d.ref); notifCount++; });
               if (notifs.size > 0) await batch.commit();

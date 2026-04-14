@@ -8,6 +8,7 @@ export async function POST(req: NextRequest) {
   // Auth
   const auth = await requireAuth(req);
   if (auth.error) return auth.error;
+  if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
   // Rate limit (uid-based, after auth)
   const rl = await rateLimit(auth.uid, "notif:create", { maxRequests: 30, windowSec: 60 });
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
       createdAt: new Date(),
       // Track sender for audit
       sentBy: isAdmin ? "admin" : "self",
-      senderUid: auth.uid,
+      senderUid: auth.uid ?? "",
     });
 
     return NextResponse.json({ success: true });

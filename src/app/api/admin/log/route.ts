@@ -2,6 +2,58 @@ import { NextRequest, NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { requireAdmin } from "@/lib/auth-verify";
 import { getAdminFirestore } from "@/lib/admin-firestore";
+import { randomBytes } from "crypto";
+
+// ── Confirm token store ──
+// SECURITY FIX: Use cryptographic tokens instead of predictable formula.
+// Tokens are stored in Firestore and expire after 5 minutes.
+
+const CONFIRM_TOKEN_COLLECTION = "adminConfirmTokens";
+const CONFIRM_TOKEN_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function createConfirmToken(
+  adminDb: any,
+  uid: string,
+  action: string
+): Promise<string> {
+  const token = `cfm_${randomBytes(32).toString("hex")}`;
+  await adminDb.collection(CONFIRM_TOKEN_COLLECTION).doc(token).set({
+    uid,
+    action,
+    createdAt: new Date(),
+    expiresAt: new Date(Date.now() + CONFIRM_TOKEN_TTL_MS),
+  });
+  return token;
+}
+
+async function verifyConfirmToken(
+  adminDb: any,
+  token: string,
+  uid: string,
+  action: string
+): Promise<boolean> {
+  if (!token) return false;
+
+  try {
+    const docRef = adminDb.collection(CONFIRM_TOKEN_COLLECTION).doc(token);
+    const snap = await docRef.get();
+
+    if (!snap.exists) return false;
+
+    const data = snap.data();
+    if (data.uid !== uid || data.action !== action) return false;
+    if (Date.now() > new Date(data.expiresAt).getTime()) {
+      await docRef.delete().catch(() => {});
+      return false;
+    }
+
+    // One-time use — delete after verification
+    await docRef.delete().catch(() => {});
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export async function POST(req: NextRequest) {
   // SECURITY: Firebase Custom Claims
@@ -30,14 +82,15 @@ export async function POST(req: NextRequest) {
     }
 
     // ══════════════════════════════════════════════════
-    // Destructive reset actions — require confirmation token
+    // Destructive reset actions — require cryptographic confirmation token
     // ══════════════════════════════════════════════════
     const isResetAction = action === "RESET_TRANSACTIONS" || action === "RESET_NOTIFICATIONS" || action === "RESET_BALANCES" || action === "RESET_ALL";
 
     if (isResetAction) {
-      const expectedToken = `CONFIRM_${action}_${auth.uid.slice(0, 8)}`;
-      if (confirmToken !== expectedToken) {
-        return NextResponse.json({ error: "Jeton de confirmation invalide" }, { status: 403 });
+      // SECURITY FIX: Verify cryptographic token instead of predictable formula
+      const valid = await verifyConfirmToken(adminDb, confirmToken, auth.uid, action);
+      if (!valid) {
+        return NextResponse.json({ error: "Jeton de confirmation invalide ou expiré" }, { status: 403 });
       }
 
       if (action === "RESET_TRANSACTIONS") {
@@ -57,7 +110,7 @@ export async function POST(req: NextRequest) {
           try {
             const notifs = await adminDb.collection("users", userDoc.id, "notifications").get();
             const batch = adminDb.batch();
-            notifs.docs.forEach((d) => { batch.delete(d.ref); count++; });
+            notifs.docs.forEach((d: any) => { batch.delete(d.ref); count++; });
             if (notifs.size > 0) await batch.commit();
           } catch { /* subcollection may not exist */ }
         }
@@ -71,7 +124,7 @@ export async function POST(req: NextRequest) {
       if (action === "RESET_BALANCES") {
         const usersSnap = await adminDb.collection("moraliUsers").get();
         const batch = adminDb.batch();
-        usersSnap.docs.forEach((userDoc) => {
+        usersSnap.docs.forEach((userDoc: any) => {
           batch.update(userDoc.ref, {
             balance: 0,
             savingsAmount: 0,
@@ -93,7 +146,7 @@ export async function POST(req: NextRequest) {
           for (let i = 0; i < allDocs.length; i += 500) {
             const chunk = allDocs.slice(i, i + 500);
             const batch = adminDb.batch();
-            chunk.forEach((userDoc) => {
+            chunk.forEach((userDoc: any) => {
               batch.update(userDoc.ref, {
                 balance: 0, savingsAmount: 0, totalSent: 0, totalReceived: 0, updatedAt: new Date(),
               });
@@ -117,7 +170,7 @@ export async function POST(req: NextRequest) {
             try {
               const notifs = await adminDb.collection("users", userDoc.id, "notifications").get();
               const batch = adminDb.batch();
-              notifs.docs.forEach((d) => { batch.delete(d.ref); notifCount++; });
+              notifs.docs.forEach((d: any) => { batch.delete(d.ref); notifCount++; });
               if (notifs.size > 0) await batch.commit();
             } catch { /* skip */ }
           }
@@ -133,6 +186,21 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: err instanceof Error ? err.message.slice(0, 100) : "Erreur reset" }, { status: 500 });
         }
       }
+    }
+
+    // ── REQUEST confirmation token ──
+    if (action === "REQUEST_CONFIRM") {
+      const targetAction = details; // The action to confirm (e.g., "RESET_ALL")
+      if (!targetAction) {
+        return NextResponse.json({ error: "Action cible requise dans 'details'" }, { status: 400 });
+      }
+      const token = await createConfirmToken(adminDb, auth.uid, targetAction);
+      return NextResponse.json({
+        success: true,
+        confirmToken: token,
+        expiresIn: CONFIRM_TOKEN_TTL_MS / 1000,
+        message: `Jeton de confirmation généré. Valide pendant ${CONFIRM_TOKEN_TTL_MS / 1000} secondes.`,
+      });
     }
 
     // Normal admin log entry
@@ -173,7 +241,7 @@ export async function GET(req: NextRequest) {
       .orderBy("timestamp", "desc")
       .limit(limit)
       .get();
-    const logs = logsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const logs = logsSnap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
     return NextResponse.json({ logs });
   } catch {
     return NextResponse.json({ logs: [] }, { status: 200 });

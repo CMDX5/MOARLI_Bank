@@ -10,7 +10,8 @@
  * - PIN is ALSO stored as AES-256-GCM encrypted (for reveal after auth)
  * - Master key is derived from env variable MORALI_PIN_MASTER_KEY
  * - Each user gets a unique key derived from master key + UID (HKDF)
- * - If master key is not set, falls back to a deterministic key (less secure, dev only)
+ *
+ * SECURITY FIX: In production, master key is MANDATORY. No fallback.
  */
 
 import { createCipheriv, createDecipheriv, randomBytes, createHmac } from "crypto";
@@ -31,24 +32,37 @@ function deriveUserKey(masterKey: Buffer, uid: string): Buffer {
 }
 
 /**
- * Get or generate the master encryption key.
+ * Get the master encryption key.
+ * SECURITY FIX: In production, MORALI_PIN_MASTER_KEY is MANDATORY.
+ * Returns null if not configured in production (fail-closed).
  */
-function getMasterKey(): Buffer {
+function getMasterKey(): Buffer | null {
   const envKey = process.env.MORALI_PIN_MASTER_KEY;
+
   if (envKey && envKey.length >= 32) {
     return Buffer.from(envKey.slice(0, 32), "utf8");
   }
-  // Fallback for development — deterministic but NOT secure for production
-  console.warn("[pin-crypto] ⚠️ MORALI_PIN_MASTER_KEY not set or too short. Using fallback key.");
+
+  // SECURITY FIX: No fallback key in production
+  if (process.env.NODE_ENV === "production") {
+    console.error("[pin-crypto] CRITICAL: MORALI_PIN_MASTER_KEY is not set or too short in production!");
+    console.error("[pin-crypto] PIN encryption is DISABLED. Set MORALI_PIN_MASTER_KEY (min 32 chars) immediately.");
+    return null;
+  }
+
+  // Development only fallback — deterministic but NOT secure for production
+  console.warn("[pin-crypto] WARNING: Using development fallback key. DO NOT use in production.");
   return Buffer.from("morali-dev-fallback-key-32bytes-ok!!", "utf8");
 }
 
 /**
  * Encrypt a PIN for server-side storage.
- * Returns base64-encoded string (IV + ciphertext + auth tag).
+ * Returns base64-encoded string (IV + ciphertext + auth tag), or null if master key unavailable.
  */
-export function encryptPinServerSide(pin: string, uid: string): string {
+export function encryptPinServerSide(pin: string, uid: string): string | null {
   const masterKey = getMasterKey();
+  if (!masterKey) return null;
+
   const userKey = deriveUserKey(masterKey, uid);
   const iv = randomBytes(IV_LENGTH);
 
@@ -66,11 +80,13 @@ export function encryptPinServerSide(pin: string, uid: string): string {
 
 /**
  * Decrypt a server-side encrypted PIN.
- * Returns the plaintext PIN or null if decryption fails.
+ * Returns the plaintext PIN or null if decryption fails or master key unavailable.
  */
 export function decryptPinServerSide(encryptedBase64: string, uid: string): string | null {
   try {
     const masterKey = getMasterKey();
+    if (!masterKey) return null;
+
     const userKey = deriveUserKey(masterKey, uid);
 
     const combined = Buffer.from(encryptedBase64, "base64");

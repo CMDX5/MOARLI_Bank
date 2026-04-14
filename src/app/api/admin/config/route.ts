@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 
 /**
- * Admin Config API — Returns the admin email for the login form.
+ * Admin Config API — Returns whether admin exists (NOT the email).
  *
  * Security:
  * - Rate limited: max 10 requests per minute
- * - Only exposes the admin email (not a secret — login still requires password)
+ * - SECURITY FIX: No longer exposes admin email (prevented targeted phishing)
  * - Admin login page is hidden behind a long-press gesture
  */
 
@@ -23,12 +23,8 @@ export async function GET(req: Request) {
 
   const adminEmail = process.env.ADMIN_EMAIL;
 
-  if (!adminEmail) {
-    return NextResponse.json(
-      { error: "Configuration admin non définie" },
-      { status: 503 }
-    );
-  }
-
-  return NextResponse.json({ email: adminEmail });
+  // SECURITY FIX: Only return whether admin is configured, NOT the email
+  return NextResponse.json({
+    adminConfigured: !!adminEmail,
+  });
 }

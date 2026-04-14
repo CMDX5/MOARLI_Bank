@@ -6,7 +6,7 @@ import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
  * Admin Check Exists API
  *
  * Returns whether an admin account has been created.
- * Uses a Firestore document config/adminExists as the source of truth.
+ * SECURITY FIX: No longer exposes admin email (prevented targeted phishing/credential stuffing).
  * Rate limited: 10 req/min.
  */
 export async function GET(req: Request) {
@@ -23,7 +23,7 @@ export async function GET(req: Request) {
       const adminEmail = process.env.ADMIN_EMAIL;
       return NextResponse.json({
         adminExists: !!adminEmail,
-        adminEmail: adminEmail || null,
+        // SECURITY FIX: No longer expose adminEmail
       });
     }
 
@@ -31,23 +31,20 @@ export async function GET(req: Request) {
     const snap = await configRef.get();
 
     if (snap.exists) {
-      const data = snap.data();
+      // SECURITY FIX: Only return existence, NOT the email
       return NextResponse.json({
         adminExists: true,
-        adminEmail: data.adminEmail || null,
       });
     }
 
     return NextResponse.json({
       adminExists: false,
-      adminEmail: null,
     });
   } catch {
-    // On error, fall back to env var
     const adminEmail = process.env.ADMIN_EMAIL;
     return NextResponse.json({
       adminExists: !!adminEmail,
-      adminEmail: adminEmail || null,
+      // SECURITY FIX: No longer expose adminEmail
     });
   }
 }

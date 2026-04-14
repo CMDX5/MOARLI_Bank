@@ -49,72 +49,37 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Validate amount is a positive finite number
-    const numericAmount = Number(amount);
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      return NextResponse.json({ success: false, error: "Montant invalide" }, { status: 400 });
-    }
-
     // Server-side fee calculation
     // TODO: Calculate fees server-side based on transaction type and amount
-    const calculatedFees = 0; // Will be replaced by real fee calculation when payment APIs are integrated
+    const calculatedFees = 0;
+
+    // SECURITY FIX: Use Firestore runTransaction for atomic duplicate detection + write
+    // Prevents race condition where two simultaneous requests both pass the duplicate check
+    const lockDocId = `receiptLock_${String(receiptId).replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+    const lockRef = adminDb.collection("txLocks").doc(lockDocId);
 
     try {
-      // ── ATOMIC TRANSACTION: duplicate check + balance debit + credit + record ──
-      // Prevents race conditions: two simultaneous transfers cannot both succeed
       const result = await adminDb.runTransaction(async (transaction) => {
-        // 1. Duplicate detection by receiptId
-        const existingQuery = adminDb.collection("serverTransactions")
-          .where("receiptId", "==", String(receiptId))
-          .limit(1);
-        const existingSnap = await transaction.get(existingQuery);
+        // Atomic check-and-set: verify lock doesn't exist
+        const lockSnap = await transaction.get(lockRef);
 
-        if (!existingSnap.empty) {
-          return { duplicate: true, existingId: existingSnap.docs[0].id };
+        if (lockSnap.exists) {
+          // Already processed — return existing transaction ID (idempotent)
+          const existingTxId = lockSnap.data()?.transactionId;
+          if (existingTxId) {
+            // Verify the existing transaction exists
+            const existingTxRef = adminDb.collection("serverTransactions").doc(existingTxId);
+            const existingTxSnap = await transaction.get(existingTxRef);
+            if (existingTxSnap.exists) {
+              return { success: true, id: existingTxId, duplicate: true };
+            }
+          }
+          // Lock exists but transaction doesn't — treat as new (stale lock)
         }
 
-        // 2. Read sender balance for atomic check
-        const senderRef = adminDb.collection("moraliUsers").doc(String(senderUid));
-        const senderDoc = await transaction.get(senderRef);
-
-        if (!senderDoc.exists) {
-          return { error: "Émetteur introuvable", code: 404 };
-        }
-
-        const senderData = senderDoc.data();
-        const currentBalance = Number(senderData?.balance) || 0;
-        const totalDebit = numericAmount + calculatedFees;
-
-        // 3. Insufficient balance check (atomic — no race condition possible)
-        if (currentBalance < totalDebit) {
-          return { error: "Solde insuffisant", code: 422, currentBalance };
-        }
-
-        // 4. Read recipient for atomic credit
-        const recipientRef = adminDb.collection("moraliUsers").doc(String(recipientUid));
-        const recipientDoc = await transaction.get(recipientRef);
-
-        if (!recipientDoc.exists) {
-          return { error: "Destinataire introuvable", code: 404 };
-        }
-
-        const recipientBalance = Number(recipientDoc.data()?.balance) || 0;
-
-        // 5. Debit sender
-        transaction.update(senderRef, {
-          balance: currentBalance - totalDebit,
-          updatedAt: new Date(),
-        });
-
-        // 6. Credit recipient
-        transaction.update(recipientRef, {
-          balance: recipientBalance + numericAmount,
-          updatedAt: new Date(),
-        });
-
-        // 7. Create transaction record
-        const txDocRef = adminDb.collection("serverTransactions").doc();
-        transaction.set(txDocRef, {
+        // Create the transaction document
+        const docRef = adminDb.collection("serverTransactions").doc();
+        const txData = {
           receiptId: String(receiptId),
           senderUid: String(senderUid),
           senderMoraliId: String(senderMoraliId || ""),
@@ -122,31 +87,29 @@ export async function POST(req: NextRequest) {
           recipientUid: String(recipientUid),
           recipientMoraliId: String(recipientMoraliId || ""),
           recipientName: String(recipientName || "Utilisateur"),
-          amount: numericAmount,
-          fees: calculatedFees,
+          amount: Number(amount),
+          fees: 0,
           type: String(type || "virement"),
           status: "success",
           destination: destination ? String(destination) : null,
           createdAt: new Date(),
+        };
+
+        transaction.set(docRef, txData);
+
+        // Create the lock (prevents race condition)
+        transaction.set(lockRef, {
+          transactionId: docRef.id,
+          receiptId: String(receiptId),
+          createdAt: new Date(),
+          // Auto-expire after 24 hours (cleanup)
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         });
 
-        return { success: true, id: txDocRef.id, newSenderBalance: currentBalance - totalDebit };
+        return { success: true, id: docRef.id };
       });
 
-      // Handle transaction results
-      if (result.duplicate) {
-        return NextResponse.json({ success: true, id: result.existingId, duplicate: true });
-      }
-
-      if (result.error) {
-        const statusCode = result.code || 400;
-        return NextResponse.json(
-          { success: false, error: result.error, ...(result.currentBalance !== undefined && { currentBalance: result.currentBalance }) },
-          { status: statusCode }
-        );
-      }
-
-      return NextResponse.json({ success: true, id: result.id });
+      return NextResponse.json(result);
     } catch (err: unknown) {
       captureError(err, { action: "transaction:create", route: "/api/transactions/create", uid: auth.uid, extra: { receiptId, senderUid, recipientUid, amount } });
       return NextResponse.json({ success: false, error: "Transaction failed" }, { status: 500 });

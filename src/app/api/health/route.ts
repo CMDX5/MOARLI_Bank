@@ -3,7 +3,11 @@ import { getAdminFirestore } from "@/lib/admin-firestore";
 
 /**
  * GET /api/health — Health check.
- * Always returns 200 with diagnostic info.
+ * Always returns 200 with minimal diagnostic info.
+ *
+ * SECURITY FIX: No longer exposes sensitive information:
+ * - Removed: nodeEnv, Firebase hint, Firestore error messages, memory usage
+ * - Kept: status, version, database connectivity, response time
  */
 export async function GET() {
   const startTime = Date.now();
@@ -11,38 +15,27 @@ export async function GET() {
     status: "ok",
     version: "2.3.0",
     timestamp: new Date().toISOString(),
-    database: "firestore",
-    nodeEnv: process.env.NODE_ENV,
   };
 
   // Check Firebase Admin SDK (non-blocking)
   try {
     const adminDb = await getAdminFirestore();
     if (adminDb) {
-      info.firebaseAdmin = "ok";
-
-      // Try a simple get instead of count (more compatible)
+      // SECURITY FIX: Only return connectivity status, no details
       try {
-        const testRef = adminDb.collection("moraliUsers").limit(1);
-        await testRef.get();
-        info.firestoreRead = "ok";
-      } catch (fsErr: unknown) {
-        info.firestoreRead = "error";
-        info.firestoreReadError = fsErr instanceof Error ? fsErr.message : String(fsErr);
+        await adminDb.collection("moraliUsers").limit(1).get();
+        info.database = "connected";
+      } catch {
+        info.database = "degraded";
       }
     } else {
-      info.firebaseAdmin = "not_configured";
-      info.firebaseHint = "GOOGLE_APPLICATION_CREDENTIALS or service-account-key.json not found";
+      info.database = "disconnected";
     }
-  } catch (err: unknown) {
-    info.firebaseAdmin = "error";
-    info.firebaseError = err instanceof Error ? err.message : String(err);
+  } catch {
+    info.database = "disconnected";
   }
 
   info.responseTime = `${Date.now() - startTime}ms`;
-  info.memory = typeof process !== "undefined" && process.memoryUsage
-    ? `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`
-    : "N/A";
 
   return NextResponse.json(info, {
     status: 200,

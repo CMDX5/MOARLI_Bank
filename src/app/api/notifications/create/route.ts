@@ -26,16 +26,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Champs requis manquants" }, { status: 400 });
     }
 
+    // SECURITY FIX: Only admin can send cross-user notifications.
+    // Regular users can only send notifications to themselves.
+    const isAdmin = auth.claims?.admin === true;
+    let targetUid: string;
+
+    if (isAdmin) {
+      // Admin can send to any user
+      targetUid = String(uid);
+    } else {
+      // Regular user: force targetUid to own UID (prevent IDOR)
+      targetUid = auth.uid;
+      if (String(uid) !== auth.uid) {
+        return NextResponse.json(
+          { error: "Interdit — vous ne pouvez envoyer des notifications qu'à vous-même" },
+          { status: 403 }
+        );
+      }
+    }
+
     const adminDb = await getAdminFirestore();
     if (!adminDb) {
       // Fallback: write directly via client Firestore (only to own notifications)
-      // This is handled client-side — return success to avoid blocking
       return NextResponse.json({ success: true, fallback: true });
     }
 
-    // ALWAYS use Admin SDK to write to the TARGET user's notifications
-    // (bypasses client rules that only allow write to own doc)
-    const targetUid = String(uid);
     const sanitize = (s: string) => String(s || "")
       .slice(0, 200)
       .replace(/<[^>]*>/g, "")    // Strip HTML tags
@@ -51,6 +66,9 @@ export async function POST(req: NextRequest) {
       bg: sanitize(bg || "rgba(59,130,246,0.12)"),
       read: false,
       createdAt: new Date(),
+      // Track sender for audit
+      sentBy: isAdmin ? "admin" : "self",
+      senderUid: auth.uid,
     });
 
     return NextResponse.json({ success: true });

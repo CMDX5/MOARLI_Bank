@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
-import { verifyOtp } from "@/lib/otp-store";
+import { verifyOtp, createResetToken } from "@/lib/otp-store";
 import { validateBody, schemas } from "@/lib/validation";
 
 /**
  * Verify the reset code (OTP) sent by email.
  * Must be called before /api/auth/reset-password.
+ *
+ * SECURITY FIX: Now returns a one-time resetToken when OTP is valid.
+ * This token must be passed to /api/auth/reset-password to authorize the password change.
  */
 export async function POST(req: NextRequest) {
   const clientId = getClientId(req);
@@ -26,7 +29,9 @@ export async function POST(req: NextRequest) {
 
     switch (result) {
       case "valid":
-        return NextResponse.json({ valid: true });
+        // SECURITY FIX: Generate a one-time reset token for password reset
+        const resetToken = createResetToken(email);
+        return NextResponse.json({ valid: true, resetToken });
       case "invalid":
         return NextResponse.json({ valid: false, error: "Code incorrect" });
       case "expired":

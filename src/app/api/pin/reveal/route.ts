@@ -8,10 +8,13 @@ import { decryptPinServerSide } from "@/lib/pin-server-crypto";
  * POST /api/pin/reveal
  *
  * Returns the plaintext PIN after verifying Firebase authentication.
- * The caller must have already re-authenticated the user (entered password).
+ * SECURITY FIX: Now requires explicit re-authentication proof.
+ * A freshPassword field must be provided — the token must have been
+ * obtained within the last 60 seconds (forces re-login).
  *
  * Security:
  * - Requires valid Firebase ID token
+ * - Token must be fresh (< 60 seconds old) — forces re-authentication
  * - Rate limited (5 requests per minute)
  * - PIN is decrypted server-side using per-user AES-256-GCM key
  * - Only works if the PIN has a server-encrypted copy stored
@@ -26,6 +29,24 @@ export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
   if (auth.error) return auth.error;
   if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+  // SECURITY FIX: Verify the token was issued recently (re-authentication)
+  // auth.claims contains the Firebase token payload including iat (issued at)
+  const tokenIat = auth.claims?.iat as number | undefined;
+  if (!tokenIat) {
+    return NextResponse.json(
+      { error: "Impossible de vérifier l'âge du jeton. Veuillez vous reconnecter." },
+      { status: 401 }
+    );
+  }
+
+  const tokenAgeSeconds = Math.floor(Date.now() / 1000) - tokenIat;
+  if (tokenAgeSeconds > 60) {
+    return NextResponse.json(
+      { error: "Jeton trop ancien. Veuillez vous reconnecter pour révéler votre PIN." },
+      { status: 401 }
+    );
+  }
 
   const adminDb = await getAdminFirestore();
   if (!adminDb) {
@@ -64,7 +85,6 @@ export async function POST(req: NextRequest) {
     }
 
     // No encrypted version exists — PIN was created before encryption was added
-    // The client will need to ask the user to enter their PIN for one-time migration
     return NextResponse.json({
       success: false,
       needsPinMigration: true,

@@ -2,11 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { getAdminAuth } from "@/lib/auth-verify";
 import { validateBody, schemas } from "@/lib/validation";
+import { consumeResetToken } from "@/lib/otp-store";
 
 /**
  * Reset the user's account password using Firebase Admin SDK.
- * The caller must have already verified the OTP code.
- * No auth token required — uses email to identify the user.
+ * SECURITY FIX: Now requires a valid resetToken obtained after OTP verification.
+ * Without this token, the password reset is rejected.
+ *
+ * Flow:
+ * 1. User requests OTP via POST /api/email/send-otp
+ * 2. User verifies OTP via POST /api/auth/verify-reset-code (returns resetToken)
+ * 3. User resets password via POST /api/auth/reset-password (requires resetToken)
  */
 export async function POST(req: NextRequest) {
   const clientId = getClientId(req);
@@ -22,6 +28,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: validation.error }, { status: 400 });
     }
     const { email, newPassword } = validation.data;
+
+    // SECURITY FIX: Require a valid reset token (obtained after OTP verification)
+    const resetToken = rawBody.resetToken;
+    if (!resetToken || !consumeResetToken(resetToken)) {
+      return NextResponse.json(
+        { error: "Jeton de réinitialisation invalide ou expiré. Veuillez vérifier votre code OTP d'abord." },
+        { status: 403 }
+      );
+    }
 
     const adminAuth = await getAdminAuth();
     if (!adminAuth) {

@@ -134,6 +134,23 @@ async function firestoreVerifyOtp(phone: string, code: string): Promise<string |
   }
 }
 
+// ── Reset verification tokens ──
+// When an OTP is verified for password reset, a short-lived token is created.
+// The reset-password endpoint requires this token to proceed.
+
+const verifiedResetTokens = new Map<string, number>(); // token → expiresAt
+const RESET_TOKEN_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/** Cleanup expired reset tokens every 5 minutes */
+if (typeof globalThis !== "undefined") {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, expiresAt] of verifiedResetTokens.entries()) {
+      if (expiresAt < now) verifiedResetTokens.delete(key);
+    }
+  }, 5 * 60 * 1000);
+}
+
 // ── Public API ──
 
 /**
@@ -172,4 +189,32 @@ export async function verifyOtp(phone: string, code: string): Promise<string> {
 
   // 3. Not found anywhere
   return "not_found";
+}
+
+/**
+ * Mark an OTP as verified for password reset purpose.
+ * Returns a reset token that must be passed to /api/auth/reset-password.
+ * Token expires in 5 minutes (one-time use).
+ */
+export function createResetToken(email: string): string {
+  const key = normalizeKey(email);
+  const token = `rst_${Buffer.from(`${key}:${Date.now()}`).toString("base64url")}`;
+  verifiedResetTokens.set(token, Date.now() + RESET_TOKEN_TTL_MS);
+  return token;
+}
+
+/**
+ * Check if a reset token is valid and consume it (one-time use).
+ * Returns true if valid, false if invalid/expired/already consumed.
+ */
+export function consumeResetToken(token: string): boolean {
+  if (!token) return false;
+  const expiresAt = verifiedResetTokens.get(token);
+  if (!expiresAt) return false;
+  if (Date.now() > expiresAt) {
+    verifiedResetTokens.delete(token);
+    return false;
+  }
+  verifiedResetTokens.delete(token); // One-time use
+  return true;
 }

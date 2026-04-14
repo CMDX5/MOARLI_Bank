@@ -1,6 +1,3 @@
-// ── MORALI PAY — Shared Utilities ──
-// Extracted from MoraliApp.tsx for component reusability
-
 import type { FirestoreMoraliUser } from "@/types/morali";
 
 // ── Input sanitization ──
@@ -101,16 +98,23 @@ export const firebaseAuthMessage = (error: unknown) => {
 };
 
 // ── Morali Identity Generation ──
+// SECURITY FIX: Added salt support to prevent deterministic ID calculation from email.
+// When a salt is provided, it's incorporated into the hash to prevent enumeration.
+// Backward compatible: if no salt, falls back to original algorithm for existing users.
+
 export const getIdentitySeed = (email?: string | null, uid?: string | null) => {
   const normalizedEmail = (email || "").trim().toLowerCase();
   return normalizedEmail || uid || "morali-default";
 };
 
-export const generateMoraliIdentity = (seed?: string) => {
+export const generateMoraliIdentity = (seed?: string, salt?: string) => {
   const source = seed && seed.trim() ? seed.trim() : "morali-default";
+  // SECURITY FIX: Incorporate salt if provided (prevents deterministic calculation)
+  const saltedSource = salt ? `${source}:${salt}` : source;
+
   let hash = 0;
-  for (let i = 0; i < source.length; i += 1) {
-    hash = ((hash * 1099511628) + source.charCodeAt(i)) % 900000000;
+  for (let i = 0; i < saltedSource.length; i += 1) {
+    hash = ((hash * 1099511628) + saltedSource.charCodeAt(i)) % 900000000;
   }
   const suffix = String(hash + 1).padStart(9, "0").slice(-9);
   const suffix5 = suffix.slice(0, 5);

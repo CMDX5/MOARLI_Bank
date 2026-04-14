@@ -4,12 +4,14 @@ import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { setOtp } from "@/lib/otp-store";
 import { validateBody, schemas } from "@/lib/validation";
 
-// SECURITY FIX: Demo mode only in non-production environments.
-// In demo mode, uses a fixed predictable code (111111) and logs it server-side.
-// NEVER returns the OTP code in the API response — even in demo.
+// DEMO MODE: Active when no SMS_API_KEY is configured.
+// In development: automatically enabled.
+// In production: enabled ONLY if ALLOW_DEMO_OTP=true (env var on Vercel).
+// When a real SMS provider is configured (SMS_API_KEY), demo mode is disabled.
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
-const DEMO_MODE = !process.env.SMS_API_KEY && !IS_PRODUCTION;
-const DEMO_OTP_CODE = "111111"; // Fixed code for demo — check server logs
+const HAS_SMS_PROVIDER = !!process.env.SMS_API_KEY;
+const DEMO_MODE = !HAS_SMS_PROVIDER && (!IS_PRODUCTION || process.env.ALLOW_DEMO_OTP === "true");
+const DEMO_OTP_CODE = "111111";
 
 export async function POST(req: NextRequest) {
   const clientId = getClientId(req);
@@ -26,9 +28,9 @@ export async function POST(req: NextRequest) {
     }
     const { phone } = validation.data;
 
-    if (IS_PRODUCTION && !process.env.SMS_API_KEY) {
-      // SECURITY: In production, refuse to send OTP if SMS provider is not configured
-      console.error("[sms/send-otp] SMS_API_KEY not configured in production. OTP send blocked.");
+    // Production without provider AND without demo override → block
+    if (IS_PRODUCTION && !HAS_SMS_PROVIDER && !DEMO_MODE) {
+      console.error("[sms/send-otp] SMS_API_KEY not configured and ALLOW_DEMO_OTP not enabled. OTP send blocked.");
       return NextResponse.json(
         { error: "Service SMS non configuré. Contactez le support." },
         { status: 503 }
@@ -36,14 +38,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (DEMO_MODE) {
-      // Demo mode: use fixed code, log server-side, NEVER return in response
       setOtp(phone, DEMO_OTP_CODE);
       console.warn(`[DEMO] SMS OTP for ${phone}: ${DEMO_OTP_CODE}`);
       return NextResponse.json({
         success: true,
         message: "Code envoyé (mode développement)",
         demoMode: true,
-        // SECURITY: No demoOtp field — check server logs instead
+        demoOtp: DEMO_OTP_CODE,
       });
     }
 
@@ -60,7 +61,6 @@ export async function POST(req: NextRequest) {
     //   to: phone,
     // });
 
-    // Placeholder for production SMS integration
     return NextResponse.json({
       success: true,
       message: "Code envoyé par SMS",

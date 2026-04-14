@@ -576,7 +576,7 @@ export default function AuthView({
             <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.5, paddingLeft: 28 }}>
               {forgotStep === "email" && "Entrez votre email pour recevoir un code de vérification."}
               {forgotStep === "code" && "Saisissez le code envoyé à votre email."}
-              {forgotStep === "newPassword" && "Choisissez votre nouveau mot de passe."}
+              {forgotStep === "newPassword" && "Saisissez votre nouveau mot de passe."}
               {forgotStep === "success" && "Votre mot de passe a été modifié avec succès."}
             </div>
           </div>
@@ -598,7 +598,7 @@ export default function AuthView({
                   }}>
                     {forgotStep === "success" || (step !== "newPassword" && forgotStep === "newPassword") || (step === "email" && forgotStep !== "email") ? "✓" : i + 1}
                   </div>
-                  <div style={{ fontSize: 9, color: "#475569", fontWeight: 700 }}>{step === "email" ? "Email" : step === "code" ? "Code" : "Nv. MDP"}</div>
+                  <div style={{ fontSize: 9, color: "#475569", fontWeight: 700 }}>{step === "email" ? "Email" : step === "code" ? "Code" : "Mot de passe"}</div>
                 </div>
                 {i < 2 && (
                   <div style={{

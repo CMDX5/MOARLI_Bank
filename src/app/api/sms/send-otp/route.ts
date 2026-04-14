@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (DEMO_MODE) {
-      setOtp(phone, DEMO_OTP_CODE);
+      await setOtp(phone, DEMO_OTP_CODE);
       console.warn(`[DEMO] SMS OTP for ${phone}: ${DEMO_OTP_CODE}`);
       return NextResponse.json({
         success: true,
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
 
     // Production: generate cryptographically secure 6-digit code
     const code = String(randomInt(100000, 1000000));
-    setOtp(phone, code);
+    await setOtp(phone, code);
 
     // Production: send via SMS provider (e.g., Twilio, Vonage)
     // Example with Twilio:

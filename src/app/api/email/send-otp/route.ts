@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (DEMO_MODE) {
-      setOtp(`email:${email}`, DEMO_OTP_CODE);
+      await setOtp(`email:${email}`, DEMO_OTP_CODE);
       console.warn(`[DEMO] Email OTP for ${email}: ${DEMO_OTP_CODE}`);
       return NextResponse.json({
         success: true,
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
     // Production: generate cryptographically secure 6-digit code
     const code = String(randomInt(100000, 1000000));
-    setOtp(`email:${email}`, code);
+    await setOtp(`email:${email}`, code);
 
     // Send via Resend
     const { Resend } = await import("resend");

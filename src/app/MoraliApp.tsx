@@ -8981,54 +8981,54 @@ function App() {
             openPaymentsTab={openPaymentsTab}
           />
           )}
-
-          {screen !== "auth" && screen !== "admin" && (
-            <nav className="bottom-nav" role="tablist" aria-label="Navigation principale">
-              {navItems.map((item) => {
-                const active = navActive === item;
-                return (
-                  <div
-                    key={item}
-                    className={`bn ${active ? "act" : ""}`}
-                    role="tab"
-                    aria-selected={active}
-                    tabIndex={active ? 0 : -1}
-                    onClick={() => {
-                      if (item === "Accueil") {
-                        openDashboard();
-                        return;
-                      }
-                      if (item === "Cartes") {
-                        openCardsTab();
-                        return;
-                      }
-                      if (item === "Privilèges") {
-                        openPrivilegesTab();
-                        return;
-                      }
-                      if (item === "Profil") {
-                        openProfileTab();
-                        return;
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      const items = navItems;
-                      const idx = items.indexOf(item);
-                      if (e.key === "ArrowRight") { const next = items[(idx + 1) % items.length]; const el = document.querySelector(`[aria-selected="${next === navActive}"]`)?.parentElement?.children[idx + 1] as HTMLElement; el?.focus(); }
-                      if (e.key === "ArrowLeft") { const prev = items[(idx - 1 + items.length) % items.length]; const el = document.querySelector(`[aria-selected="${prev === navActive}"]`)?.parentElement?.children[idx - 1] as HTMLElement; el?.focus(); }
-                    }}
-                  >
-                    <div className={`bn-ico ${active ? "act" : ""}`}>
-                      {renderNavIcon(item, active)}
-                    </div>
-                    <div className="bn-lbl">{item}</div>
-                    <div className="bn-pip" />
-                  </div>
-                );
-              })}
-            </nav>
-          )}
         </div>
+
+        {screen !== "auth" && screen !== "admin" && (
+          <nav className="bottom-nav" role="tablist" aria-label="Navigation principale">
+            {navItems.map((item) => {
+              const active = navActive === item;
+              return (
+                <div
+                  key={item}
+                  className={`bn ${active ? "act" : ""}`}
+                  role="tab"
+                  aria-selected={active}
+                  tabIndex={active ? 0 : -1}
+                  onClick={() => {
+                    if (item === "Accueil") {
+                      openDashboard();
+                      return;
+                    }
+                    if (item === "Cartes") {
+                      openCardsTab();
+                      return;
+                    }
+                    if (item === "Privilèges") {
+                      openPrivilegesTab();
+                      return;
+                    }
+                    if (item === "Profil") {
+                      openProfileTab();
+                      return;
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    const items = navItems;
+                    const idx = items.indexOf(item);
+                    if (e.key === "ArrowRight") { const next = items[(idx + 1) % items.length]; const el = document.querySelector(`[aria-selected="${next === navActive}"]`)?.parentElement?.children[idx + 1] as HTMLElement; el?.focus(); }
+                    if (e.key === "ArrowLeft") { const prev = items[(idx - 1 + items.length) % items.length]; const el = document.querySelector(`[aria-selected="${prev === navActive}"]`)?.parentElement?.children[idx - 1] as HTMLElement; el?.focus(); }
+                  }}
+                >
+                  <div className={`bn-ico ${active ? "act" : ""}`}>
+                    {renderNavIcon(item, active)}
+                  </div>
+                  <div className="bn-lbl">{item}</div>
+                  <div className="bn-pip" />
+                </div>
+              );
+            })}
+          </nav>
+        )}
 
         <div className={`modal-drawer-overlay ${infoDrawerOpen ? "active" : ""}`} onClick={closeInfoDrawer}>
           <div className="modal-drawer-content" onClick={(event) => event.stopPropagation()}>

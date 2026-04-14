@@ -80,10 +80,8 @@ input[type="number"] {
 }
 
 /* ── GPU fluidity: promote scroll containers to GPU layer ── */
-/* ⚠️ .app-viewport is NOT included here because a transform on a parent
-   creates a new containing block for position:fixed descendants.
-   This would break .bottom-nav which uses position:fixed. */
 .content-scrollable,
+.app-viewport,
 .transfer-modal,
 .card-modal,
 .bc-modal {

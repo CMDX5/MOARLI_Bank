@@ -162,9 +162,9 @@ body.lock-scroll{overflow:hidden;position:fixed}
 .content-scrollable::-webkit-scrollbar{display:none}
 .auth-scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:12px 22px 10px;overscroll-behavior:none}
 .auth-scroll::-webkit-scrollbar{display:none}
-.content-scrollable.dashboard-mode{padding-bottom:200px}
-.content-scrollable.nav-safe{padding-bottom:200px}
-.content-scrollable.transaction-safe{padding-bottom:200px}
+.content-scrollable.dashboard-mode{padding-bottom:100px}
+.content-scrollable.nav-safe{padding-bottom:100px}
+.content-scrollable.transaction-safe{padding-bottom:100px}
 
 .auth-hero{display:flex;flex-direction:column;align-items:center;padding:calc(env(safe-area-inset-top, 0px) + 24px) 20px 2px;position:relative;z-index:2}
 .auth-shield-wrap{
@@ -6871,7 +6871,7 @@ function App() {
           )}
 
           <div className={`app-screen ${screen === "services" ? "active" : ""}`}>
-            <div className="content-scrollable nav-safe">
+            <div className="content-scrollable nav-safe" style={{ paddingBottom: 200 }}>
               <div className="services-screen">
                 <div className="services-header">
                   <div className="services-topbar">

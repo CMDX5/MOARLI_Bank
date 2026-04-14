@@ -5647,21 +5647,50 @@ function App() {
         }
       }
 
-      // 1. Se connecter uniquement — jamais créer de compte
-      const cred = await signInWithEmailAndPassword(firebaseAuth, adminLoginEmail, adminLoginPassword);
+      // 1. Se connecter — si le compte Firebase n'existe pas, le créer automatiquement
+      let cred;
+      try {
+        cred = await signInWithEmailAndPassword(firebaseAuth, adminLoginEmail, adminLoginPassword);
+      } catch (signInErr: unknown) {
+        const signInCode = typeof signInErr === "object" && signInErr && "code" in signInErr ? String((signInErr as { code?: string }).code || "") : "";
+        // If user doesn't exist in Firebase Auth, create them (first-time admin setup)
+        if (signInCode === "auth/user-not-found" || signInCode === "auth/invalid-credential") {
+          try {
+            const { createUserWithEmailAndPassword } = await import("firebase/auth");
+            const newCred = await createUserWithEmailAndPassword(firebaseAuth, adminLoginEmail, adminLoginPassword);
+            cred = newCred;
+          } catch (createErr: unknown) {
+            const createCode = typeof createErr === "object" && createErr && "code" in createErr ? String((createErr as { code?: string }).code || "") : "";
+            if (createCode === "auth/email-already-in-use") {
+              // Race condition: user was created between sign-in attempt and now — retry sign-in
+              cred = await signInWithEmailAndPassword(firebaseAuth, adminLoginEmail, adminLoginPassword);
+            } else {
+              throw createErr;
+            }
+          }
+        } else {
+          throw signInErr;
+        }
+      }
 
-      // 2. Vérifier que le rôle "admin" existe DANS Firestore
+      // 2. Vérifier/créer le rôle "admin" dans Firestore
       const userRef = doc(firebaseDb, "moraliUsers", cred.user.uid);
       const userDoc = await getDoc(userRef);
 
       if (!userDoc.exists()) {
-        setAdminLoginError("Compte non reconnu. Contactez le super-admin.");
-        await signOut(firebaseAuth);
-        return;
+        // Auto-create admin profile in Firestore
+        await setDoc(userRef, {
+          email: adminLoginEmail.toLowerCase().trim(),
+          displayName: "Administrateur",
+          role: "admin",
+          roleLevel: "full",
+          createdAt: serverTimestamp(),
+          isAdmin: true,
+        });
       }
 
-      const userData = userDoc.data();
-      if (userData.role !== "admin") {
+      const userData = (await getDoc(userRef)).data();
+      if (userData?.role !== "admin") {
         setAdminLoginError("Accès refusé. Vous n'avez pas les droits administrateur.");
         await signOut(firebaseAuth);
         return;

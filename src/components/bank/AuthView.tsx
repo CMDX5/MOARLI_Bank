@@ -581,11 +581,12 @@ export default function AuthView({
             </div>
           </div>
 
-          {/* Step indicators */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0, marginBottom: 22 }}>
-            {["email", "code", "newPassword"].map((step, i) => (
-              <React.Fragment key={step}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+          {/* Step indicators — two-row layout for perfect alignment */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, marginBottom: 22 }}>
+            {/* Row 1: circles + connecting lines */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {["email", "code", "newPassword"].map((step, i) => (
+                <React.Fragment key={step}>
                   <div style={{
                     width: 28, height: 28, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: 11, fontWeight: 800,
@@ -598,17 +599,24 @@ export default function AuthView({
                   }}>
                     {forgotStep === "success" || (step !== "newPassword" && forgotStep === "newPassword") || (step === "email" && forgotStep !== "email") ? "✓" : i + 1}
                   </div>
-                  <div style={{ fontSize: 9, color: "#475569", fontWeight: 700 }}>{step === "email" ? "Email" : step === "code" ? "Code" : "Mot de passe"}</div>
-                </div>
-                {i < 2 && (
-                  <div style={{
-                    width: 48, height: 2, borderRadius: 1, margin: "0 6px", marginBottom: 16,
-                    background: (step === "email" && forgotStep !== "email") || (step === "code" && forgotStep === "newPassword") || forgotStep === "success"
-                      ? "rgba(212,164,55,.3)" : "rgba(255,255,255,.06)",
-                  }} />
-                )}
-              </React.Fragment>
-            ))}
+                  {i < 2 && (
+                    <div style={{
+                      width: 48, height: 2, borderRadius: 1, margin: "0 8px",
+                      background: (step === "email" && forgotStep !== "email") || (step === "code" && forgotStep === "newPassword") || forgotStep === "success"
+                        ? "rgba(212,164,55,.3)" : "rgba(255,255,255,.06)",
+                    }} />
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+            {/* Row 2: labels — fixed widths matching circle row */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 28, textAlign: "center", fontSize: 9, color: forgotStep === "email" ? "#D4A437" : "#475569", fontWeight: 700 }}>Email</div>
+              <div style={{ width: 64 }} />
+              <div style={{ width: 28, textAlign: "center", fontSize: 9, color: forgotStep === "code" ? "#D4A437" : "#475569", fontWeight: 700 }}>Code</div>
+              <div style={{ width: 64 }} />
+              <div style={{ width: 28, textAlign: "center", fontSize: 9, color: forgotStep === "newPassword" ? "#D4A437" : "#475569", fontWeight: 700 }}>Mot de passe</div>
+            </div>
           </div>
 
           {forgotStep === "email" && (

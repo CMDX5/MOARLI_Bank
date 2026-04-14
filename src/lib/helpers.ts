@@ -146,11 +146,12 @@ export const cacheIdentityForUid = (uid: string, identity: { id: string; rib: st
 };
 
 // ── Auth headers helper ──
-export const getAuthHeaders = async (getAuth: () => { getIdToken: () => Promise<string> } | null): Promise<Record<string, string>> => {
+export const getAuthHeaders = async (getAuth: (() => { getIdToken: () => Promise<string> }) | null): Promise<Record<string, string>> => {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (getAuth) {
     try {
-      const token = await getAuth.getIdToken();
+      const authObj = getAuth();
+      const token = await authObj.getIdToken();
       headers["Authorization"] = `Bearer ${token}`;
     } catch { /* token fetch failed */ }
   }
@@ -181,7 +182,7 @@ export const buildMoraliUser = (d: { uid: string; fullName?: string; pseudo?: st
 // ── Chart data helper ──
 export const chartDays = (() => {
   const monthNames = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
-  const days = [];
+  const days: Array<{ label: string; day: number; month: number; year: number; dateStr: string }> = [];
   for (let d = 6; d >= 0; d--) {
     const date = new Date();
     date.setDate(date.getDate() - d);

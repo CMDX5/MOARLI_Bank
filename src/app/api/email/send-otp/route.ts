@@ -3,8 +3,12 @@ import { randomInt } from "crypto";
 import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { setOtp } from "@/lib/otp-store";
 
-// Set to true to enable demo mode (returns OTP in response for testing without Resend API)
-const DEMO_MODE = !process.env.RESEND_API_KEY;
+// SECURITY FIX: Demo mode only in non-production environments.
+// In demo mode, uses a fixed predictable code (111111) and logs it server-side.
+// NEVER returns the OTP code in the API response — even in demo.
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const DEMO_MODE = !process.env.RESEND_API_KEY && !IS_PRODUCTION;
+const DEMO_OTP_CODE = "111111"; // Fixed code for demo — check server logs
 
 export async function POST(req: NextRequest) {
   const clientId = getClientId(req);
@@ -21,22 +25,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Email invalide" }, { status: 400 });
     }
 
-    // Generate cryptographically secure 6-digit code
-    const code = String(randomInt(100000, 1000000));
-    await setOtp(`email:${email}`, code);
+    if (IS_PRODUCTION && !process.env.RESEND_API_KEY) {
+      // SECURITY: In production, refuse to send OTP if email provider is not configured
+      console.error("[email/send-otp] RESEND_API_KEY not configured in production. OTP send blocked.");
+      return NextResponse.json(
+        { error: "Service d'email non configuré. Contactez le support." },
+        { status: 503 }
+      );
+    }
 
     if (DEMO_MODE) {
-      // Demo mode: return code in response
-      // SECURITY: OTP code never logged in any environment
+      // Demo mode: use fixed code, log server-side, NEVER return in response
+      setOtp(`email:${email}`, DEMO_OTP_CODE);
+      console.warn(`[DEMO] Email OTP for ${email}: ${DEMO_OTP_CODE}`);
       return NextResponse.json({
         success: true,
-        message: "Code de test généré (mode démo)",
-        demoOtp: code,
+        message: "Code envoyé (mode développement)",
         demoMode: true,
+        // SECURITY: No demoOtp field — check server logs instead
       });
     }
 
-    // Production: send via Resend
+    // Production: generate cryptographically secure 6-digit code
+    const code = String(randomInt(100000, 1000000));
+    setOtp(`email:${email}`, code);
+
+    // Send via Resend
     const { Resend } = await import("resend");
     const resend = new Resend(process.env.RESEND_API_KEY);
 

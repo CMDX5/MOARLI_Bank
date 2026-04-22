@@ -70,17 +70,30 @@ export async function POST(req: NextRequest) {
       txSnap2.docs.forEach((d) => batch2.delete(d.ref));
       if (txSnap2.size > 0) await batch2.commit();
 
+      // Delete server transactions (sent + received)
+      const stxSnap1 = await adminDb.collection("serverTransactions")
+        .where("senderUid", "==", uid).get();
+      const batch3 = adminDb.batch();
+      stxSnap1.docs.forEach((d) => batch3.delete(d.ref));
+      if (stxSnap1.size > 0) await batch3.commit();
+
+      const stxSnap2 = await adminDb.collection("serverTransactions")
+        .where("recipientUid", "==", uid).get();
+      const batch4 = adminDb.batch();
+      stxSnap2.docs.forEach((d) => batch4.delete(d.ref));
+      if (stxSnap2.size > 0) await batch4.commit();
+
       // Delete notifications subcollection
       const notifSnap = await adminDb.collection("users", uid, "notifications").get();
-      const batch3 = adminDb.batch();
-      notifSnap.docs.forEach((d) => batch3.delete(d.ref));
-      if (notifSnap.size > 0) await batch3.commit();
+      const batch5 = adminDb.batch();
+      notifSnap.docs.forEach((d) => batch5.delete(d.ref));
+      if (notifSnap.size > 0) await batch5.commit();
 
       // Delete support tickets subcollection
       const supportSnap = await adminDb.collection("users", uid, "supportTickets").get();
-      const batch4 = adminDb.batch();
-      supportSnap.docs.forEach((d) => batch4.delete(d.ref));
-      if (supportSnap.size > 0) await batch4.commit();
+      const batch6 = adminDb.batch();
+      supportSnap.docs.forEach((d) => batch6.delete(d.ref));
+      if (supportSnap.size > 0) await batch6.commit();
     } catch (fsErr) {
       console.error("[admin/delete-user] Firestore cleanup error:", fsErr);
     }

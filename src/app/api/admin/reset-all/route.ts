@@ -77,6 +77,20 @@ export async function POST(req: NextRequest) {
       results["firestore_transactions"] = { ok: false, error: msg };
     }
 
+    // 1b2. Delete all serverTransactions from Firestore
+    try {
+      const stxSnap = await adminDb.collection("serverTransactions").get();
+      let stxDeleted = 0;
+      for (const stxDoc of stxSnap.docs) {
+        await stxDoc.ref.delete();
+        stxDeleted++;
+      }
+      results["firestore_serverTransactions"] = { ok: true, count: stxDeleted };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      results["firestore_serverTransactions"] = { ok: false, error: msg };
+    }
+
     // 1c. Delete all pending credits from Firestore
     try {
       const pcSnap = await adminDb.collection("pendingCredits").get();

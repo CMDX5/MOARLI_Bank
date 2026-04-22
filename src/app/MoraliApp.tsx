@@ -5822,6 +5822,22 @@ function App() {
   const fetchAdminData = async () => {
     setAdminLoading(true);
     try {
+      // Use server-side API (Admin SDK) instead of client-side Firestore
+      // This ensures the dashboard always sees the latest data from both
+      // "transactions" and "serverTransactions" collections, and all users
+      // including those created via Admin API endpoints.
+      const res = await fetch("/api/admin/fetch-data", {
+        headers: await getAuthHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setAdminUsers(data.users as FirestoreMoraliUser[]);
+          setAdminTransactions(data.transactions as FirestoreTransfer[]);
+          return;
+        }
+      }
+      // Fallback: client-side Firestore (if API fails)
       const [usersSnap, txSnap] = await Promise.all([
         getDocs(collection(firebaseDb, "moraliUsers")),
         getDocs(collection(firebaseDb, "transactions")),
@@ -6431,7 +6447,7 @@ function App() {
       adminRefreshRef.current = setInterval(async () => {
         await fetchAdminData();
         setAdminLastRefresh(new Date());
-      }, 15000);
+      }, 8000);
     } else {
       if (adminRefreshRef.current) {
         clearInterval(adminRefreshRef.current);

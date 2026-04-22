@@ -96,25 +96,46 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 5. Atomic recharge: credit user + create transaction record ──
+  //    Auto-creates moraliUsers profile if user exists in Firebase Auth but has no Firestore doc.
   try {
     const result = await adminDb.runTransaction(async (transaction) => {
       // Read user document
       const userRef = adminDb.collection("moraliUsers").doc(uid);
       const userSnap = await transaction.get(userRef);
 
+      let userData: Record<string, unknown>;
+      let currentBalance: number;
+
       if (!userSnap.exists) {
-        throw new Error("USER_NOT_FOUND");
+        // Auto-create profile for Firebase Auth users without Firestore doc
+        transaction.set(userRef, {
+          uid,
+          email: "",
+          fullName: "Utilisateur",
+          balance: cleanAmount,
+          savingsAmount: 0,
+          totalSent: 0,
+          totalReceived: cleanAmount,
+          accountStatus: "active",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        userData = { fullName: "Utilisateur", moraliId: "", name: "Utilisateur" };
+        currentBalance = 0;
+      } else {
+        userData = userSnap.data()!;
+        currentBalance = Number(userData.balance) || 0;
       }
 
-      const userData = userSnap.data()!;
-      const currentBalance = Number(userData.balance) || 0;
       const newBalance = currentBalance + cleanAmount;
 
-      // Credit user
-      transaction.update(userRef, {
-        balance: newBalance,
-        updatedAt: new Date(),
-      });
+      if (userSnap.exists) {
+        // Credit existing user
+        transaction.update(userRef, {
+          balance: newBalance,
+          updatedAt: new Date(),
+        });
+      }
 
       // Create transaction record
       const txnRef = adminDb.collection("transactions").doc();
@@ -163,7 +184,7 @@ export async function POST(req: NextRequest) {
 
     console.error("[admin:recharge] Error:", err);
     return NextResponse.json(
-      { error: "Erreur interne du serveur", debug: msg },
+      { error: "Erreur interne du serveur" },
       { status: 500 }
     );
   }

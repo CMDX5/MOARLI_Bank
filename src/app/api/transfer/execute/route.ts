@@ -118,18 +118,34 @@ export async function POST(req: NextRequest) {
       const senderRef = adminDb.collection("moraliUsers").doc(auth.uid);
       const senderSnap = await transaction.get(senderRef);
 
+      let senderData: Record<string, unknown>;
+      let senderBalance: number;
+
       if (!senderSnap.exists) {
-        throw new Error("SENDER_NOT_FOUND");
+        // Auto-create sender profile
+        transaction.set(senderRef, {
+          uid: auth.uid,
+          email: "",
+          fullName: "Utilisateur",
+          balance: 0,
+          savingsAmount: 0,
+          totalSent: 0,
+          totalReceived: 0,
+          accountStatus: "active",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        senderData = { fullName: "Utilisateur", moraliId: "", name: "Utilisateur", accountStatus: "active" };
+        senderBalance = 0;
+      } else {
+        senderData = senderSnap.data()!;
+        // Check account suspension
+        if (senderData.accountStatus === "suspended") {
+          throw new Error("ACCOUNT_SUSPENDED");
+        }
+        senderBalance = Number(senderData.balance) || 0;
       }
 
-      const senderData = senderSnap.data()!;
-
-      // Check account suspension
-      if (senderData.accountStatus === "suspended") {
-        throw new Error("ACCOUNT_SUSPENDED");
-      }
-
-      const senderBalance = Number(senderData.balance) || 0;
       if (senderBalance < cleanAmount) {
         throw new Error("INSUFFICIENT_BALANCE");
       }
@@ -140,12 +156,29 @@ export async function POST(req: NextRequest) {
         .doc(recipientUid);
       const recipientSnap = await transaction.get(recipientRef);
 
-      if (!recipientSnap.exists) {
-        throw new Error("RECIPIENT_NOT_FOUND");
-      }
+      let recipientData: Record<string, unknown>;
+      let recipientBalance: number;
 
-      const recipientData = recipientSnap.data()!;
-      const recipientBalance = Number(recipientData.balance) || 0;
+      if (!recipientSnap.exists) {
+        // Auto-create recipient profile
+        transaction.set(recipientRef, {
+          uid: recipientUid,
+          email: "",
+          fullName: "Utilisateur",
+          balance: 0,
+          savingsAmount: 0,
+          totalSent: 0,
+          totalReceived: 0,
+          accountStatus: "active",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        recipientData = { fullName: "Utilisateur", moraliId: "", name: "Utilisateur" };
+        recipientBalance = 0;
+      } else {
+        recipientData = recipientSnap.data()!;
+        recipientBalance = Number(recipientData.balance) || 0;
+      }
 
       // ── Debit sender ──
       const newSenderBalance = senderBalance - cleanAmount;

@@ -1535,6 +1535,7 @@ function App() {
   const [toastMessage, setToastMessage] = useState("");
   const [toastVisible, setToastVisible] = useState(false);
   const toastTimerRef = useRef<number | null>(null);
+  const pendingCreditsClaimedRef = useRef(false);
   const otpInputRef = useRef<HTMLInputElement | null>(null);
 
   const [loginEmail, setLoginEmail] = useState("");
@@ -1940,6 +1941,31 @@ function App() {
         }
         if (typeof data.usdWallet === "number") {
           setUsdWallet(data.usdWallet);
+        }
+
+        // Auto-claim pending credits on first snapshot (fire-and-forget)
+        if (!pendingCreditsClaimedRef.current) {
+          pendingCreditsClaimedRef.current = true;
+          (async () => {
+            try {
+              const pendingRes = await fetch(`/api/directory/pending-credit?uid=${authUid}`, {
+                headers: await getAuthHeaders(),
+              });
+              const pendingData = await pendingRes.json().catch(() => ({ credits: [] }));
+              const pendingCredits = (pendingData.credits || []).filter(
+                (c: { status: string }) => c.status === "pending"
+              );
+              for (const credit of pendingCredits) {
+                await fetch("/api/directory/pending-credit", {
+                  method: "PUT",
+                  headers: await getAuthHeaders(),
+                  body: JSON.stringify({ pendingCreditId: credit.id }),
+                }).catch(() => {});
+              }
+            } catch {
+              // Silent — processPendingCredits via onSnapshot will retry
+            }
+          })();
         }
       }
     });

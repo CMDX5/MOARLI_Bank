@@ -263,67 +263,80 @@ export default function TransferView({
           return;
         }
 
-        // Phase 1: Atomically debit sender (own doc — allowed)
-        await runTransaction(firebaseDb, async (tx) => {
-          const senderDoc = await tx.get(senderRef);
-          if (!senderDoc.exists()) throw new Error("SENDER_NOT_FOUND");
-          const currentBalance = senderDoc.data().balance || 0;
-          if (amount > currentBalance) throw new Error("INSUFFICIENT_BALANCE");
-          tx.update(senderRef, { balance: currentBalance - amount, updatedAt: serverTimestamp() });
-        });
+        // ── PRIMARY: Atomic transfer via Admin SDK API ──
+        // Debits sender + credits recipient + creates record in one Firestore transaction
+        let transferDone = false;
+        let apiError: string | null = null;
+        try {
+          const atomicRes = await fetch("/api/transfer/execute", {
+            method: "POST",
+            headers: await getAuthHeaders(),
+            body: JSON.stringify({
+              recipientUid,
+              amount,
+              senderName: dashboardName || "Utilisateur",
+              senderMoraliId: bankingIdentity.id || "",
+              receiptId,
+            }),
+          });
+          const atomicData = await atomicRes.json().catch(() => ({}));
+          if (atomicData.success) {
+            transferDone = true;
+            setTransferPostBalance(atomicData.newSenderBalance ?? (balance - amount));
+          } else if (atomicRes.status === 400 || atomicRes.status === 403) {
+            // Business logic error — show to user, don't fall through
+            apiError = atomicData.error || "Erreur lors du virement";
+          }
+          // 500/503 errors — fall through to client-side fallback
+        } catch {
+          // Network error — fall through to client-side fallback
+        }
 
-        // Phase 2: Create transaction record in Firestore
-        await addDoc(collection(firebaseDb, "transactions"), {
-          senderUid: authUid, senderMoraliId: bankingIdentity.id, senderName: dashboardName,
-          recipientUid, recipientMoraliId: transferRecipient.account, recipientName: transferRecipient.name,
-          amount, fees: 0, type: "virement", status: "success", receiptId,
-          createdAt: serverTimestamp(),
-        });
-        await createRealtimeTransaction({
-          senderUid: authUid, senderMoraliId: bankingIdentity.id, senderName: dashboardName,
-          recipientUid, recipientMoraliId: transferRecipient.account, recipientName: transferRecipient.name,
-          amount, fees: 0, type: "virement", status: "success", receiptId,
-        });
+        if (apiError) {
+          showToast(apiError);
+          setTransferProcessing(false);
+          return;
+        }
 
-        // Phase 3: Credit recipient via API (server-side uses Admin SDK to bypass rules)
-        const creditRes = await fetch("/api/directory/pending-credit", {
-          method: "PUT",
-          headers: await getAuthHeaders(),
-          body: JSON.stringify({
-            recipientUid,
-            amount,
-            senderName: dashboardName || "Utilisateur",
-            senderMoraliId: bankingIdentity.id || "",
-            receiptId,
-          }),
-        });
-        if (!creditRes.ok) {
-          // Fallback 1: try direct Firestore (will fail if rules block it)
+        // ── FALLBACK: Client-side Phase 1 + 2 + 3 ──
+        if (!transferDone) {
+          // Phase 1: Atomically debit sender (own doc — allowed by rules)
+          await runTransaction(firebaseDb, async (tx) => {
+            const senderDoc = await tx.get(senderRef);
+            if (!senderDoc.exists()) throw new Error("SENDER_NOT_FOUND");
+            const currentBalance = senderDoc.data().balance || 0;
+            if (amount > currentBalance) throw new Error("INSUFFICIENT_BALANCE");
+            tx.update(senderRef, { balance: currentBalance - amount, updatedAt: serverTimestamp() });
+          });
+
+          // Phase 2: Create transaction record in Firestore
+          await addDoc(collection(firebaseDb, "transactions"), {
+            senderUid: authUid, senderMoraliId: bankingIdentity.id, senderName: dashboardName,
+            recipientUid, recipientMoraliId: transferRecipient.account, recipientName: transferRecipient.name,
+            amount, fees: 0, type: "virement", status: "success", receiptId,
+            createdAt: serverTimestamp(),
+          });
+          await createRealtimeTransaction({
+            senderUid: authUid, senderMoraliId: bankingIdentity.id, senderName: dashboardName,
+            recipientUid, recipientMoraliId: transferRecipient.account, recipientName: transferRecipient.name,
+            amount, fees: 0, type: "virement", status: "success", receiptId,
+          });
+
+          // Phase 3: Credit recipient — create pending credit (recipient auto-claims via onSnapshot)
           try {
-            const recipientRef = doc(firebaseDb, "moraliUsers", recipientUid);
-            await runTransaction(firebaseDb, async (tx) => {
-              const recipientDoc = await tx.get(recipientRef);
-              if (recipientDoc.exists()) {
-                const recipientBalance = recipientDoc.data().balance || 0;
-                tx.update(recipientRef, { balance: recipientBalance + amount, updatedAt: serverTimestamp() });
-              }
-            });
-          } catch {
-            // Rules blocked — write pending credit directly via client Firestore
-            try {
-              await addDoc(collection(firebaseDb, "pendingCredits"), {
+            await fetch("/api/directory/pending-credit", {
+              method: "POST",
+              headers: await getAuthHeaders(),
+              body: JSON.stringify({
                 recipientUid,
-                senderUid: authUid,
+                amount,
                 senderName: dashboardName || "Utilisateur",
                 senderMoraliId: bankingIdentity.id || "",
-                amount,
                 receiptId,
-                status: "pending",
-                createdAt: serverTimestamp(),
-              });
-            } catch (pcErr) {
-              console.error("[transfer] Failed to create pending credit:", pcErr);
-            }
+              }),
+            });
+          } catch {
+            // Best-effort — recipient will auto-claim pending credits on next login/snapshot
           }
         }
 
@@ -341,8 +354,10 @@ export default function TransferView({
           badge: "Reçu", badgeClass: "nb-green", icon: "receive", bg: "rgba(34,197,94,0.12)", read: false,
         });
       }
-      // Calculate post-transfer balance locally
-      setTransferPostBalance(balance - Number(transferAmountInput || 0));
+      // Calculate post-transfer balance (atomic API may have already set it)
+      if (!transferDone) {
+        setTransferPostBalance(balance - Number(transferAmountInput || 0));
+      }
       setTransferReceiptId(receiptId);
       setTransferSuccess(true);
       setTransferStage("success");

@@ -298,7 +298,12 @@ export default function AuthView({
             enterDashboard();
           }
         } else {
-          // No Firestore doc — use Firebase displayName or email-based name
+          // No Firestore doc — create it now (auto-repair for users whose profile wasn't saved during registration)
+          try {
+            await persistMoraliProfile(cred.user.uid);
+          } catch {
+            /* non-critical */
+          }
           const firebaseName = cred.user.displayName || "";
           const emailName = loginEmail ? loginEmail.split("@")[0] : "";
           const emailCapitalized = emailName ? `${emailName.charAt(0).toUpperCase()}${emailName.slice(1)}` : "";

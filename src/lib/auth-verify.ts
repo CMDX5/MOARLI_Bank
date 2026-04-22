@@ -122,6 +122,30 @@ function verifyTokenLocal(token: string): string | null {
   }
 }
 
+// ── Internal: extract claims from raw JWT payload (supplements customClaims) ──
+function extractJwtPayloadClaims(token: string): Record<string, unknown> {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return {};
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString());
+    // Known Firebase standard claims to exclude
+    const reserved = new Set([
+      "iss", "aud", "auth_time", "user_id", "sub", "iat", "exp",
+      "email", "email_verified", "phone_number", "name", "picture",
+      "firebase", "provider_id", "password_hash", "nonce",
+    ]);
+    const claims: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(payload)) {
+      if (!reserved.has(key)) {
+        claims[key] = value;
+      }
+    }
+    return claims;
+  } catch {
+    return {};
+  }
+}
+
 // ── Internal: verify token and return uid + claims ──
 async function verifyRequestAuthFull(req: NextRequest): Promise<{ uid: string; claims: Record<string, unknown> } | null> {
   try {
@@ -133,13 +157,20 @@ async function verifyRequestAuthFull(req: NextRequest): Promise<{ uid: string; c
     // Production: full RS256 signature verification + custom claims
     const decoded = await verifyTokenAdmin(token);
     if (decoded) {
-      return { uid: decoded.uid, claims: (decoded.customClaims || {}) as Record<string, unknown> };
+      // Merge SDK customClaims with raw JWT payload claims for maximum compatibility
+      const sdkClaims = (decoded.customClaims || {}) as Record<string, unknown>;
+      const jwtClaims = extractJwtPayloadClaims(token);
+      const merged = { ...jwtClaims, ...sdkClaims };
+      return { uid: decoded.uid, claims: merged };
     }
 
     // Fallback: local JWT verification (ONLY when ALLOW_INSECURE_AUTH=true)
     // verifyTokenLocal() also guards internally, but this check is defense-in-depth
     const localUid = verifyTokenLocal(token);
-    if (localUid) return { uid: localUid, claims: {} };
+    if (localUid) {
+      const jwtClaims = extractJwtPayloadClaims(token);
+      return { uid: localUid, claims: jwtClaims };
+    }
     return null;
   } catch {
     return null;

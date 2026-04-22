@@ -233,8 +233,8 @@ export async function requireAdmin(req: NextRequest): Promise<AuthResult> {
     return { uid, claims };
   }
 
-  // ── Fallback: Firestore role field (development ONLY) ──
-  if (process.env.NODE_ENV !== "production") {
+  // ── Fallback: Firestore role field (works in all environments) ──
+  {
     try {
       const { getAdminFirestore } = await import("@/lib/admin-firestore");
       const adminDb = await getAdminFirestore();

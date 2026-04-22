@@ -5819,9 +5819,17 @@ function App() {
     showToast("Déconnexion effectuée");
   };
 
-  const fetchAdminData = async () => {
-    setAdminLoading(true);
+  const fetchAdminData = async (isAutoRefresh = false) => {
+    if (isAutoRefresh) {
+      // Lightweight set for auto-refresh (no loading spinner)
+    } else {
+      setAdminLoading(true);
+    }
     try {
+      // Refresh Firebase Auth token before API call to prevent 401 on expired tokens
+      if (firebaseAuth.currentUser) {
+        try { await firebaseAuth.currentUser.getIdToken(true); } catch { /* token refresh failed, will use cached token */ }
+      }
       // Use server-side API (Admin SDK) instead of client-side Firestore
       // This ensures the dashboard always sees the latest data from both
       // "transactions" and "serverTransactions" collections, and all users
@@ -5834,19 +5842,29 @@ function App() {
         if (data.success) {
           setAdminUsers(data.users as FirestoreMoraliUser[]);
           setAdminTransactions(data.transactions as FirestoreTransfer[]);
+          setAdminLastRefresh(new Date());
           return;
         }
       }
-      // Fallback: client-side Firestore (if API fails)
-      const [usersSnap, txSnap] = await Promise.all([
+      // If API returns 401/403, don't silently fall through — log and skip
+      if (res.status === 401 || res.status === 403) {
+        console.warn("[fetchAdminData] Auth failed (" + res.status + "), skipping refresh");
+        return;
+      }
+      // Fallback: client-side Firestore (if API fails for non-auth reasons)
+      console.warn("[fetchAdminData] API failed, falling back to client-side Firestore");
+      const [usersSnap, txSnap, stxSnap] = await Promise.all([
         getDocs(collection(firebaseDb, "moraliUsers")),
         getDocs(collection(firebaseDb, "transactions")),
+        getDocs(collection(firebaseDb, "serverTransactions")).catch(() => ({ docs: [], size: 0 } as any)),
       ]);
       const users = usersSnap.docs
         .map((d) => ({ uid: d.id, ...d.data() } as FirestoreMoraliUser))
         .filter((u) => u.role !== "admin");
-      const txs = txSnap.docs
-        .map((d) => ({ id: d.id, ...d.data() } as FirestoreTransfer & { id?: string }))
+      const allTxs = [
+        ...txSnap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestoreTransfer & { id?: string })),
+        ...(stxSnap.docs || []).map((d) => ({ id: d.id, ...d.data() } as FirestoreTransfer & { id?: string })),
+      ]
         .filter((d) => d.type !== "__directory__" && d.status !== "directory")
         .sort((a, b) => {
           const ta = a.createdAt && typeof a.createdAt === "object" && "seconds" in a.createdAt ? (a.createdAt as { seconds: number }).seconds * 1000 : 0;
@@ -5854,9 +5872,12 @@ function App() {
           return tb - ta;
         });
       setAdminUsers(users);
-      setAdminTransactions(txs as FirestoreTransfer[]);
+      setAdminTransactions(allTxs as FirestoreTransfer[]);
+      setAdminLastRefresh(new Date());
     } catch (err) {
-      /* admin data fetch failed silently */
+      if (!isAutoRefresh) {
+        console.error("[fetchAdminData] Error:", err);
+      }
     } finally {
       setAdminLoading(false);
     }
@@ -6445,8 +6466,7 @@ function App() {
   useEffect(() => {
     if (isAdminLoggedIn && screen === "admin") {
       adminRefreshRef.current = setInterval(async () => {
-        await fetchAdminData();
-        setAdminLastRefresh(new Date());
+        await fetchAdminData(true);
       }, 8000);
     } else {
       if (adminRefreshRef.current) {
@@ -6648,13 +6668,16 @@ function App() {
       // Find the tx document - we need its ID from the transactions collection
       const txId = (tx as FirestoreTransfer & { id?: string }).id;
       if (txId) {
-        await updateDoc(doc(firebaseDb, "transactions", txId), { status: "contested" });
+        // Try updating in transactions collection first
+        try { await updateDoc(doc(firebaseDb, "transactions", txId), { status: "contested" }); } catch { /* not in transactions */ }
+        // Also try serverTransactions (admin recharges, transfers, etc.)
+        try { await updateDoc(doc(firebaseDb, "serverTransactions", txId), { status: "contested" }); } catch { /* not in serverTransactions */ }
       }
       setAdminTransactions((prev) => prev.map((t) => (t as FirestoreTransfer & { id?: string }).id === txId ? { ...t, status: "contested" as const } : t));
       setAdminSelectedTx((prev) => prev && (prev as FirestoreTransfer & { id?: string }).id === txId ? { ...prev, status: "contested" as const } : prev);
       logAdminActivity("Transaction contestée", `${tx.receiptId} — ${formatCurrency(tx.amount)} XAF`);
     } catch (err) {
-      /* contest tx failed silently */
+      console.error("Erreur contestation transaction:", err);
     }
   };
 

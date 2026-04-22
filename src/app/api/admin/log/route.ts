@@ -94,18 +94,29 @@ export async function POST(req: NextRequest) {
       }
 
       if (action === "RESET_TRANSACTIONS") {
+        let totalDeleted = 0;
+        // Delete from transactions collection
         const snap = await adminDb.collection("transactions").get();
         for (const docSnap of snap.docs) await docSnap.ref.delete();
+        totalDeleted += snap.size;
+        // Delete from serverTransactions collection (recharges, virements, etc.)
+        try {
+          const stxSnap = await adminDb.collection("serverTransactions").get();
+          for (const docSnap of stxSnap.docs) await docSnap.ref.delete();
+          totalDeleted += stxSnap.size;
+        } catch { /* serverTransactions may not exist */ }
+        // Delete pending credits
         try {
           const pc = await adminDb.collection("pendingCredits").get();
-          for (const d of pc.docs) await d.ref.delete();
+          for (const d of pc.docs) { await d.ref.delete(); totalDeleted++; }
         } catch { /* pendingCredits may not exist */ }
-        return NextResponse.json({ success: true, message: `${snap.size} transactions supprimées` });
+        return NextResponse.json({ success: true, message: `${totalDeleted} transactions supprimées (transactions + serverTransactions)` });
       }
 
       if (action === "RESET_NOTIFICATIONS") {
         const usersSnap = await adminDb.collection("moraliUsers").get();
         let count = 0;
+        // Delete per-user notification subcollections
         for (const userDoc of usersSnap.docs) {
           try {
             const notifs = await adminDb.collection(`users/${userDoc.id}/notifications`).get();
@@ -114,9 +125,15 @@ export async function POST(req: NextRequest) {
             if (notifs.size > 0) await batch.commit();
           } catch { /* subcollection may not exist */ }
         }
+        // Delete server-side notifications
         try {
           const sn = await adminDb.collection("serverNotifications").get();
           for (const d of sn.docs) { await d.ref.delete(); count++; }
+        } catch { /* collection may not exist */ }
+        // Delete global notifications collection
+        try {
+          const gn = await adminDb.collection("notifications").get();
+          for (const d of gn.docs) { await d.ref.delete(); count++; }
         } catch { /* collection may not exist */ }
         return NextResponse.json({ success: true, message: `${count} notifications supprimées` });
       }
@@ -155,7 +172,7 @@ export async function POST(req: NextRequest) {
           }
           results["moraliUsers_balances"] = { ok: true, count: allDocs.length };
 
-          for (const collName of ["transactions", "pendingCredits", "serverNotifications"]) {
+          for (const collName of ["transactions", "serverTransactions", "pendingCredits", "serverNotifications", "notifications"]) {
             try {
               const snap = await adminDb.collection(collName).get();
               for (const docSnap of snap.docs) await docSnap.ref.delete();

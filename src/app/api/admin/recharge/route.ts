@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
 
     console.error("[admin:recharge] Error:", err);
     return NextResponse.json(
-      { error: "Erreur interne du serveur" },
+      { error: "Erreur interne du serveur", debug: msg },
       { status: 500 }
     );
   }

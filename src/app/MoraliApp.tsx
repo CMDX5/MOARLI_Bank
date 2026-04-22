@@ -1220,9 +1220,11 @@ body.lock-scroll{overflow:hidden;position:fixed}
 // Helper to build chart data from live transactions
 const buildChartData = (txs: Transaction[], bal: number, days?: typeof chartDays) => {
   const usedDays = days || chartDays;
-  const seededRandom = (seed: number) => {
-    const x = Math.sin(seed * 9301 + 49297) % 233280;
-    return x / 233280;
+
+  // Helper: extract positive numeric value from formatted amount strings like "+ FCFA 5 000"
+  const parseNum = (amountStr: string): number => {
+    const cleaned = amountStr.replace(/[^\d]/g, "");
+    return parseInt(cleaned, 10) || 0;
   };
 
   // Build date ranges for each chart day
@@ -1241,28 +1243,19 @@ const buildChartData = (txs: Transaction[], bal: number, days?: typeof chartDays
     });
 
     if (matching.length > 0) {
-      // Extract positive numeric value from formatted amount strings
-      const parseNum = (amountStr: string): number => {
-        const cleaned = amountStr.replace(/[^\d]/g, "");
-        return parseInt(cleaned, 10) || 0;
-      };
       const credits = matching.filter((t) => t.type === "credit").reduce((sum, t) => sum + parseNum(t.amount), 0);
       const debits = matching.filter((t) => t.type === "debit").reduce((sum, t) => sum + parseNum(t.amount), 0);
       return { amount: credits + debits, credits, debits, hasRealData: true };
     }
 
-    // No real data — generate deterministic simulated data
-    const r = seededRandom(d.day * 31 + d.month * 7);
-    const isSalaryDay = (d.day === 25 || d.day === 26 || d.day === 30 || d.day === 1);
-    const isExpenseDay = (d.day === 1 || d.day === 5 || d.day === 15 || d.day === 20);
-    const amount = Math.round(bal * 0.15 * (isSalaryDay ? 1.6 + r * 0.4 : isExpenseDay ? 0.6 + r * 0.3 : 0.9 + r * 0.5));
-    return { amount, credits: isExpenseDay ? Math.round(amount * 0.4) : amount, debits: isExpenseDay ? Math.round(amount * 0.6) : 0, hasRealData: false };
+    // No real data for this day — return zeros
+    return { amount: 0, credits: 0, debits: 0, hasRealData: false };
   });
 
+  // maxAmount of at least 1 to avoid division by zero
   const maxAmount = Math.max(...dayData.map((d) => d.amount), 1);
 
-  // Build cumulative balance trajectory for sparkline
-  // Reverse-engineer daily balances from current balance
+  // Build cumulative balance trajectory for sparkline from REAL net flows only
   const netFlows = dayData.map((d) => d.credits - d.debits);
   const len = usedDays.length;
   const trajectory: number[] = new Array(len);
@@ -1271,12 +1264,14 @@ const buildChartData = (txs: Transaction[], bal: number, days?: typeof chartDays
   for (let i = len - 2; i >= 0; i--) {
     trajectory[i] = trajectory[i + 1] - netFlows[i];
   }
-  // trajectory[0] = estimated balance 6 days ago, trajectory[6] = current balance
 
   return {
-    heights: dayData.map((d) => Math.max(12, Math.round((d.amount / maxAmount) * 80))),
+    heights: dayData.map((d) => d.amount > 0 ? Math.max(12, Math.round((d.amount / maxAmount) * 80)) : 0),
     amounts: dayData.map((d) => d.amount),
     netFlow: netFlows,
+    credits: dayData.map((d) => d.credits),
+    debits: dayData.map((d) => d.debits),
+    hasRealData: dayData.map((d) => d.hasRealData),
     trajectory,
   };
 };
@@ -2763,15 +2758,22 @@ function App() {
     }
 
     const hasRealData = totalIncome > 0 || totalExpenses > 0;
-    let savingsRate = 0;
-    if (hasRealData && totalIncome > 0) {
-      savingsRate = Math.max(0, Math.min(100, Math.round(((totalIncome - totalExpenses) / totalIncome) * 100)));
+    let savingsRate: string;
+    if (!hasRealData) {
+      // No transactions at all
+      savingsRate = "—";
+    } else if (totalIncome === 0 && totalExpenses > 0) {
+      // Expenses but no income
+      savingsRate = "0%";
+    } else {
+      const pct = Math.max(0, Math.min(100, Math.round(((totalIncome - totalExpenses) / totalIncome) * 100)));
+      savingsRate = `${pct}%`;
     }
 
     return {
       income: totalIncome,
       expenses: totalExpenses,
-      savingsRate: hasRealData ? `${savingsRate}%` : "0%",
+      savingsRate,
       txCount: txCount > 0 ? `${txCount} opération${txCount > 1 ? "s" : ""}` : "0 opération",
       hasRealData,
     };

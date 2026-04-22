@@ -25,6 +25,9 @@ export interface ChartData {
   heights: number[];
   amounts: number[];
   netFlow: number[];
+  credits: number[];
+  debits: number[];
+  hasRealData: boolean[];
   trajectory: number[];
 }
 
@@ -216,8 +219,12 @@ export default function DashboardView({
               </defs>
               <path d={sparklinePath.fillArea} fill="url(#spk-grad)" />
               <path d={sparklinePath.curveLine} fill="none" stroke="rgba(59,130,246,0.55)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" filter="url(#spk-glow)" />
-              <circle cx={sparklinePath.endPt.x} cy={sparklinePath.endPt.y} r="3.5" fill="#3b82f6" opacity="0.9" />
-              <circle cx={sparklinePath.endPt.x} cy={sparklinePath.endPt.y} r="6" fill="rgba(59,130,246,0.25)" />
+              {chartData.hasRealData?.[chartData.hasRealData.length - 1] && (
+                <>
+                  <circle cx={sparklinePath.endPt.x} cy={sparklinePath.endPt.y} r="3.5" fill="#3b82f6" opacity="0.9" />
+                  <circle cx={sparklinePath.endPt.x} cy={sparklinePath.endPt.y} r="6" fill="rgba(59,130,246,0.25)" />
+                </>
+              )}
             </svg>
           </div>
 
@@ -456,6 +463,7 @@ export default function DashboardView({
           </div>
           <div className="chart-area" style={{ position: "relative" }}>
             {chartData.heights.map((height, i) => {
+              const hasData = chartData.hasRealData?.[i] ?? false;
               const flow = chartData.netFlow[i];
               const isPositive = flow >= 0;
               const barColor = isPositive
@@ -465,7 +473,26 @@ export default function DashboardView({
                 ? "linear-gradient(180deg,rgba(34,197,94,0.95) 0%,rgba(16,185,129,0.5) 100%)"
                 : "linear-gradient(180deg,rgba(239,68,68,0.95) 0%,rgba(220,38,38,0.5) 100%)";
               const dotColor = isPositive ? "#22c55e" : "#ef4444";
-              const isLast = i === chartData.heights.length - 1;
+              // Highlight the LAST bar that has real data
+              const lastIndexWithData = [...(chartData.hasRealData || [])].lastIndexOf(true);
+              const isLast = hasData && i === lastIndexWithData;
+
+              if (!hasData) {
+                // No transactions this day — minimal neutral bar
+                return (
+                  <div key={i} className="chart-line-wrap" style={{ position: "relative" }}>
+                    <div
+                      className="chart-bar"
+                      style={{
+                        height: 4,
+                        background: "rgba(255,255,255,0.08)",
+                        cursor: "default",
+                      }}
+                    />
+                  </div>
+                );
+              }
+
               return (
                 <div key={i} className="chart-line-wrap" style={{ position: "relative" }}>
                   <div
@@ -489,21 +516,23 @@ export default function DashboardView({
                   )}
                   {chartTooltip?.index === i && (
                     <div style={{
-                      position: "absolute", top: -38, left: "50%", transform: "translateX(-50%)",
-                      background: "rgba(10,20,40,.95)", border: `1px solid ${isPositive ? "rgba(34,197,94,.4)" : "rgba(239,68,68,.4)"}`,
+                      position: "absolute", top: -50, left: "50%", transform: "translateX(-50%)",
+                      background: "rgba(10,20,40,.95)", border: `1px solid rgba(212,164,55,.35)`,
                       borderRadius: 10, padding: "5px 10px", whiteSpace: "nowrap", zIndex: 10,
                       pointerEvents: "none", boxShadow: "0 4px 16px rgba(0,0,0,.4)",
-                      fontSize: 11, fontWeight: 700, color: isPositive ? "#4ade80" : "#f87171",
-                      fontFamily: "'Montserrat',sans-serif", textAlign: "center", lineHeight: 1.3,
+                      fontSize: 11, fontWeight: 700, color: "var(--gold)",
+                      fontFamily: "'Montserrat',sans-serif", textAlign: "center", lineHeight: 1.4,
                     }}>
-                      <div style={{ fontSize: 9, fontWeight: 600, color: isPositive ? "rgba(74,222,128,.6)" : "rgba(248,113,113,.6)", marginBottom: 1 }}>
-                        {isPositive ? "↑ Revenu" : "↓ Dépense"}
+                      <div style={{ fontSize: 9, fontWeight: 600, color: "rgba(74,222,128,.8)", marginBottom: 1 }}>
+                        ↑ Revenus: {formatCurrency(chartData.credits?.[i] ?? 0)} XAF
                       </div>
-                      {formatCurrency(chartData.amounts[i])} XAF
+                      <div style={{ fontSize: 9, fontWeight: 600, color: "rgba(248,113,113,.8)", marginBottom: 1 }}>
+                        ↓ Dépenses: {formatCurrency(chartData.debits?.[i] ?? 0)} XAF
+                      </div>
                       <div style={{
                         position: "absolute", bottom: -5, left: "50%", transform: "translateX(-50%)",
                         width: 0, height: 0, borderLeft: "5px solid transparent",
-                        borderRight: "5px solid transparent", borderTop: `4px solid ${isPositive ? "rgba(34,197,94,.4)" : "rgba(239,68,68,.4)"}`,
+                        borderRight: "5px solid transparent", borderTop: "4px solid rgba(212,164,55,.35)",
                       }} />
                     </div>
                   )}

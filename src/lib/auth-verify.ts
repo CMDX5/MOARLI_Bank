@@ -198,7 +198,7 @@ export async function requireAdmin(req: NextRequest): Promise<AuthResult> {
   const { uid, claims } = result;
 
   // ── Primary: Firebase Custom Claims (production authoritative) ──
-  if (claims.admin === true) {
+  if (claims.admin === true || claims.role === "admin") {
     return { uid, claims };
   }
 

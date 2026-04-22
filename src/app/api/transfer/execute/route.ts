@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
       const senderRef = adminDb.collection("moraliUsers").doc(auth.uid);
       const senderSnap = await transaction.get(senderRef);
 
-      if (!senderSnap.exists()) {
+      if (!senderSnap.exists) {
         throw new Error("SENDER_NOT_FOUND");
       }
 
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
         .doc(recipientUid);
       const recipientSnap = await transaction.get(recipientRef);
 
-      if (!recipientSnap.exists()) {
+      if (!recipientSnap.exists) {
         throw new Error("RECIPIENT_NOT_FOUND");
       }
 

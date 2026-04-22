@@ -71,14 +71,14 @@ export async function GET(req: NextRequest) {
     // ── Layer 1: Search directoryLookup — O(1) ──
     if (normalizedMoraliId.startsWith("MORALI") && /^MORALI\d{1,20}$/.test(normalizedMoraliId)) {
       const lookupDoc = await adminDb.collection("directoryLookup").doc(`morali_${normalizedMoraliId}`).get();
-      if (lookupDoc.exists()) {
+      if (lookupDoc.exists) {
         return NextResponse.json(formatResult(lookupDoc.data()!));
       }
     }
 
     if (normalizedPseudo.length >= 2) {
       const lookupDoc = await adminDb.collection("directoryLookup").doc(`pseudo_${normalizedPseudo}`).get();
-      if (lookupDoc.exists()) {
+      if (lookupDoc.exists) {
         return NextResponse.json(formatResult(lookupDoc.data()!));
       }
 

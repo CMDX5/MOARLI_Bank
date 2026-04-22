@@ -240,7 +240,7 @@ export async function requireAdmin(req: NextRequest): Promise<AuthResult> {
       const adminDb = await getAdminFirestore();
       if (adminDb) {
         const userDoc = await adminDb.collection("moraliUsers").doc(uid).get();
-        if (userDoc.exists() && userDoc.data()?.role === "admin") {
+        if (userDoc.exists && userDoc.data()?.role === "admin") {
           return { uid, claims };
         }
       }

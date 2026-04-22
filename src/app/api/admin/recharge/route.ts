@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
       const userRef = adminDb.collection("moraliUsers").doc(uid);
       const userSnap = await transaction.get(userRef);
 
-      if (!userSnap.exists()) {
+      if (!userSnap.exists) {
         throw new Error("USER_NOT_FOUND");
       }
 

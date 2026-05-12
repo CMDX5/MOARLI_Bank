@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import Script from "next/script";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -22,8 +21,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Read the CSP nonce generated per-request in next.config.ts
-  // This nonce is passed via the x-csp-nonce response header
+  // Read the CSP nonce generated per-request in middleware
+  // Middleware passes it via request headers: NextResponse.next({ request: { headers } })
   const headersList = await headers();
   const nonce = headersList.get("x-csp-nonce") || "";
 

@@ -2,18 +2,22 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
- * Middleware — Security layer for all API routes.
+ * Middleware — Security layer for all requests.
  *
  * SECURITY FEATURES:
  * 1. X-Request-Id: Unique identifier for every request (traceability)
- * 2. Rate limiting: Firestore-backed (serverless-safe, no in-memory state)
- *    - IP-based for unauthenticated sensitive endpoints
- *    - Persists across Vercel serverless instances
- * 3. Security headers: CORS control, no-sniff, HSTS reinforcement
+ * 2. CSP Nonce: Cryptographic nonce generated per-request, passed to
+ *    server components via request headers for script-src protection.
+ *    This blocks script injection (XSS) while allowing React inline styles.
+ * 3. Rate limiting: Lightweight in-memory IP-based check for sensitive
+ *    unauthenticated endpoints (first line of defense). The primary
+ *    per-user rate limiting is handled in each API route via
+ *    src/lib/rate-limit.ts (Firestore-backed, persistent).
  *
- * NOTE: The main per-user rate limiting happens in src/lib/rate-limit.ts
- * and is applied in each API route handler. This middleware provides
- * an additional IP-based layer for unauthenticated sensitive endpoints.
+ * EDGE RUNTIME COMPATIBLE:
+ * - No Node.js APIs (fs, path, process.cwd) — only Web APIs
+ * - No Firestore Admin SDK import (uses Node.js fs for credentials)
+ * - Uses crypto.randomUUID() for nonce generation (Edge-compatible)
  */
 
 const RATE_LIMIT_WINDOW = 60_000; // 1 minute
@@ -21,52 +25,71 @@ const RATE_LIMIT_MAX = 20; // requests per window per IP
 
 const SENSITIVE_PATTERNS = ['/auth', '/pin', '/login', '/register', '/verify'];
 
-/**
- * Check rate limit using Firestore (serverless-safe).
- * Falls back to permissive mode if Firestore is unavailable (no silent failures).
- */
-async function checkRateLimit(ip: string): Promise<{ limited: boolean; remaining: number } | null> {
-  try {
-    const { getAdminFirestore } = await import("@/lib/admin-firestore");
-    const adminDb = await getAdminFirestore();
-    if (!adminDb) return null;
+// Lightweight in-memory rate limit store (Edge Runtime compatible)
+// Note: This is a first line of defense only. On Vercel, each edge node
+// has its own memory. The authoritative rate limiting happens in API routes
+// via src/lib/rate-limit.ts which uses Firestore for persistence.
+const ipCounters = new Map<string, { count: number; resetAt: number }>();
 
-    const now = Date.now();
-    const resetAt = now + RATE_LIMIT_WINDOW;
-    const docRef = adminDb.collection("rateLimits").doc(`ip:${ip}`);
-    const docSnap = await docRef.get();
+function checkIpRateLimit(ip: string): { limited: boolean; remaining: number } {
+  const now = Date.now();
+  const entry = ipCounters.get(ip);
 
-    if (!docSnap.exists || (docSnap.data()?.resetAt ?? 0) <= now) {
-      // New window — set counter to 1
-      await docRef.set({ count: 1, resetAt });
-      return { limited: false, remaining: RATE_LIMIT_MAX - 1 };
-    }
-
-    const data = docSnap.data()!;
-    if (data.count >= RATE_LIMIT_MAX) {
-      return { limited: true, remaining: 0 };
-    }
-
-    // Increment counter (fire-and-forget for performance)
-    docRef.update({ count: data.count + 1 }).catch(() => {});
-
-    return { limited: false, remaining: RATE_LIMIT_MAX - data.count - 1 };
-  } catch {
-    // Firestore unavailable — allow request but log warning
-    // Security degrades gracefully: no rate limiting rather than blocking all traffic
-    console.warn("[middleware] Rate limit check failed (Firestore unavailable), allowing request");
-    return null;
+  if (!entry || entry.resetAt <= now) {
+    ipCounters.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    return { limited: false, remaining: RATE_LIMIT_MAX - 1 };
   }
+
+  if (entry.count >= RATE_LIMIT_MAX) {
+    return { limited: true, remaining: 0 };
+  }
+
+  entry.count += 1;
+  return { limited: false, remaining: RATE_LIMIT_MAX - entry.count };
 }
 
 export async function middleware(request: NextRequest) {
-  const response = NextResponse.next();
   const { pathname } = request.nextUrl;
 
-  // ── 1. Add request ID for traceability ──
+  // ── 1. Generate CSP nonce (Edge-compatible) ──
+  const nonce = crypto.randomUUID();
+
+  // ── 2. Build CSP header ──
+  // script-src: nonce-based — blocks XSS via injected <script> tags
+  // style-src: 'unsafe-inline' required for React's style={{}} syntax
+  //            CSS exfiltration risk is accepted and mitigated by:
+  //            - Input sanitization via Zod validation
+  //            - No user-controlled HTML rendering (no dangerouslySetInnerHTML)
+  //            - Content-Security-Policy-Report-Only for monitoring
+  const cspValue = [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' https://js.sentry-cdn.com`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data: blob: https:",
+    "connect-src 'self' https://*.firebaseio.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firebaseinstallations.googleapis.com https://www.googleapis.com https://sentry.io https://*.ingest.sentry.io",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "upgrade-insecure-requests",
+  ].join("; ");
+
+  // ── 3. Create response with security headers ──
+  const response = NextResponse.next();
+
+  // Set CSP on response (browser enforces this)
+  response.headers.set('Content-Security-Policy', cspValue);
+
+  // Pass nonce to server components via request headers
+  // (server components read this via `headers()` from next/headers)
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-csp-nonce', nonce);
+
+  // Add request ID for traceability
   response.headers.set('X-Request-Id', crypto.randomUUID());
 
-  // ── 2. Rate limiting on sensitive unauthenticated endpoints ──
+  // ── 4. Rate limiting on sensitive unauthenticated endpoints ──
   if (pathname.startsWith('/api/')) {
     const isSensitive = SENSITIVE_PATTERNS.some((p) => pathname.includes(p));
 
@@ -75,15 +98,16 @@ export async function middleware(request: NextRequest) {
         || request.headers.get('x-real-ip')
         || 'unknown';
 
-      const result = await checkRateLimit(ip);
+      const result = checkIpRateLimit(ip);
 
-      if (result?.limited) {
+      if (result.limited) {
         return new NextResponse(
           JSON.stringify({ error: 'Trop de requêtes. Réessayez plus tard.' }),
           {
             status: 429,
             headers: {
               'Content-Type': 'application/json',
+              'Content-Security-Policy': cspValue,
               'Retry-After': '60',
               'X-Request-Id': crypto.randomUUID(),
               'X-RateLimit-Limit': String(RATE_LIMIT_MAX),
@@ -93,16 +117,19 @@ export async function middleware(request: NextRequest) {
         );
       }
 
-      if (result) {
-        response.headers.set('X-RateLimit-Limit', String(RATE_LIMIT_MAX));
-        response.headers.set('X-RateLimit-Remaining', String(result.remaining));
-      }
+      response.headers.set('X-RateLimit-Limit', String(RATE_LIMIT_MAX));
+      response.headers.set('X-RateLimit-Remaining', String(result.remaining));
     }
   }
 
-  return response;
+  // ── 5. Return response with modified request (carries nonce to layout) ──
+  return NextResponse.next({
+    request: { headers: requestHeaders },
+    headers: response.headers,
+  });
 }
 
 export const config = {
-  matcher: ['/api/:path*'],
+  // Match all routes except static assets and Next.js internals
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)'],
 };

@@ -3424,14 +3424,6 @@ function App() {
     }
   };
 
-  const handleSkipPinSetup = () => {
-    setShowPinSetup(false);
-    setRegPinDraft("");
-    setRegPinConfirm("");
-    setRegPinStep("create");
-    setShowRegisterSuccess(true);
-  };
-
   const openCardLimitsModal = () => {
     setCardLimitsOpen(true);
   };

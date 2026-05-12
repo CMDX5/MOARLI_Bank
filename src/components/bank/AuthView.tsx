@@ -541,14 +541,6 @@ export default function AuthView({
     }
   };
 
-  const handleSkipPinSetup = () => {
-    setShowPinSetup(false);
-    setRegPinDraft("");
-    setRegPinConfirm("");
-    setRegPinStep("create");
-    setShowRegisterSuccess(true);
-  };
-
   // ── Resend OTP ──
   const resendOtp = async () => {
     setOtpValue("");
@@ -830,9 +822,7 @@ export default function AuthView({
               {regPinStep === "confirm" && regPinConfirm.length === 4 && regPinDraft !== regPinConfirm && (
                 <div className="pin-error-msg">Les codes PIN ne correspondent pas</div>
               )}
-              <div style={{ textAlign: "center", marginTop: 16 }}>
-                <span style={{ fontSize: 11, color: "var(--dim)", cursor: "pointer" }} onClick={handleSkipPinSetup}>Passer pour plus tard</span>
-              </div>
+
             </div>
           )}
 

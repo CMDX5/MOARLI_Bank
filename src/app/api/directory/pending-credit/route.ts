@@ -52,14 +52,19 @@ export async function GET(req: NextRequest) {
 
     const q = adminDb.collection("pendingCredits")
       .where("recipientUid", "==", uid)
-      .orderBy("createdAt", "asc")
       .limit(100);
     const snapshot = await q.get();
 
-    const credits = snapshot.docs.map((d) => ({
-      id: d.id,
-      ...d.data(),
-    }));
+    const credits = snapshot.docs
+      .map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }))
+      .sort((a, b) => {
+        const ta = a.createdAt instanceof Date ? a.createdAt.getTime() : (typeof a.createdAt === "object" && a.createdAt?.seconds ? (a.createdAt as { seconds: number }).seconds * 1000 : 0);
+        const tb = b.createdAt instanceof Date ? b.createdAt.getTime() : (typeof b.createdAt === "object" && b.createdAt?.seconds ? (b.createdAt as { seconds: number }).seconds * 1000 : 0);
+        return ta - tb;
+      });
 
     return NextResponse.json({ credits });
   } catch (err) {

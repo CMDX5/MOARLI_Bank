@@ -1966,7 +1966,14 @@ function App() {
       updatedAt: serverTimestamp(),
     };
 
-    const cleanPayload = Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined));
+    // Sanitize payload: remove undefined, NaN, and ensure all values are Firestore-compatible
+    const cleanPayload = Object.fromEntries(
+      Object.entries(payload).filter(([, v]) => {
+        if (v === undefined) return false;
+        if (typeof v === "number" && !Number.isFinite(v)) return false;
+        return true;
+      })
+    );
     await setDoc(userRef, cleanPayload, { merge: true });
 
     // Publish directory entry in transactions collection (public read for search)

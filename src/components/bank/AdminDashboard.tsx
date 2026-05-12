@@ -1423,16 +1423,25 @@ const handleAdminRestore = async (file: File) => {
     if (!data.users || !data.transactions) throw new Error("Format de fichier invalide");
     let userCount = 0;
     let txCount = 0;
+    // Sanitize user data before writing to Firestore
+    const sanitizeForFirestore = (obj: Record<string, unknown>) =>
+      Object.fromEntries(
+        Object.entries(obj).filter(([, v]) => {
+          if (v === undefined) return false;
+          if (typeof v === "number" && !Number.isFinite(v)) return false;
+          return true;
+        })
+      );
     await Promise.all(
       data.users.map((u: Record<string, unknown>) => {
         userCount++;
-        return setDoc(doc(firebaseDb, "moraliUsers", String(u.uid)), u);
+        return setDoc(doc(firebaseDb, "moraliUsers", String(u.uid)), sanitizeForFirestore(u));
       })
     );
     await Promise.all(
       data.transactions.map((t: Record<string, unknown>) => {
         txCount++;
-        return setDoc(doc(firebaseDb, "transactions", String(t.id)), t);
+        return setDoc(doc(firebaseDb, "transactions", String(t.id)), sanitizeForFirestore(t));
       })
     );
     logAdminActivity("Données restaurées", `${userCount} utilisateurs, ${txCount} transactions importés`);

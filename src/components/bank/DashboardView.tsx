@@ -484,8 +484,8 @@ export default function DashboardView({
                     <div
                       className="chart-bar"
                       style={{
-                        height: 4,
-                        background: "rgba(255,255,255,0.08)",
+                        height: 6,
+                        background: "rgba(255,255,255,0.12)",
                         cursor: "default",
                       }}
                     />
@@ -543,6 +543,11 @@ export default function DashboardView({
           <div className="chart-labels">
             {dynamicChartDays.map((day) => <span key={day.label}>{day.label}</span>)}
           </div>
+          {!chartData.hasRealData?.some(Boolean) && (
+            <div style={{ textAlign: "center", padding: "8px 0 4px", fontSize: 11, color: "var(--dim)", fontWeight: 600 }}>
+              Les données apparaîtront après votre première transaction
+            </div>
+          )}
         </div>
 
         {/* ── Recent Transactions ── */}

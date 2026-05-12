@@ -24,9 +24,11 @@ export async function getAdminAuth(): Promise<import("firebase-admin/auth").Auth
   adminInitAttempted = true;
   try {
     const { getAuth } = await import("firebase-admin/auth");
-    const { initializeApp, getApps, cert } = await import("firebase-admin/app");
+    const firebaseAdminApp = await import("firebase-admin/app");
+    const { initializeApp, getApps, cert } = firebaseAdminApp;
+    type Credential = ReturnType<typeof firebaseAdminApp.cert>;
 
-    let credential: { projectId: string; privateKey: string; clientEmail: string } | undefined;
+    let credential: Credential | undefined;
 
     const localKeyPath = resolve(process.cwd(), "service-account-key.json");
     if (existsSync(localKeyPath)) {

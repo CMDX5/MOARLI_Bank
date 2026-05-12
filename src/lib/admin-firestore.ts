@@ -1,4 +1,4 @@
-import { getApps, initializeApp, cert, getApp } from "firebase-admin/app";
+import { getApps, initializeApp, cert, getApp, type Credential } from "firebase-admin/app";
 import { getFirestore, Firestore } from "firebase-admin/firestore";
 import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
@@ -17,7 +17,7 @@ export async function getAdminFirestore(): Promise<Firestore | null> {
 
   try {
     // Check for credentials
-    let credential: { projectId: string; privateKey: string; clientEmail: string } | undefined;
+    let credential: Credential | undefined;
 
     // 1. Local service account key file
     const localKeyPath = resolve(process.cwd(), "service-account-key.json");

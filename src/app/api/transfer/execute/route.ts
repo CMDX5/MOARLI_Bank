@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
   try {
     const result = await adminDb.runTransaction(async (transaction) => {
       // ── Read sender document ──
-      const senderRef = adminDb.collection("moraliUsers").doc(auth.uid);
+      const senderRef = adminDb.collection("moraliUsers").doc(auth.uid!);
       const senderSnap = await transaction.get(senderRef);
 
       let senderData: Record<string, unknown>;
@@ -202,11 +202,11 @@ export async function POST(req: NextRequest) {
         senderName: sanitize(senderName || "", 100),
         recipientUid,
         recipientMoraliId:
-          sanitize(recipientData.moraliId || recipientData.id || "", 50),
+          sanitize(String(recipientData.moraliId || recipientData.id || ""), 50),
         recipientName: sanitize(
-          recipientData.fullName ||
+          String(recipientData.fullName ||
             recipientData.name ||
-            "Utilisateur",
+            "Utilisateur"),
           100
         ),
         amount: cleanAmount,

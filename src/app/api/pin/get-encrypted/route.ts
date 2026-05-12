@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const record = snap.data();
+    const record = snap.data()!;
     const encryptedPin: string | null | undefined = record.encryptedPin;
     const pinIv: string | null | undefined = record.pinIv;
 

@@ -167,11 +167,8 @@ export function startTransaction(
 
   try {
     const Sentry = require("@sentry/nextjs");
-    return (Sentry as Record<string, unknown>).startSpan?.({
-      name,
-      op,
-      data,
-    }) || null;
+    const startSpan = (Sentry as Record<string, unknown>).startSpan as ((opts: { name: string; op: string; data?: Record<string, unknown> }) => unknown) | undefined;
+    return startSpan?.({ name, op, data }) || null;
   } catch {
     return null;
   }

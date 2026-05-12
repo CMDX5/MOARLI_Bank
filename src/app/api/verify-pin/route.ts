@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ valid: false }, { status: 200 });
     }
 
-    const record = snap.data();
+    const record = snap.data()!;
 
     // ── Path 1: Modern bcrypt verification ──
     if (record.pinBcrypt) {
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
             captureError(migrationErr, {
               action: "pin:migrate:fail",
               route: "/api/verify-pin",
-              uid: auth.uid,
+              uid: auth.uid ?? undefined,
               level: "error",
             });
           }

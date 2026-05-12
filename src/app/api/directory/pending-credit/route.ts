@@ -276,7 +276,7 @@ export async function PUT(req: NextRequest) {
       }
 
       // ── 6. Atomically credit the recipient balance ──
-      const recipientRef = adminDb.collection("moraliUsers").doc(auth.uid);
+      const recipientRef = adminDb.collection("moraliUsers").doc(auth.uid!);
       const recipientSnap = await transaction.get(recipientRef);
 
       if (!recipientSnap.exists) {

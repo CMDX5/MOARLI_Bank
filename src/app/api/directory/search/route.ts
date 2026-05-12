@@ -72,14 +72,14 @@ export async function GET(req: NextRequest) {
     if (normalizedMoraliId.startsWith("MORALI") && /^MORALI\d{1,20}$/.test(normalizedMoraliId)) {
       const lookupDoc = await adminDb.collection("directoryLookup").doc(`morali_${normalizedMoraliId}`).get();
       if (lookupDoc.exists) {
-        return NextResponse.json(formatResult(lookupDoc.data()!));
+        return NextResponse.json(formatResult(lookupDoc.data()! as Parameters<typeof formatResult>[0]));
       }
     }
 
     if (normalizedPseudo.length >= 2) {
       const lookupDoc = await adminDb.collection("directoryLookup").doc(`pseudo_${normalizedPseudo}`).get();
       if (lookupDoc.exists) {
-        return NextResponse.json(formatResult(lookupDoc.data()!));
+        return NextResponse.json(formatResult(lookupDoc.data()! as Parameters<typeof formatResult>[0]));
       }
 
       // Prefix search — limited to 3 results max
@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
 
       if (!prefixResults.empty) {
         // SECURITY: return first match only — never expose full user list
-        const firstMatch = prefixResults.docs[0].data()!;
+        const firstMatch = prefixResults.docs[0].data()! as Parameters<typeof formatResult>[0];
         return NextResponse.json(formatResult(firstMatch));
       }
     }

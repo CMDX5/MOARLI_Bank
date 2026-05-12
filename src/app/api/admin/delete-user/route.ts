@@ -84,13 +84,13 @@ export async function POST(req: NextRequest) {
       if (stxSnap2.size > 0) await batch4.commit();
 
       // Delete notifications subcollection
-      const notifSnap = await adminDb.collection("users", uid, "notifications").get();
+      const notifSnap = await adminDb.collection("users").doc(uid).collection("notifications").get();
       const batch5 = adminDb.batch();
       notifSnap.docs.forEach((d) => batch5.delete(d.ref));
       if (notifSnap.size > 0) await batch5.commit();
 
       // Delete support tickets subcollection
-      const supportSnap = await adminDb.collection("users", uid, "supportTickets").get();
+      const supportSnap = await adminDb.collection("users").doc(uid).collection("supportTickets").get();
       const batch6 = adminDb.batch();
       supportSnap.docs.forEach((d) => batch6.delete(d.ref));
       if (supportSnap.size > 0) await batch6.commit();
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
       const adminApp = getApps()[0];
       if (adminApp) {
         const adminAuth = getAdminAuth(adminApp);
-        await adminAuth.disableUser(uid);
+        await adminAuth.updateUser(uid, { disabled: true });
       }
     } catch (authErr) {
       console.error("[admin/delete-user] Auth disable error:", authErr);

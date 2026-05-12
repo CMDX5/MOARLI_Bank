@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Aucun code PIN enregistré" }, { status: 404 });
     }
 
-    const record = snap.data();
+    const record = snap.data()!;
     const pinBcrypt: string | null | undefined = record.pinBcrypt;
 
     if (!pinBcrypt) {

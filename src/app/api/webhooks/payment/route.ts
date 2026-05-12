@@ -219,8 +219,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       received: true,
       processed: true,
-      credited: result.newBalance - result.previousBalance,
-      newBalance: result.newBalance,
+      credited: (result.newBalance ?? 0) - (result.previousBalance ?? 0),
+      newBalance: result.newBalance ?? 0,
       reference,
     });
   } catch (err) {

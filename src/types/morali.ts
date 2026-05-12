@@ -8,7 +8,8 @@ export type Screen =
   | "privileges" | "transaction" | "services" | "merchant"
   | "microcredit" | "personalloan" | "loans" | "currency"
   | "credit" | "internet" | "canalplus" | "electricity"
-  | "water" | "tontine" | "crypto" | "savings" | "wallet" | "admin";
+  | "water" | "tontine" | "crypto" | "savings" | "wallet" | "admin"
+  | "eurWallet" | "usdWallet";
 export type AdminTab = "overview" | "users" | "transactions" | "analytics" | "settings" | "loans" | "audit";
 export type NavItem = "Accueil" | "Cartes" | "Privilèges" | "Profil";
 export type TransactionType = "depot" | "retrait";
@@ -32,7 +33,8 @@ export type IconName =
   | "search" | "globe" | "tv" | "droplet" | "qr"
   | "piggy" | "coins" | "swap" | "users" | "flash"
   | "crypto" | "camera" | "request" | "pin" | "snowflake"
-  | "receipt" | "headset" | "document" | "chevronRight";
+  | "receipt" | "headset" | "document" | "chevronRight"
+  | "refresh" | "arrow-down";
 
 export type Transaction = {
   icon: IconName;
@@ -44,7 +46,7 @@ export type Transaction = {
   type: "credit" | "debit";
   category: string;
   receiptId?: string;
-  status?: "success" | "pending" | "failed";
+  status?: "success" | "pending" | "failed" | "contested" | "flagged";
   channel?: string;
 };
 
@@ -115,7 +117,7 @@ export type FirestoreTransfer = {
   amount: number;
   fees: number;
   type: "depot" | "retrait" | "virement" | "remboursement";
-  destination?: "cash" | "airtime" | "loan_request" | "loan_granted";
+  destination?: "cash" | "airtime" | "loan_request" | "loan_granted" | "savings";
   status: "success" | "contested" | "flagged" | "pending";
   creditPending?: boolean;
   createdAt?: unknown;

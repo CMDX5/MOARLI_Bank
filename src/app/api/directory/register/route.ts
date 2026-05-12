@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Pseudo trop long" }, { status: 400 });
     }
 
-    const sanitize = (s: string, maxLen: number) =>
+    const sanitize = (s: string | undefined, maxLen: number) =>
       String(s || "").slice(0, maxLen).replace(/[<>'"&]/g, "").trim();
 
     const safeFullName = sanitize(fullName, 100) || "Utilisateur";

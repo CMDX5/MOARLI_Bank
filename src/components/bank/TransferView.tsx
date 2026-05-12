@@ -15,7 +15,7 @@ import {
   where,
 } from "firebase/firestore";
 import { firebaseAuth, firebaseDb } from "@/lib/firebase";
-import type { MoraliUser, FirestoreMoraliUser, FirestoreTransfer, FirestoreNotification } from "@/types/morali";
+import type { MoraliUser, FirestoreMoraliUser, FirestoreTransfer, FirestoreNotification, IconName } from "@/types/morali";
 import { sanitizeInput, formatCurrency } from "@/lib/helpers";
 import { AppIcon } from "./Icons";
 
@@ -32,7 +32,7 @@ export interface TransferViewProps {
   balance: number;
   securitySettings: { biometrics: boolean; faceId: boolean; transactionValidation: boolean };
   showToast: (msg: string) => void;
-  showQuickNotif: (type: string, label: string, amount: string, icon: string, color: string) => void;
+  showQuickNotif: (type: string, label: string, amount: string, icon: IconName, color: string) => void;
   promptBiometric: () => Promise<boolean>;
   getAuthHeaders: () => Promise<Record<string, string>>;
   findMoraliUser: (rawValue: string) => Promise<{ user: MoraliUser | null; isSelf: boolean }>;
@@ -245,6 +245,7 @@ export default function TransferView({
     setTransferProcessing(true);
     const ms = Date.now().toString();
     const receiptId = `TRX-${ms.slice(-8)}`;
+    let transferDone = true; // default: skip post-balance if block not entered
     try {
       if (authUid && transferRecipient) {
         const recipientUid = transferRecipient.uid || transferRecipient.account;
@@ -265,7 +266,6 @@ export default function TransferView({
 
         // ── PRIMARY: Atomic transfer via Admin SDK API ──
         // Debits sender + credits recipient + creates record in one Firestore transaction
-        let transferDone = false;
         let apiError: string | null = null;
         try {
           const atomicRes = await fetch("/api/transfer/execute", {

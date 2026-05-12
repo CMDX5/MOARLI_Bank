@@ -2,10 +2,8 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
-  // NOTE: Set to true because the MoraliApp.tsx has some intentional `catch (err: any)` patterns.
-  // TODO: Remove when all types are strict.
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   reactStrictMode: true,
 

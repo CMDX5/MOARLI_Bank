@@ -65,7 +65,7 @@ export default function ClientWrapper() {
     vv.addEventListener("scroll", () => {
       // Prevent visual viewport offset from keyboard (iOS Safari)
       if (keyboardHeight > 0) {
-        vv.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+        (vv as unknown as { scrollTo: (opts: ScrollToOptions) => void }).scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
       }
     });
 

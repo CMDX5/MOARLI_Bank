@@ -5,6 +5,7 @@ import { requireAuth } from "@/lib/auth-verify";
 // firebase-admin v13: doc/collection/query methods are on the Firestore instance (adminDb)
 import { validateBody, schemas } from "@/lib/validation";
 import { captureError } from "@/lib/sentry";
+import { auditLog, AUDIT_ACTIONS, getClientIp } from "@/lib/audit-log";
 
 /**
  * POST /api/pin/reset
@@ -51,6 +52,12 @@ export async function POST(req: NextRequest) {
         resetAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }, { merge: true });
+
+      auditLog({
+        uid: auth.uid!,
+        action: AUDIT_ACTIONS.PIN_RESET,
+        ip: getClientIp(req),
+      }).catch(() => {});
 
       return NextResponse.json({ success: true, bcrypt: true });
     }

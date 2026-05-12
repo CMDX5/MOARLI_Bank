@@ -6,6 +6,7 @@ import { createHash, timingSafeEqual } from "crypto";
 // firebase-admin v13: doc/collection/query methods are on the Firestore instance (adminDb)
 import { validateBody, schemas } from "@/lib/validation";
 import { captureError } from "@/lib/sentry";
+import { auditLog, AUDIT_ACTIONS, getClientIp } from "@/lib/audit-log";
 
 /**
  * POST /api/verify-pin
@@ -81,6 +82,13 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      auditLog({
+        uid: auth.uid!,
+        action: isValid ? AUDIT_ACTIONS.PIN_VERIFY_SUCCESS : AUDIT_ACTIONS.PIN_VERIFY_FAILED,
+        ip: getClientIp(req),
+        level: isValid ? undefined : "warning",
+      }).catch(() => {});
+
       return NextResponse.json({ valid: isValid }, {
         status: 200,
         headers: { "X-RateLimit-Remaining": String(rl.remaining) },
@@ -128,6 +136,13 @@ export async function POST(req: NextRequest) {
           level: "warning",
         });
       }
+
+      auditLog({
+        uid: auth.uid!,
+        action: isValid ? AUDIT_ACTIONS.PIN_VERIFY_SUCCESS : AUDIT_ACTIONS.PIN_VERIFY_FAILED,
+        ip: getClientIp(req),
+        level: isValid ? undefined : "warning",
+      }).catch(() => {});
 
       return NextResponse.json({ valid: isValid }, {
         status: 200,

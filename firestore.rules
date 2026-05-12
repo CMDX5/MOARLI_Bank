@@ -1,0 +1,176 @@
+rules_version = '2';
+service cloud.firestore {
+
+  // ── Helper: authenticated user ──
+  function isAuth() {
+    return request.auth != null;
+  }
+
+  // ── Helper: user can only read/write their own document ──
+  function isOwner(userId) {
+    return isAuth() && request.auth.uid == userId;
+  }
+
+  // ── Helper: admin check via custom claims ──
+  function isAdmin() {
+    return isAuth() && request.auth.token.admin == true;
+  }
+
+  // ── Helper: signed in less than 1 hour ago (prevents stale token abuse) ──
+  function isRecentAuth() {
+    return request.auth.token.auth_time + 3600 > request.time;
+  }
+
+  // ── Helper: valid string (non-empty, reasonable length) ──
+  function isValidString(value, maxLen) {
+    return value != null && value is string && value.size() <= maxLen && value.size() > 0;
+  }
+
+  // ─────────────────────────────────────────────
+  //  MORALI USERS — Read own profile only
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/moraliUsers/{userId} {
+    allow read: if isOwner(userId);
+    allow write: if false; // All writes via Admin SDK only
+
+    // Sub-collection: virtual cards — user can read own
+    match /virtualCards/{cardId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
+    // Sub-collection: black cards — user can read own
+    match /blackCards/{cardId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  //  TRANSACTIONS — Users can only read their own
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/transactions/{txId} {
+    allow read: if isAuth()
+      && (resource.data.senderUid == request.auth.uid
+          || resource.data.recipientUid == request.auth.uid);
+    allow create, update, delete: if false; // Admin SDK only
+  }
+
+  // ─────────────────────────────────────────────
+  //  SERVER TRANSACTIONS — Users can read their own
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/serverTransactions/{txId} {
+    allow read: if isAuth()
+      && (resource.data.senderUid == request.auth.uid
+          || resource.data.recipientUid == request.auth.uid);
+    allow create, update, delete: if false; // Admin SDK only
+  }
+
+  // ─────────────────────────────────────────────
+  //  PIN RECORDS — Write via Admin SDK only
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/pinRecords/{userId} {
+    allow read, write: if false; // PIN operations via API routes only
+  }
+
+  // ─────────────────────────────────────────────
+  //  USER DIRECTORY — Read-only for authenticated
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/userDirectory/{userId} {
+    allow read: if isAuth(); // Search needs read access
+    allow write: if false; // Registration via Admin SDK
+  }
+
+  // ─────────────────────────────────────────────
+  //  NOTIFICATIONS — Users read own only
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/notifications/{notifId} {
+    allow read: if isAuth() && resource.data.uid == request.auth.uid;
+    allow create: if isAuth()
+      && request.resource.data.uid == request.auth.uid
+      && isValidString(request.resource.data.title, 200);
+    allow update, delete: if false; // Admin manages lifecycle
+  }
+
+  // ─────────────────────────────────────────────
+  //  RATE LIMITS — Admin SDK only
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/rateLimits/{key} {
+    allow read, write: if false;
+  }
+
+  // ─────────────────────────────────────────────
+  //  TX LOCKS — Admin SDK only
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/txLocks/{key} {
+    allow read, write: if false;
+  }
+
+  // ─────────────────────────────────────────────
+  //  PENDING CREDITS — Admin SDK only
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/pendingCredits/{docId} {
+    allow read, write: if false;
+  }
+
+  // ─────────────────────────────────────────────
+  //  ADMIN COLLECTIONS — Admin only
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/adminAuditLog/{logId} {
+    allow read: if isAdmin();
+    allow write: if isAdmin();
+  }
+
+  match /databases/{db}/documents/adminActivityLog/{logId} {
+    allow read: if isAdmin();
+    allow write: if isAdmin();
+  }
+
+  // ─────────────────────────────────────────────
+  //  OTP STORES — Admin SDK only
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/otpStore/{docId} {
+    allow read, write: if false;
+  }
+
+  match /databases/{db}/documents/smsOtpStore/{docId} {
+    allow read, write: if false;
+  }
+
+  match /databases/{db}/documents/emailOtpStore/{docId} {
+    allow read, write: if false;
+  }
+
+  // ─────────────────────────────────────────────
+  //  KYC — Users read/write own only, via API
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/kyc/{userId} {
+    allow read: if isOwner(userId);
+    allow write: if false; // Admin SDK via API
+  }
+
+  // ─────────────────────────────────────────────
+  //  LEGAL ACCEPTANCE — Users read/write own only
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/legalAcceptance/{userId} {
+    allow read: if isOwner(userId);
+    allow write: if false; // Admin SDK via API
+  }
+
+  // ─────────────────────────────────────────────
+  //  CURRENCY WALLET — Admin SDK only
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/currencyRates/{docId} {
+    allow read: if isAuth();
+    allow write: if false;
+  }
+
+  // ─────────────────────────────────────────────
+  //  DELETION REQUESTS — Users create own, Admin reads all
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/accountDeletionRequests/{docId} {
+    allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
+    allow read: if isAdmin() || (isAuth() && resource.data.uid == request.auth.uid);
+    allow update, delete: if isAdmin();
+  }
+}

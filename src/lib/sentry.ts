@@ -117,7 +117,7 @@ export function captureValidationError(
  * Sanitize an error for Sentry reporting
  * Removes PII and sensitive data
  */
-function sanitizeError(error: unknown): Error {
+export function sanitizeError(error: unknown): Error {
   if (error instanceof Error) {
     const message = error.message
       .replace(/Bearer\s+[^\s]+/g, "Bearer ***")

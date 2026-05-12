@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { requireAuth, revokeUserTokens } from "@/lib/auth-verify";
+import { auditLog, AUDIT_ACTIONS, getClientIp } from "@/lib/audit-log";
 
 /**
  * POST /api/auth/logout
@@ -38,6 +39,12 @@ export async function POST(req: NextRequest) {
   const revoked = await revokeUserTokens(auth.uid);
 
   if (revoked) {
+    auditLog({
+      uid: auth.uid!,
+      action: AUDIT_ACTIONS.LOGOUT,
+      ip: getClientIp(req),
+    }).catch(() => {});
+
     return NextResponse.json({
       success: true,
       message: "Déconnecté sur tous les appareils",

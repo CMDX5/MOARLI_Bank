@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/admin-firestore";
 import { rateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
+import { auditLog, AUDIT_ACTIONS, getClientIp } from "@/lib/audit-log";
 
 /**
  * Atomic Transfer API
@@ -226,6 +227,13 @@ export async function POST(req: NextRequest) {
       };
     });
 
+    auditLog({
+      uid: auth.uid!,
+      action: AUDIT_ACTIONS.TRANSFER_SEND,
+      details: { amount: cleanAmount, recipientUid, txnId: result.txnId },
+      ip: getClientIp(req),
+    }).catch(() => {});
+
     return NextResponse.json({ success: true, ...result });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -256,6 +264,15 @@ export async function POST(req: NextRequest) {
     }
 
     console.error("[transfer:execute] Transaction failed:", err);
+
+    auditLog({
+      uid: auth.uid!,
+      action: AUDIT_ACTIONS.TRANSFER_FAILED,
+      details: { amount: cleanAmount, recipientUid, error: msg },
+      ip: getClientIp(req),
+      level: "warning",
+    }).catch(() => {});
+
     return NextResponse.json(
       { error: "Erreur interne du serveur" },
       { status: 500 }

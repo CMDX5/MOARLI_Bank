@@ -5,6 +5,7 @@ import { requireAuth } from "@/lib/auth-verify";
 import { validateBody, schemas } from "@/lib/validation";
 import { captureError } from "@/lib/sentry";
 import { encryptPinServerSide } from "@/lib/pin-server-crypto";
+import { auditLog, AUDIT_ACTIONS, getClientIp } from "@/lib/audit-log";
 
 /**
  * POST /api/pin/store
@@ -60,6 +61,12 @@ export async function POST(req: NextRequest) {
         pinIv: rawBody.pinIv || null,
         updatedAt: new Date().toISOString(),
       }, { merge: true });
+
+      auditLog({
+        uid: auth.uid!,
+        action: AUDIT_ACTIONS.PIN_CREATE,
+        ip: getClientIp(req),
+      }).catch(() => {});
 
       return NextResponse.json({ success: true, bcrypt: true, serverEncrypted: !!serverEncryptedPin });
     }

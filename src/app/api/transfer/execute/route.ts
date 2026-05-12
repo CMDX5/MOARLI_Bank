@@ -227,6 +227,43 @@ export async function POST(req: NextRequest) {
       };
     });
 
+    // ── 6. Send notifications to both parties (best-effort, non-blocking) ──
+    try {
+      const formattedAmount = cleanAmount.toLocaleString("fr-FR");
+      const now = new Date().toLocaleString("fr-FR", { timeZone: "Africa/Brazzaville" });
+      const senderNameStr = result.recipientName || "Utilisateur";
+
+      // Recipient notification: "Vous avez reçu un virement"
+      await adminDb.collection("users").doc(recipientUid).collection("notifications").add({
+        title: `Virement reçu — ${formattedAmount} FCFA`,
+        time: now,
+        badge: "Reçu",
+        badgeClass: "nb-green",
+        icon: "receive",
+        bg: "rgba(34,197,94,0.12)",
+        read: false,
+        createdAt: new Date(),
+        senderUid: auth.uid,
+        senderName: senderNameStr,
+      });
+
+      // Sender notification: "Votre virement a été envoyé"
+      await adminDb.collection("users").doc(auth.uid).collection("notifications").add({
+        title: `Virement envoyé — ${formattedAmount} FCFA à ${result.recipientName}`,
+        time: now,
+        badge: "Envoyé",
+        badgeClass: "nb-blue",
+        icon: "send",
+        bg: "rgba(59,130,246,0.12)",
+        read: false,
+        createdAt: new Date(),
+        recipientUid,
+      });
+    } catch (notifErr) {
+      // Notifications are best-effort — never block the transfer
+      console.error("[transfer:execute] Notification delivery failed:", notifErr);
+    }
+
     auditLog({
       uid: auth.uid!,
       action: AUDIT_ACTIONS.TRANSFER_SEND,

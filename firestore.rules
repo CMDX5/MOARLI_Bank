@@ -96,6 +96,24 @@ service cloud.firestore {
   }
 
   // ─────────────────────────────────────────────
+  //  USERS SUBCOLLECTIONS — Notifications under users/{userId}/notifications
+  //  Writes via Admin SDK only. Users can read their own.
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/users/{userId} {
+    // Users can read/write their own notifications subcollection
+    match /notifications/{notifId} {
+      allow read: if isOwner(userId);
+      allow create, update, delete: if false; // Admin SDK only
+    }
+
+    // Support tickets subcollection
+    match /supportTickets/{ticketId} {
+      allow read: if isOwner(userId);
+      allow create, update, delete: if false; // Admin SDK only
+    }
+  }
+
+  // ─────────────────────────────────────────────
   //  RATE LIMITS — Admin SDK only
   // ─────────────────────────────────────────────
   match /databases/{db}/documents/rateLimits/{key} {

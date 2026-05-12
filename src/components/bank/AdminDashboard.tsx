@@ -471,6 +471,12 @@ const fetchAdminData = async () => {
       if (data.success) {
         setAdminUsers(data.users as FirestoreMoraliUser[]);
         setAdminTransactions(data.transactions as FirestoreTransfer[]);
+        // Keep adminSelectedUser in sync with fresh data
+        setAdminSelectedUser((prev) => {
+          if (!prev) return prev;
+          const fresh = (data.users as FirestoreMoraliUser[]).find((u) => u.uid === prev.uid);
+          return fresh ? { ...prev, ...fresh } : prev;
+        });
         return;
       }
     }
@@ -493,7 +499,7 @@ const fetchAdminData = async () => {
     setAdminUsers(users);
     setAdminTransactions(txs as FirestoreTransfer[]);
   } catch (err) {
-    /* admin data fetch failed silently */
+    console.error("[fetchAdminData] Failed:", err);
   } finally {
     setAdminLoading(false);
   }
@@ -590,7 +596,8 @@ const filteredAdminTransactions = useMemo(() => {
 }, [adminTransactions, adminTxFilter, adminTxDateFrom, adminTxDateTo, adminTxAmountMin, adminTxAmountMax]);
 
 const getAdminUserInitials = (user: FirestoreMoraliUser) => {
-  const first = (user.firstName || user.pseudo || "?").charAt(0).toUpperCase();
+  const nameFallback = user.fullName || user.email?.split("@")[0] || "?";
+  const first = (user.firstName || user.pseudo || nameFallback).charAt(0).toUpperCase();
   const last = (user.lastName || "").charAt(0).toUpperCase();
   return last ? first + last : first;
 };

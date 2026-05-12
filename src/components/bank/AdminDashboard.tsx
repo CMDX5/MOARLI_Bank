@@ -40,8 +40,8 @@ function MoraliShield({ small = false }: { small?: boolean }) {
   return (
     <svg width={width} height={height} viewBox="0 0 40 46" fill="none" aria-hidden="true">
       <path d="M20 2L4 8V22C4 31.6 11.2 40.5 20 44C28.8 40.5 36 31.6 36 22V8L20 2Z" fill="#1A3E78" />
-      <path d="M20 2L4 8V22C4 31.6 11.2 40.5 20 44C28.8 40.5 36 31.6 36 22V8L20 2Z" stroke="#D4A437" stroke-width={stroke} strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M11 29V17L20 23L29 17V29" stroke="#D4A437" stroke-width={small ? 3.2 : 3} strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M20 2L4 8V22C4 31.6 11.2 40.5 20 44C28.8 40.5 36 31.6 36 22V8L20 2Z" stroke="#D4A437" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M11 29V17L20 23L29 17V29" stroke="#D4A437" strokeWidth={small ? 3.2 : 3} strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 }
@@ -297,9 +297,7 @@ const handleAdminLogin = async () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: adminLoginEmail, password: adminLoginPassword }),
       });
-      console.log("[ADMIN LOGIN] API status:", loginRes.status);
       const loginData = await loginRes.json();
-      console.log("[ADMIN LOGIN] API response:", JSON.stringify(loginData));
       if (!loginData.success) {
         setAdminLoginError(loginData.error || "Identifiants incorrects.");
         setAdminLoginLoading(false);

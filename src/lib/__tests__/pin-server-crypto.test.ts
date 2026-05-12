@@ -5,6 +5,7 @@ describe("pin-server-crypto", () => {
   beforeAll(() => {
     // Ensure the dev fallback key is used (needs min 32 chars)
     // In dev mode, the library falls back automatically
+    // @ts-expect-error — NODE_ENV is read-only in TS 5.9 types
     process.env.NODE_ENV = "test";
   });
 

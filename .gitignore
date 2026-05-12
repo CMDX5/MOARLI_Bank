@@ -60,5 +60,8 @@ examples/
 Caddyfile
 mini-services/
 
+# test coverage
+coverage/
+
 # worklog (internal)
 worklog.md

@@ -127,7 +127,7 @@ describe("sentry — AUDIT_ACTIONS constants (from audit-log)", () => {
 
   it("all action values follow category:action format", () => {
     for (const [key, value] of Object.entries(AUDIT_ACTIONS)) {
-      expect(value).toMatch(/^[a-z]+:[a-z_:]+$/, `Action ${key} has invalid format: ${value}`);
+      expect(value).toMatch(/^[a-z]+:[a-z_:]+$/);
     }
   });
 

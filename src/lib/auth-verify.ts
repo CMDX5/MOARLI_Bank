@@ -159,10 +159,16 @@ async function verifyRequestAuthFull(req: NextRequest): Promise<{ uid: string; c
     // Production: full RS256 signature verification + custom claims
     const decoded = await verifyTokenAdmin(token);
     if (decoded) {
-      // Merge SDK customClaims with raw JWT payload claims for maximum compatibility
+      // Merge SDK customClaims with raw JWT payload claims for maximum compatibility.
+      // Also include standard JWT timing claims (iat, exp, auth_time) which are needed
+      // by security-sensitive endpoints (e.g. /api/pin/reveal checks iat for freshness).
       const sdkClaims = (decoded.customClaims || {}) as Record<string, unknown>;
       const jwtClaims = extractJwtPayloadClaims(token);
-      const merged = { ...jwtClaims, ...sdkClaims };
+      const merged: Record<string, unknown> = { ...jwtClaims, ...sdkClaims };
+      // decoded (DecodedIdToken) carries iat/exp/auth_time at top level
+      if (decoded.iat != null) merged.iat = decoded.iat;
+      if (decoded.exp != null) merged.exp = decoded.exp;
+      if (decoded.auth_time != null) merged.auth_time = decoded.auth_time;
       return { uid: decoded.uid, claims: merged };
     }
 
@@ -171,6 +177,13 @@ async function verifyRequestAuthFull(req: NextRequest): Promise<{ uid: string; c
     const localUid = verifyTokenLocal(token);
     if (localUid) {
       const jwtClaims = extractJwtPayloadClaims(token);
+      // Also extract timing claims from raw JWT payload for consistency
+      try {
+        const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString());
+        if (payload.iat != null) jwtClaims.iat = payload.iat;
+        if (payload.exp != null) jwtClaims.exp = payload.exp;
+        if (payload.auth_time != null) jwtClaims.auth_time = payload.auth_time;
+      } catch { /* ignore parse errors */ }
       return { uid: localUid, claims: jwtClaims };
     }
     return null;

@@ -2988,8 +2988,10 @@ function App() {
       let decrypted: string | null = null;
 
       // 2a. Try server-side PIN reveal (new format — encrypted with server key)
+      // IMPORTANT: forceRefresh=true ensures a fresh token with recent iat,
+      // because /api/pin/reveal rejects tokens older than 60 seconds.
       try {
-        const token = await user.getIdToken();
+        const token = await user.getIdToken(true);
         const revealRes = await fetch("/api/pin/reveal", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },

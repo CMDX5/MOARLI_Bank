@@ -1957,13 +1957,17 @@ function App() {
       rib: preservedRib,
       phone: sanitizeInput(profileForm.phone || existingData?.phone || `${registerData.prefix} ${registerData.tel}`.trim(), 30),
       email: sanitizeInput(registerData.email || loginEmail || existingData?.email || "", 100),
-      balance: existingData?.balance !== undefined ? existingData.balance : 0,
+      balance: typeof existingData?.balance === "number" && Number.isFinite(existingData.balance) ? existingData.balance : 0,
+      savingsBalance: typeof existingData?.savingsBalance === "number" && Number.isFinite(existingData.savingsBalance) ? existingData.savingsBalance : 0,
+      eurWallet: typeof existingData?.eurWallet === "number" && Number.isFinite(existingData.eurWallet) ? existingData.eurWallet : 0,
+      usdWallet: typeof existingData?.usdWallet === "number" && Number.isFinite(existingData.usdWallet) ? existingData.usdWallet : 0,
       passwordHint: registerData.pw ? "set" : existingData?.passwordHint,
       createdAt: existingData?.createdAt || serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
 
-    await setDoc(userRef, payload, { merge: true });
+    const cleanPayload = Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined));
+    await setDoc(userRef, cleanPayload, { merge: true });
 
     // Publish directory entry in transactions collection (public read for search)
     await publishDirectoryEntry(uid, { fullName, firstName, lastName, pseudo: payload.pseudo, moraliId: preservedMoraliId });
@@ -4017,7 +4021,8 @@ function App() {
 
   const openTransactionChoice = () => {
     if (!validateTransactionFields()) return;
-    setTransactionChoiceOpen(true);
+    setTransactionDestination("cash");
+    openTransactionPin();
   };
 
   const closeTransactionChoice = () => {
@@ -4136,8 +4141,10 @@ function App() {
       }, 1500);
     } catch (err: unknown) {
       setTransactionProcessing(false);
+      console.error("[executeTransaction] ERROR:", err);
       const msg = err instanceof Error ? err.message : "";
       if (msg === "INSUFFICIENT_BALANCE") showToast("Solde insuffisant");
+      else if (msg === "USER_NOT_FOUND") showToast("Profil utilisateur introuvable. Veuillez recharger la page.");
       else { showToast("Transaction impossible pour le moment"); }
     }
   };
@@ -7535,38 +7542,6 @@ function App() {
               <div className="confirm-sheet-actions">
                 <button type="button" className="secondary" onClick={cancelPrivacyClose}>Continuer l’édition</button>
                 <button type="button" className="danger" onClick={discardPrivacyChanges}>Ignorer et fermer</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {transactionChoiceOpen && (
-          <div className="transaction-flow-overlay" onClick={closeTransactionChoice}>
-            <div className="transaction-flow-modal" onClick={(event) => event.stopPropagation()}>
-              <div className="transaction-flow-head">
-                <div>
-                  <div className="transaction-flow-title">Choisir la destination</div>
-                  <div className="transaction-flow-sub">Précisez comment vous souhaitez finaliser cette opération avant sécurisation.</div>
-                </div>
-                <button className="transaction-flow-close" onClick={closeTransactionChoice} aria-label="Fermer">
-                  <span className="close-x">×</span>
-                </button>
-              </div>
-              <div className="transaction-choice-grid">
-                <button className={`transaction-choice-card ${transactionDestination === "cash" ? "selected" : ""}`} onClick={() => selectTransactionDestination("cash")}>
-                  <div className="transaction-choice-icon">
-                    <AppIcon name="card" size={22} stroke="#60a5fa" />
-                  </div>
-                  <div className="transaction-choice-title">Mobile Money (Cash)</div>
-                  <div className="transaction-choice-copy">Vers le portefeuille mobile pour retrait ou encaissement immédiat.</div>
-                </button>
-                <button className={`transaction-choice-card ${transactionDestination === "airtime" ? "selected" : ""}`} onClick={() => selectTransactionDestination("airtime")}>
-                  <div className="transaction-choice-icon airtime">
-                    <AppIcon name="phone" size={22} stroke="#fbbf24" />
-                  </div>
-                  <div className="transaction-choice-title">Crédit d'appel</div>
-                  <div className="transaction-choice-copy">Convertir instantanément le montant en crédit de communication.</div>
-                </button>
               </div>
             </div>
           </div>

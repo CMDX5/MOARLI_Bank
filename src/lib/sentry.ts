@@ -43,6 +43,7 @@ export function captureError(
 
   // Try to capture via Sentry SDK
   try {
+// eslint-disable-next-line @typescript-eslint/no-require-imports
     const Sentry = require("@sentry/nextjs");
     Sentry.withScope((scope: Record<string, unknown>) => {
       if (context?.tags) {
@@ -166,6 +167,7 @@ export function startTransaction(
   if (process.env.NODE_ENV === "development") return null;
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Sentry = require("@sentry/nextjs");
     const startSpan = (Sentry as Record<string, unknown>).startSpan as ((opts: { name: string; op: string; data?: Record<string, unknown> }) => unknown) | undefined;
     return startSpan?.({ name, op, data }) || null;

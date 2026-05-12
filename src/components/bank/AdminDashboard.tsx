@@ -1,7 +1,6 @@
 'use client';
 import React, { useEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle } from "react";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AdminLoanRecord = any;
 import {
   doc,

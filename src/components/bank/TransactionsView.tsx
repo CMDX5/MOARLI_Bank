@@ -54,7 +54,7 @@ export default function TransactionsView({
 
           <div className="transaction-body">
             <div className="transaction-group">
-              <label className="transaction-label">Montant à transférer</label>
+              <label className="transaction-label">{type === 'depot' ? 'Montant à déposer' : 'Montant à retirer'}</label>
               <div className="transaction-amount">
                 <input
                   type="number"

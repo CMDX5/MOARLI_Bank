@@ -459,7 +459,7 @@ function App() {
   const [transactionMethod, setTransactionMethod] = useState<"mtn" | "airtel">("mtn");
   const [transactionPhone, setTransactionPhone] = useState("");
   const [transactionChoiceOpen, setTransactionChoiceOpen] = useState(false);
-  const [transactionDestination, setTransactionDestination] = useState<"cash" | "airtime" | null>(null);
+  const [transactionDestination] = useState<"cash">("cash");
   const [transactionPinOpen, setTransactionPinOpen] = useState(false);
   const [transactionPin, setTransactionPin] = useState("");
   const [transactionProcessing, setTransactionProcessing] = useState(false);
@@ -959,7 +959,7 @@ function App() {
         category: isIncoming ? "Reçu" : data.type === "virement" ? "Virement" : data.type === "depot" ? "Revenus" : "Retrait",
         receiptId: data.receiptId,
         status: data.status,
-        channel: isIncoming ? "Morali Transfer" : data.destination === "airtime" ? "Crédit d'appel" : data.destination === "cash" ? "Mobile Money" : data.type === "virement" ? "Morali Transfer" : "Mobile Money",
+        channel: isIncoming ? "Morali Transfer" : data.destination === "cash" ? "Mobile Money" : data.type === "virement" ? "Morali Transfer" : "Mobile Money",
       };
     };
 
@@ -3992,7 +3992,6 @@ function App() {
 
   const resetTransactionFlow = () => {
     setTransactionChoiceOpen(false);
-    setTransactionDestination(null);
     setTransactionPinOpen(false);
     setTransactionPin("");
     setTransactionProcessing(false);
@@ -4021,8 +4020,7 @@ function App() {
 
   const openTransactionChoice = () => {
     if (!validateTransactionFields()) return;
-    setTransactionDestination("cash");
-    openTransactionPin();
+    openTransactionPinDirect();
   };
 
   const closeTransactionChoice = () => {
@@ -4046,12 +4044,10 @@ function App() {
     setPendingPinAction(null);
   };
 
-  const selectTransactionDestination = (destination: "cash" | "airtime") => {
-    setTransactionDestination(destination);
-    window.setTimeout(() => {
-      setTransactionChoiceOpen(false);
-      openTransactionPin();
-    }, 300);
+  // Destination is always "cash" (airtime/credit d'appel removed)
+  const openTransactionPinDirect = () => {
+    setTransactionChoiceOpen(false);
+    openTransactionPin();
   };
 
   const executeTransaction = async () => {
@@ -4129,7 +4125,7 @@ function App() {
       window.setTimeout(() => {
         setTransactionProcessing(false);
         setTransactionSuccess(true);
-        const destLabel = transactionDestination === "airtime" ? "Crédit d'appel" : "Mobile Money";
+        const destLabel = "Mobile Money";
         const opLabel = transactionMethod === "mtn" ? "MTN" : "Airtel";
         showQuickNotif(
           transactionType === "depot" ? "credit" : "debit",
@@ -4217,7 +4213,7 @@ function App() {
 
   const finishTransactionFlow = () => {
     const operatorLabel = transactionMethod === "mtn" ? "MTN MoMo" : "Airtel Money";
-    const destinationLabel = transactionDestination === "airtime" ? "Crédit d'appel" : "Mobile Money";
+    const destinationLabel = "Mobile Money";
     const actionLabel = transactionType === "depot" ? "Dépôt" : "Retrait";
     showToast(`${actionLabel} ${destinationLabel} ${operatorLabel} effectué`);
     setTransactionAmount("");
@@ -7581,7 +7577,7 @@ function App() {
                   </div>
                   <div>
                     <span>Destination</span>
-                    <strong>{transactionDestination === "airtime" ? "Crédit d'appel" : "Mobile Money"}</strong>
+                    <strong>Mobile Money</strong>
                   </div>
                   <div>
                     <small>Montant</small>

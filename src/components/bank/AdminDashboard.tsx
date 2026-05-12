@@ -2061,7 +2061,7 @@ const handleAdminRejectLoan = async (loan: { id: string; senderUid: string; send
                           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                           <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#64748b" }} axisLine={{ stroke: "rgba(255,255,255,0.08)" }} tickLine={false} />
                           <YAxis tick={{ fontSize: 11, fill: "#64748b" }} axisLine={false} tickLine={false} tickFormatter={(v) => v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}K` : v} />
-                          <Tooltip contentStyle={{ background: "#1e293b", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, fontSize: 12, color: "#fff" }} formatter={(value: number) => [`${formatCurrency(value)} XAF`, ""]} />
+                          <Tooltip contentStyle={{ background: "#1e293b", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, fontSize: 12, color: "#fff" }} formatter={(value) => [`${formatCurrency(Number(value ?? 0))} XAF`, ""]} />
                           <Bar dataKey="depot" fill="#22c55e" radius={[4, 4, 0, 0]} name="Dépôts" />
                           <Bar dataKey="retrait" fill="#ef4444" radius={[4, 4, 0, 0]} name="Retraits" />
                           <Bar dataKey="virement" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Virements" />

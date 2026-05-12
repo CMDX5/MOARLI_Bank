@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
+import Script from "next/script";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -15,17 +17,23 @@ export const metadata: Metadata = {
   description: "Morali - Plateforme de paiement et services financiers digitaux",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Read the CSP nonce generated per-request in next.config.ts
+  // This nonce is passed via the x-csp-nonce response header
+  const headersList = await headers();
+  const nonce = headersList.get("x-csp-nonce") || "";
+
   return (
-    <html lang="fr" suppressHydrationWarning>
+    <html lang="fr" suppressHydrationWarning nonce={nonce}>
       <head>
         {/* Sentry: inject client-side monitoring script */}
         {process.env.NEXT_PUBLIC_SENTRY_DSN && (
           <script
+            nonce={nonce}
             src="https://js.sentry-cdn.com/10.48.0/bundle.min.js"
             crossOrigin="anonymous"
             data-lazy="true"

@@ -88,7 +88,10 @@ service cloud.firestore {
     allow read: if isAuth() && resource.data.uid == request.auth.uid;
     allow create: if isAuth()
       && request.resource.data.uid == request.auth.uid
-      && isValidString(request.resource.data.title, 200);
+      && isValidString(request.resource.data.title, 200)
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+        ['uid', 'title', 'time', 'badge', 'badgeClass', 'icon', 'bg']
+      );
     allow update, delete: if false; // Admin manages lifecycle
   }
 
@@ -169,7 +172,11 @@ service cloud.firestore {
   //  DELETION REQUESTS — Users create own, Admin reads all
   // ─────────────────────────────────────────────
   match /databases/{db}/documents/accountDeletionRequests/{docId} {
-    allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
+    allow create: if isAuth()
+      && request.resource.data.uid == request.auth.uid
+      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+        ['uid', 'email', 'requestedAt', 'reason', 'status']
+      );
     allow read: if isAdmin() || (isAuth() && resource.data.uid == request.auth.uid);
     allow update, delete: if isAdmin();
   }

@@ -63,6 +63,7 @@ test.describe("Dashboard — Accessibilité mobile", () => {
     const viewportMeta = await page.locator('meta[name="viewport"]').getAttribute("content");
     expect(viewportMeta).toContain("width=device-width");
     expect(viewportMeta).toContain("initial-scale=1");
-    expect(viewportMeta).toContain("user-scalable=false");
+    // Next.js normalizes user-scalable=false to user-scalable=no
+    expect(viewportMeta).toMatch(/user-scalable=(false|no)/);
   });
 });

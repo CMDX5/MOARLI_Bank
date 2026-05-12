@@ -10,8 +10,9 @@ test.describe("Auth — Page de connexion", () => {
   test("affiche le logo MORALI PAY et les onglets Connexion / Inscription", async ({ page }) => {
     await expect(page.locator(".auth-brand-name")).toHaveText("MORALI");
     await expect(page.locator(".auth-brand-sub")).toHaveText("PAY");
-    await expect(page.getByText("Connexion", { exact: true })).toBeVisible();
-    await expect(page.getByText("Inscription", { exact: true })).toBeVisible();
+    // Use role-based selectors to avoid strict mode (text exists in both tab and form-section-title)
+    await expect(page.getByRole("button", { name: "Connexion" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Inscription" })).toBeVisible();
   });
 
   test("l'onglet Connexion est actif par défaut", async ({ page }) => {
@@ -26,28 +27,27 @@ test.describe("Auth — Page de connexion", () => {
   });
 
   test("basculer vers l'onglet Inscription affiche le formulaire d'inscription", async ({ page }) => {
-    await page.getByText("Inscription", { exact: true }).click();
+    await page.getByRole("button", { name: "Inscription" }).click();
     // Should show step 1: Identity form
     await expect(page.getByText("Vos informations")).toBeVisible();
     await expect(page.getByPlaceholder("Jean")).toBeVisible();
     await expect(page.getByPlaceholder("Prince")).toBeVisible();
-    await expect(page.getByPlaceholder("votre@email.com")).toBeVisible();
+    // Email placeholder exists in multiple panels; target the active panel's input
+    await expect(page.locator(".auth-panel.active").getByPlaceholder("votre@email.com")).toBeVisible();
   });
 
   test("le lien 'Mot de passe oublié' bascule vers le panneau de reset", async ({ page }) => {
     await page.getByText("Mot de passe oublié ?").click();
-    await expect(page.getByText("Mot de passe oublié")).toBeVisible();
-    await expect(page.getByPlaceholder("votre@email.com")).toBeVisible();
+    // The forgot panel shows "Mot de passe oublié" as its form-section-title
+    await expect(page.locator(".auth-panel.active .form-section-title")).toHaveText("Mot de passe oublié");
+    await expect(page.locator(".auth-panel.active").getByPlaceholder("votre@email.com")).toBeVisible();
     await expect(page.getByRole("button", { name: "Envoyer le code" })).toBeVisible();
   });
 
   test("connexion avec champs vides affiche un toast d'erreur", async ({ page }) => {
     await page.getByRole("button", { name: "Se connecter" }).click();
-    // Toast should appear
-    await expect(page.locator(".toast, [class*=toast], [class*=Toast]")).toBeVisible({ timeout: 5_000 }).catch(() => {
-      // Fallback: check for any error message text
-      expect(page.getByText(/champs|email|mot de passe/i)).toBeVisible();
-    });
+    // Toast should appear with class "toast"
+    await expect(page.locator('[class*="toast"][class*="show"]')).toBeVisible({ timeout: 5_000 });
   });
 
   test("connexion avec email invalide affiche un toast", async ({ page }) => {
@@ -64,10 +64,11 @@ test.describe("Auth — Page de connexion", () => {
 
   test("le bouton retour depuis 'Mot de passe oublié' revient à la connexion", async ({ page }) => {
     await page.getByText("Mot de passe oublié ?").click();
-    await expect(page.getByText("Mot de passe oublié")).toBeVisible();
+    await expect(page.locator(".auth-panel.active .form-section-title")).toHaveText("Mot de passe oublié");
     // Click the back arrow
     await page.locator(".auth-panel.active svg").first().click();
-    await expect(page.getByText("Connexion", { exact: true })).toBeVisible();
+    // Login tab should be visible again
+    await expect(page.getByRole("button", { name: "Connexion" })).toBeVisible();
   });
 });
 
@@ -75,14 +76,14 @@ test.describe("Auth — Inscription multi-étapes", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     await page.waitForSelector(".auth-scroll", { timeout: 30_000 });
-    await page.getByText("Inscription", { exact: true }).click();
+    await page.getByRole("button", { name: "Inscription" }).click();
     await expect(page.getByText("Vos informations")).toBeVisible();
   });
 
   test("étape 1: remplir le formulaire identité et passer à l'étape 2", async ({ page }) => {
     await page.getByPlaceholder("Jean").fill("Test");
     await page.getByPlaceholder("Prince").fill("E2E");
-    await page.getByPlaceholder("votre@email.com").fill("test@example.com");
+    await page.locator(".auth-panel.active").getByPlaceholder("votre@email.com").fill("test@example.com");
     await page.getByPlaceholder("").fill("061234567"); // phone input (no placeholder text)
     await page.getByRole("button", { name: /Continuer/ }).click();
     // Should show step 2: Security
@@ -99,7 +100,7 @@ test.describe("Auth — Inscription multi-étapes", () => {
   test("étape 1: email invalide affiche un toast", async ({ page }) => {
     await page.getByPlaceholder("Jean").fill("Test");
     await page.getByPlaceholder("Prince").fill("E2E");
-    await page.getByPlaceholder("votre@email.com").fill("notanemail");
+    await page.locator(".auth-panel.active").getByPlaceholder("votre@email.com").fill("notanemail");
     await page.getByPlaceholder("").fill("061234567");
     await page.getByRole("button", { name: /Continuer/ }).click();
     await expect(page.getByText(/invalide/i)).toBeVisible({ timeout: 5_000 });
@@ -109,7 +110,7 @@ test.describe("Auth — Inscription multi-étapes", () => {
     // Fill step 1
     await page.getByPlaceholder("Jean").fill("Test");
     await page.getByPlaceholder("Prince").fill("E2E");
-    await page.getByPlaceholder("votre@email.com").fill("test@example.com");
+    await page.locator(".auth-panel.active").getByPlaceholder("votre@email.com").fill("test@example.com");
     await page.getByPlaceholder("").fill("061234567");
     await page.getByRole("button", { name: /Continuer/ }).click();
     await expect(page.getByText("Sécurité du compte")).toBeVisible();
@@ -126,7 +127,7 @@ test.describe("Auth — Inscription multi-étapes", () => {
   test("étape 2: mots de passe différents affichent un toast", async ({ page }) => {
     await page.getByPlaceholder("Jean").fill("Test");
     await page.getByPlaceholder("Prince").fill("E2E");
-    await page.getByPlaceholder("votre@email.com").fill("test@example.com");
+    await page.locator(".auth-panel.active").getByPlaceholder("votre@email.com").fill("test@example.com");
     await page.getByPlaceholder("").fill("061234567");
     await page.getByRole("button", { name: /Continuer/ }).click();
     await expect(page.getByText("Sécurité du compte")).toBeVisible();

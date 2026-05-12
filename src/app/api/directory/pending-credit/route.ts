@@ -55,16 +55,21 @@ export async function GET(req: NextRequest) {
       .limit(100);
     const snapshot = await q.get();
 
-    const credits = snapshot.docs
-      .map((d) => ({
-        id: d.id,
-        ...d.data(),
-      }))
-      .sort((a, b) => {
-        const ta = a.createdAt instanceof Date ? a.createdAt.getTime() : (typeof a.createdAt === "object" && a.createdAt?.seconds ? (a.createdAt as { seconds: number }).seconds * 1000 : 0);
-        const tb = b.createdAt instanceof Date ? b.createdAt.getTime() : (typeof b.createdAt === "object" && b.createdAt?.seconds ? (b.createdAt as { seconds: number }).seconds * 1000 : 0);
-        return ta - tb;
-      });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const credits = snapshot.docs.map((d): Record<string, any> => ({
+      id: d.id,
+      ...d.data(),
+    }));
+
+    credits.sort((a, b) => {
+      const getTs = (v: unknown): number => {
+        if (v instanceof Date) return v.getTime();
+        if (typeof v === "object" && v !== null && "seconds" in v) return (v as { seconds: number }).seconds * 1000;
+        if (typeof v === "number") return v;
+        return 0;
+      };
+      return getTs(a.createdAt) - getTs(b.createdAt);
+    });
 
     return NextResponse.json({ credits });
   } catch (err) {

@@ -62,6 +62,8 @@ mini-services/
 
 # test coverage
 coverage/
+playwright-report/
+test-results/
 
 # worklog (internal)
 worklog.md

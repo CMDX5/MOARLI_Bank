@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth-verify";
+import { setAdminClaim } from "@/lib/auth-verify";
 import { getAdminFirestore } from "@/lib/admin-firestore";
 
 /**
- * TEMPORARY: Admin Init Role API
+ * Admin Init Role API
  *
- * Sets the Firestore role field for the authenticated user.
- * This is a one-time setup endpoint that will be removed after use.
+ * Sets both Firestore role field AND Firebase custom claims for the authenticated user.
+ * This ensures admin access works across all API routes (claims-based + Firestore fallback).
  */
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
@@ -24,23 +25,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ── 1. Set Firestore role ──
     const userRef = adminDb.collection("moraliUsers").doc(auth.uid);
     const userSnap = await userRef.get();
+    let wasAlreadyAdmin = false;
 
     if (userSnap.exists) {
       const data = userSnap.data()!;
       if (data.role === "admin") {
-        return NextResponse.json({
-          success: true,
-          message: "Rôle admin déjà configuré",
+        wasAlreadyAdmin = true;
+      } else {
+        await userRef.update({
+          role: "admin",
+          roleLevel: "full",
+          isAdmin: true,
+          updatedAt: new Date(),
         });
       }
-      await userRef.update({
-        role: "admin",
-        roleLevel: "full",
-        isAdmin: true,
-        updatedAt: new Date(),
-      });
     } else {
       await userRef.set({
         uid: auth.uid,
@@ -59,10 +60,16 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // ── 2. Set Firebase custom claims (authoritative for API auth) ──
+    const claimsSet = await setAdminClaim(auth.uid, "full");
+
     return NextResponse.json({
       success: true,
-      message: "Rôle admin configuré avec succès",
+      message: claimsSet
+        ? "Rôle admin configuré avec succès (Firestore + Custom Claims)"
+        : "Rôle Firestore configuré — Custom Claims en attente",
       uid: auth.uid,
+      claimsSet,
     });
   } catch (err) {
     console.error("[admin:init-role] Error:", err);

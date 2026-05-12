@@ -2931,28 +2931,39 @@ function App() {
       showToast("Les codes PIN ne correspondent pas");
       return;
     }
+    const user = firebaseAuth.currentUser;
+    const pinToSave = cardPinDraft;
     // Send plaintext PIN to server; server hashes with bcrypt
     try {
       // Remove any legacy items
       window.localStorage.removeItem("morali_card_pin");
       window.localStorage.removeItem("morali_card_pin_hash");
       window.localStorage.removeItem("morali_card_pin_salt");
+      // Also clear any stale client-encrypted copies (re-encryption will happen on first reveal)
+      window.localStorage.removeItem("morali_card_pin_encrypted");
+      window.localStorage.removeItem("morali_card_pin_iv");
       setSavedCardPin("••••");
-      setSessionPinPlaintext(cardPinDraft);
+      setSessionPinPlaintext(pinToSave);
       cardPinExistsRef.current = true;
       window.localStorage.setItem("morali_pin_exists", "true");
       setCardPinRevealed(false);
       setCardPinPassword("");
-      // Store on server (source of truth — bcrypt)
-      try {
-        const token = await firebaseAuth.currentUser?.getIdToken();
-        await fetch("/api/pin/store", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ pin: cardPinDraft }),
-        });
-      } catch { /* server store failed */ }
-      // Server is source of truth for PIN hash (bcrypt)
+
+      // Store PIN on server: bcrypt hash + server-side AES encryption (if master key set).
+      // Server is source of truth for PIN verification during transactions.
+      // Client-side encryption is deferred to the first "reveal" attempt, where
+      // the user's password is available for AES-GCM key derivation.
+      if (user?.uid) {
+        try {
+          const token = await user.getIdToken();
+          await fetch("/api/pin/store", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ pin: pinToSave }),
+          });
+        } catch { /* server store failed — non-critical, will retry on next reveal */ }
+      }
+
       setCardPinStage("menu");
       showToast("Code PIN de la carte enregistré");
     } catch {

@@ -298,3 +298,64 @@ describe("schemas.otpCode", () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe("validateBody — strip unknown fields (security)", () => {
+  it("strips unknown fields from transaction create payload", () => {
+    const result = validateBody(schemas.transactionCreate, {
+      receiptId: "rcpt-001",
+      senderUid: "user-abc-123",
+      recipientUid: "user-xyz-789",
+      amount: 5000,
+      // Injection attempt: extra fields that should be stripped
+      isAdmin: true,
+      role: "admin",
+      balance: 999999,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.receiptId).toBe("rcpt-001");
+      expect((result.data as Record<string, unknown>).isAdmin).toBeUndefined();
+      expect((result.data as Record<string, unknown>).role).toBeUndefined();
+      expect((result.data as Record<string, unknown>).balance).toBeUndefined();
+    }
+  });
+
+  it("strips unknown fields from PIN store payload", () => {
+    const result = validateBody(schemas.pinStore, {
+      pin: "1234",
+      // Injection attempt
+      uid: "attacker-uid",
+      bypassVerification: true,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.pin).toBe("1234");
+      expect((result.data as Record<string, unknown>).uid).toBeUndefined();
+      expect((result.data as Record<string, unknown>).bypassVerification).toBeUndefined();
+    }
+  });
+
+  it("strips unknown fields from admin login payload", () => {
+    const result = validateBody(schemas.adminLogin, {
+      email: "admin@morali.pay",
+      password: "secret123",
+      // Injection attempt
+      isAdmin: true,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.email).toBe("admin@morali.pay");
+      expect((result.data as Record<string, unknown>).isAdmin).toBeUndefined();
+    }
+  });
+
+  it("still rejects invalid known fields even with strip mode", () => {
+    const result = validateBody(schemas.pinStore, {
+      pin: "abcde", // Invalid: not 4 digits
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBeTruthy();
+    }
+  });
+});

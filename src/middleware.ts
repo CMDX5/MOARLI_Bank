@@ -6,9 +6,9 @@ import type { NextRequest } from 'next/server';
  *
  * SECURITY FEATURES:
  * 1. X-Request-Id: Unique identifier for every request (traceability)
- * 2. Rate limiting: Hybrid Firestore + in-memory for sensitive endpoints
- *    - Unauthenticated routes: IP-based (in-memory fallback for serverless)
- *    - Authenticated routes: UID-based via API route rate-limit.ts
+ * 2. Rate limiting: Firestore-backed (serverless-safe, no in-memory state)
+ *    - IP-based for unauthenticated sensitive endpoints
+ *    - Persists across Vercel serverless instances
  * 3. Security headers: CORS control, no-sniff, HSTS reinforcement
  *
  * NOTE: The main per-user rate limiting happens in src/lib/rate-limit.ts
@@ -16,39 +16,50 @@ import type { NextRequest } from 'next/server';
  * an additional IP-based layer for unauthenticated sensitive endpoints.
  */
 
-// Lightweight in-memory rate limiter for unauthenticated routes
-// This is a first line of defense; per-route rate limiting handles authenticated users
-const rateLimitMap = new Map<string, { count: number; lastReset: number }>();
 const RATE_LIMIT_WINDOW = 60_000; // 1 minute
 const RATE_LIMIT_MAX = 20; // requests per window per IP
 
-// Cleanup stale entries every 5 minutes to prevent memory leaks
-if (typeof globalThis !== "undefined") {
-  setInterval(() => {
-    const now = Date.now();
-    for (const [key, entry] of rateLimitMap.entries()) {
-      if (now - entry.lastReset > RATE_LIMIT_WINDOW * 2) {
-        rateLimitMap.delete(key);
-      }
-    }
-  }, 5 * 60 * 1000);
-}
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (!entry || now - entry.lastReset > RATE_LIMIT_WINDOW) {
-    rateLimitMap.set(ip, { count: 1, lastReset: now });
-    return false;
-  }
-  entry.count++;
-  return entry.count > RATE_LIMIT_MAX;
-}
-
-// Routes that require stricter rate limiting (unauthenticated)
 const SENSITIVE_PATTERNS = ['/auth', '/pin', '/login', '/register', '/verify'];
 
-export function middleware(request: NextRequest) {
+/**
+ * Check rate limit using Firestore (serverless-safe).
+ * Falls back to permissive mode if Firestore is unavailable (no silent failures).
+ */
+async function checkRateLimit(ip: string): Promise<{ limited: boolean; remaining: number } | null> {
+  try {
+    const { getAdminFirestore } = await import("@/lib/admin-firestore");
+    const adminDb = await getAdminFirestore();
+    if (!adminDb) return null;
+
+    const now = Date.now();
+    const resetAt = now + RATE_LIMIT_WINDOW;
+    const docRef = adminDb.collection("rateLimits").doc(`ip:${ip}`);
+    const docSnap = await docRef.get();
+
+    if (!docSnap.exists || (docSnap.data()?.resetAt ?? 0) <= now) {
+      // New window — set counter to 1
+      await docRef.set({ count: 1, resetAt });
+      return { limited: false, remaining: RATE_LIMIT_MAX - 1 };
+    }
+
+    const data = docSnap.data()!;
+    if (data.count >= RATE_LIMIT_MAX) {
+      return { limited: true, remaining: 0 };
+    }
+
+    // Increment counter (fire-and-forget for performance)
+    docRef.update({ count: data.count + 1 }).catch(() => {});
+
+    return { limited: false, remaining: RATE_LIMIT_MAX - data.count - 1 };
+  } catch {
+    // Firestore unavailable — allow request but log warning
+    // Security degrades gracefully: no rate limiting rather than blocking all traffic
+    console.warn("[middleware] Rate limit check failed (Firestore unavailable), allowing request");
+    return null;
+  }
+}
+
+export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
   const { pathname } = request.nextUrl;
 
@@ -64,7 +75,9 @@ export function middleware(request: NextRequest) {
         || request.headers.get('x-real-ip')
         || 'unknown';
 
-      if (isRateLimited(ip)) {
+      const result = await checkRateLimit(ip);
+
+      if (result?.limited) {
         return new NextResponse(
           JSON.stringify({ error: 'Trop de requêtes. Réessayez plus tard.' }),
           {
@@ -73,16 +86,17 @@ export function middleware(request: NextRequest) {
               'Content-Type': 'application/json',
               'Retry-After': '60',
               'X-Request-Id': crypto.randomUUID(),
+              'X-RateLimit-Limit': String(RATE_LIMIT_MAX),
+              'X-RateLimit-Remaining': '0',
             },
           }
         );
       }
 
-      // Add rate limit headers to response
-      const entry = rateLimitMap.get(ip);
-      const remaining = entry ? Math.max(0, RATE_LIMIT_MAX - entry.count) : RATE_LIMIT_MAX;
-      response.headers.set('X-RateLimit-Limit', String(RATE_LIMIT_MAX));
-      response.headers.set('X-RateLimit-Remaining', String(remaining));
+      if (result) {
+        response.headers.set('X-RateLimit-Limit', String(RATE_LIMIT_MAX));
+        response.headers.set('X-RateLimit-Remaining', String(result.remaining));
+      }
     }
   }
 

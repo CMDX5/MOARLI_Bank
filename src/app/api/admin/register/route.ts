@@ -11,10 +11,12 @@ import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
  * 3. Creates Firestore doc config/adminExists
  * 4. Creates user profile in users/{uid}
  *
- * Security:
+ * SECURITY (hardened):
+ * - Requires ADMIN_BOOTSTRAP_TOKEN env var (one-time bootstrap token)
  * - Only works if NO admin exists yet (config/adminExists must not exist)
  * - Rate limited: 3 req/min (prevent brute force)
  * - Password min 8 chars
+ * - Bootstrap token is consumed after successful admin creation
  */
 export async function POST(req: NextRequest) {
   const clientId = getClientId(req);
@@ -23,12 +25,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Trop de requêtes" }, { status: 429 });
   }
 
+  // ── SECURITY: Require bootstrap token ──
+  const bootstrapToken = process.env.ADMIN_BOOTSTRAP_TOKEN;
+  if (!bootstrapToken) {
+    // No bootstrap token configured — admin registration is disabled
+    return NextResponse.json(
+      { error: "Enregistrement admin désactivé. Configurez ADMIN_BOOTSTRAP_TOKEN." },
+      { status: 403 },
+    );
+  }
+
   try {
     const adminDb = await getAdminFirestore();
     if (!adminDb) {
       return NextResponse.json(
         { error: "Service de base de données indisponible" },
-        { status: 503 }
+        { status: 503 },
       );
     }
 
@@ -38,12 +50,12 @@ export async function POST(req: NextRequest) {
     if (configSnap.exists) {
       return NextResponse.json(
         { error: "Un administrateur existe déjà. Utilisez la connexion." },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
     // ── Parse request body ──
-    const { email, password, name } = await req.json();
+    const { email, password, name, bootstrapToken: providedToken } = await req.json();
     if (!email || !password) {
       return NextResponse.json({ error: "Email et mot de passe requis" }, { status: 400 });
     }
@@ -52,6 +64,14 @@ export async function POST(req: NextRequest) {
     }
     if (password.length < 8) {
       return NextResponse.json({ error: "Mot de passe trop court (8 caractères min)" }, { status: 400 });
+    }
+
+    // ── SECURITY: Verify bootstrap token ──
+    if (!providedToken || providedToken !== bootstrapToken) {
+      return NextResponse.json(
+        { error: "Token de bootstrap invalide" },
+        { status: 403 },
+      );
     }
 
     // ── Create admin user via Firebase Admin Auth ──
@@ -67,7 +87,7 @@ export async function POST(req: NextRequest) {
       });
     } catch (err: unknown) {
       const code = err instanceof Error ? (err as { errorInfo?: { code: string } }).errorInfo?.code || "" : "";
-      if (code === "auth/email-already-exists") {
+      if (code === "auth/email-already-in-use") {
         return NextResponse.json({ error: "Cet email est déjà utilisé" }, { status: 409 });
       }
       return NextResponse.json({ error: "Erreur lors de la création du compte" }, { status: 500 });
@@ -76,12 +96,13 @@ export async function POST(req: NextRequest) {
     // ── Set custom claim ──
     await adminAuth.setCustomUserClaims(userRecord.uid, { role: "admin" });
 
-    // ── Mark admin as existing in Firestore ──
+    // ── Mark admin as existing + consume bootstrap token ──
     await configRef.set({
       adminEmail: email.trim().toLowerCase(),
       adminUid: userRecord.uid,
       adminName: name || "Admin Morali Pay",
       createdAt: new Date().toISOString(),
+      bootstrapTokenUsed: bootstrapToken.slice(-8), // Last 8 chars for audit
     });
 
     // ── Create user profile ──

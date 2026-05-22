@@ -151,6 +151,22 @@ const ENV_SCHEMA: EnvVarSpec[] = [
         ? "CRITIQUE: ALLOW_INSECURE_AUTH=true est interdit en production!"
         : null,
   },
+  {
+    name: "ALLOW_DEMO_OTP",
+    isPublic: false,
+    required: "optional",
+    description: "Flag pour utiliser des OTP de démonstration (prévisibles). NE JAMAIS activer en production.",
+    validate: (v) =>
+      v === "true" && process.env.NODE_ENV === "production"
+        ? "CRITIQUE: ALLOW_DEMO_OTP=true est interdit en production!"
+        : null,
+  },
+  {
+    name: "ADMIN_BOOTSTRAP_TOKEN",
+    isPublic: false,
+    required: "optional",
+    description: "Token à usage unique pour créer le premier compte admin. Si non défini, le bootstrap est désactivé.",
+  },
 ];
 
 export interface ValidationResult {
@@ -261,11 +277,51 @@ function maskSecret(value: string, spec: EnvVarSpec): string {
 }
 
 /**
+ * Harden security flags check — CRASHES in production if insecure flags are enabled.
+ * This is a defense-in-depth measure in case someone accidentally sets
+ * ALLOW_INSECURE_AUTH=true or ALLOW_DEMO_OTP=true in a production environment.
+ */
+function hardenSecurityFlags(): void {
+  const isProduction = process.env.NODE_ENV === "production";
+
+  if (!isProduction) return;
+
+  const insecureFlags = [
+    { name: "ALLOW_INSECURE_AUTH", value: process.env.ALLOW_INSECURE_AUTH },
+    { name: "ALLOW_DEMO_OTP", value: process.env.ALLOW_DEMO_OTP },
+  ];
+
+  for (const flag of insecureFlags) {
+    if (flag.value === "true") {
+      console.error(
+        `\n[SECURITY] ═══════════════════════════════════════════════════════════` +
+        `\n[SECURITY]  ARRÊT IMMÉDIAT — FAILLE CRITIQUE DE SÉCURITÉ DÉTECTÉE` +
+        `\n[SECURITY]` +
+        `\n[SECURITY]  ${flag.name}="true" est activé en production.` +
+        `\n[SECURITY]  Cela contourne l'authentification Firebase et compromise` +
+        `\n[SECURITY]  la sécurité de tous les comptes utilisateurs.` +
+        `\n[SECURITY]` +
+        `\n[SECURITY]  Action: Supprimez ou mettez ${flag.name}="false" dans` +
+        `\n[SECURITY]  les variables d'environnement de production (Vercel Dashboard).` +
+        `\n[SECURITY] ═══════════════════════════════════════════════════════════\n`,
+      );
+      throw new Error(
+        `SECURITY HARDENING: ${flag.name}=true is FORBIDDEN in production. ` +
+        `Remove this environment variable immediately.`,
+      );
+    }
+  }
+}
+
+/**
  * Validate environment and log results.
  * In production, throws if validation fails (prevents server start).
  * In development/CI, logs warnings and continues.
  */
 export function validateEnvOrThrow(): ValidationResult {
+  // ── Harden: crash immediately if insecure flags are set in production ──
+  hardenSecurityFlags();
+
   const result = validateEnv();
   const isProduction = process.env.NODE_ENV === "production";
 

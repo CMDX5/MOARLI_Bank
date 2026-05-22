@@ -81,6 +81,14 @@ export async function middleware(request: NextRequest) {
   // Set CSP on response (browser enforces this)
   response.headers.set('Content-Security-Policy', cspValue);
 
+  // Additional security headers (OWASP recommendations)
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=(self)');
+  response.headers.set('X-DNS-Prefetch-Control', 'on');
+  response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+
   // Pass nonce to server components via request headers
   // (server components read this via `headers()` from next/headers)
   const requestHeaders = new Headers(request.headers);

@@ -125,6 +125,9 @@ const [adminLoans, setAdminLoans] = useState<Array<AdminLoanRecord>>([]);
 const [adminLoansLoading, setAdminLoansLoading] = useState(false);
 const [adminTxAmountMin, setAdminTxAmountMin] = useState("");
 const [adminTxAmountMax, setAdminTxAmountMax] = useState("");
+const [adminKycSubmissions, setAdminKycSubmissions] = useState<Array<Record<string, unknown>>>([]);
+const [adminKycLoading, setAdminKycLoading] = useState(false);
+const [adminKycNotes, setAdminKycNotes] = useState("");
 // ── New admin state: user management ──
 const [adminSelectedUserIds, setAdminSelectedUserIds] = useState<Set<string>>(new Set());
 const [adminUsersPage, setAdminUsersPage] = useState(1);
@@ -544,6 +547,23 @@ useEffect(() => {
       });
       setAdminLoans(loans);
     }).catch((err: unknown) => { console.error("Erreur chargement prêts admin:", err); showToast("Erreur de connexion"); }).finally(() => setAdminLoansLoading(false));
+  }
+}, [isAdminLoggedIn, adminTab]);
+
+// Load KYC submissions for admin KYC tab
+useEffect(() => {
+  if (isAdminLoggedIn && adminTab === "kyc") {
+    setAdminKycLoading(true);
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/kyc?status=pending", { headers: await getAuthHeaders() });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) setAdminKycSubmissions(data.submissions || []);
+        }
+      } catch (err: unknown) { console.error("Erreur chargement KYC:", err); showToast("Erreur de connexion"); }
+      finally { setAdminKycLoading(false); }
+    })();
   }
 }, [isAdminLoggedIn, adminTab]);
 
@@ -1730,6 +1750,7 @@ const handleAdminRejectLoan = async (loan: { id: string; senderUid: string; send
             { tab: "transactions" as AdminTab, label: "Transactions", icon: <><path d="M7 7h11"/><path d="m14 4 4 3-4 3"/><path d="M17 17H6"/><path d="m10 14-4 3 4 3"/></> },
             { tab: "analytics" as AdminTab, label: "Analytique", icon: <><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></> },
             { tab: "loans" as AdminTab, label: "Prêts", icon: <><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></> },
+            { tab: "kyc" as AdminTab, label: "KYC", icon: <><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="8" r="3"/><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></> },
             { tab: "audit" as AdminTab, label: "Journal d'audit", icon: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></> },
             { tab: "settings" as AdminTab, label: "Paramètres", icon: <><circle cx="12" cy="12" r="3"/><path d="M12 2v3"/><path d="M12 19v3"/><path d="M4.93 4.93l2.12 2.12"/><path d="M16.95 16.95l2.12 2.12"/><path d="M3 12h4"/><path d="M17 12h4"/></> },
           ]).map((item) => (
@@ -1760,6 +1781,7 @@ const handleAdminRejectLoan = async (loan: { id: string; senderUid: string; send
                 {adminTab === "transactions" && "Transactions"}
                 {adminTab === "analytics" && "Analytique"}
                 {adminTab === "loans" && "Demandes de Prêts"}
+                {adminTab === "kyc" && "Vérification KYC"}
                 {adminTab === "audit" && "Journal d'audit"}
                 {adminTab === "settings" && "Paramètres"}
               </div>
@@ -2433,6 +2455,100 @@ const handleAdminRejectLoan = async (loan: { id: string; senderUid: string; send
                     </>
                   )}
                 </>
+              )}
+
+              {/* KYC VERIFICATION TAB */}
+              {adminTab === "kyc" && (
+                <div className="admin-section">
+                  <div className="admin-section-header">
+                    <div className="admin-section-title">Vérifications KYC en attente</div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button className="admin-filter-clear" onClick={() => { (async () => { setAdminKycLoading(true); try { const res = await fetch("/api/admin/kyc?status=pending", { headers: await getAuthHeaders() }); if (res.ok) { const d = await res.json(); if (d.success) setAdminKycSubmissions(d.submissions || []); } } catch {} finally { setAdminKycLoading(false); } })(); }}>Rafraîchir</button>
+                    </div>
+                  </div>
+                  {adminKycLoading ? (
+                    <div className="admin-empty"><div className="admin-empty-text">Chargement...</div></div>
+                  ) : adminKycSubmissions.length === 0 ? (
+                    <div className="admin-empty"><div className="admin-empty-icon">✓</div><div className="admin-empty-text">Aucune vérification KYC en attente.</div></div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      {adminKycSubmissions.map((sub) => {
+                        const uid = String(sub.uid || "");
+                        const status = String(sub.status || "");
+                        const docType = String(sub.documentType || "unknown");
+                        const fullName = String(sub.fullName || "Utilisateur");
+                        const docNumber = String(sub.documentNumber || "—");
+                        const submittedAt = sub.submittedAt;
+                        const dateStr = submittedAt
+                          ? new Date(typeof submittedAt === "string" ? submittedAt : (submittedAt as { seconds?: number }).seconds ? (submittedAt as { seconds: number }).seconds * 1000 : 0).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                          : "—";
+                        const docLabel = docType === "national_id" ? "CNI" : docType === "passport" ? "Passeport" : docType === "driver_license" ? "Permis" : docType;
+
+                        const handleKycReview = async (action: "approve" | "reject") => {
+                          const notes = adminKycNotes.trim();
+                          try {
+                            const res = await fetch("/api/admin/kyc", {
+                              method: "POST",
+                              headers: { ...await getAuthHeaders(), "Content-Type": "application/json" },
+                              body: JSON.stringify({ uid, action, reviewerNotes: notes || undefined }),
+                            });
+                            const data = await res.json();
+                            if (data.success) {
+                              showToast(`KYC ${action === "approve" ? "approuvé" : "rejeté"} pour ${fullName}`);
+                              setAdminKycSubmissions((prev) => prev.filter((s: Record<string, unknown>) => s.uid !== uid));
+                              setAdminKycNotes("");
+                              logAdminActivity(`KYC ${action === "approve" ? "Approuvé" : "Rejeté"}`, `${fullName} (${docLabel})`);
+                            } else {
+                              showToast(data.error || "Erreur");
+                            }
+                          } catch { showToast("Erreur réseau"); }
+                        };
+
+                        return (
+                          <div key={uid} style={{
+                            padding: 16, borderRadius: 14, background: "rgba(255,255,255,.04)",
+                            border: "1px solid rgba(255,255,255,.08)", display: "flex", flexDirection: "column", gap: 12,
+                          }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <div>
+                                <div style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>{fullName}</div>
+                                <div style={{ fontSize: 11, color: "#64748b" }}>UID: {uid.slice(0, 12)}... | {docLabel} {docNumber !== "—" && `— ${docNumber}`}</div>
+                              </div>
+                              <span className="admin-badge" style={{
+                                background: status === "rejected" ? "rgba(239,68,68,.15)" : "rgba(234,179,8,.15)",
+                                color: status === "rejected" ? "#ef4444" : "#eab308",
+                              }}>
+                                {status === "submitted" ? "Soumis" : status === "rejected" ? "Rejeté" : status === "under_review" ? "En cours" : status}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 11, color: "#94a3b8" }}>Soumis le {dateStr}</div>
+                            {/* Review actions */}
+                            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                              <input
+                                type="text"
+                                placeholder="Notes (optionnel)..."
+                                value={adminKycNotes}
+                                onChange={(e) => setAdminKycNotes(e.target.value)}
+                                style={{
+                                  flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,.1)",
+                                  background: "rgba(255,255,255,.04)", color: "#fff", fontSize: 12, outline: "none",
+                                }}
+                              />
+                              <button onClick={() => handleKycReview("reject")} style={{
+                                padding: "8px 16px", borderRadius: 8, border: "1px solid rgba(239,68,68,.3)",
+                                background: "rgba(239,68,68,.1)", color: "#ef4444", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                              }}>Rejeter</button>
+                              <button onClick={() => handleKycReview("approve")} style={{
+                                padding: "8px 16px", borderRadius: 8, border: "none",
+                                background: "rgba(34,197,94,.2)", color: "#22c55e", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                              }}>Approuver</button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* AUDIT LOG TAB */}

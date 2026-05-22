@@ -591,6 +591,35 @@ function App() {
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [tontineDistConfirm, setTontineDistConfirm] = useState<{ groupIndex: number; pot: number; members: number; sharePerMember: number } | null>(null);
 
+  // ── KYC States ──
+  const [kycModalOpen, setKycModalOpen] = useState(false);
+  const [kycStep, setKycStep] = useState<1 | 2 | 3>(1);
+  const [kycSubmitting, setKycSubmitting] = useState(false);
+  const [kycFirestoreStatus, setKycFirestoreStatus] = useState<"none" | "submitted" | "under_review" | "approved" | "rejected">("none");
+  const [kycDocType, setKycDocType] = useState<"national_id" | "passport" | "driver_license">("national_id");
+  const [kycDocNumber, setKycDocNumber] = useState("");
+  const [kycDob, setKycDob] = useState("");
+  const [kycDocFront, setKycDocFront] = useState<string | null>(null);
+  const [kycDocBack, setKycDocBack] = useState<string | null>(null);
+  const [kycSelfie, setKycSelfie] = useState<string | null>(null);
+  const kycSelfieVideoRef = useRef<HTMLVideoElement>(null);
+  const kycSelfieCanvasRef = useRef<HTMLCanvasElement>(null);
+  const kycSelfieStreamRef = useRef<MediaStream | null>(null);
+
+  // Fetch KYC status from Firestore on login
+  useEffect(() => {
+    if (!authUid) return;
+    (async () => {
+      try {
+        const res = await fetch("/api/kyc", { headers: await getAuthHeaders() });
+        if (res.ok) {
+          const data = await res.json();
+          setKycFirestoreStatus(data.status || "none");
+        }
+      } catch { /* silent */ }
+    })();
+  }, [authUid]);
+
   // Check biometric & platform auth support on mount
   useEffect(() => {
     if (typeof window !== "undefined" && window.PublicKeyCredential) {
@@ -1414,21 +1443,26 @@ function App() {
   const passwordStrength = useMemo(() => getStrength(registerData.pw), [registerData.pw]);
 
   // ── KYC Level Calculation ──
-  // Based on profile completion (real KYC API will override this)
+  // Uses Firestore kycRecords status when available, falls back to profile completion
   const kycLevel = useMemo(() => {
+    // Firestore KYC status takes priority
+    if (kycFirestoreStatus === "approved") return 3;
+    if (kycFirestoreStatus === "under_review" || kycFirestoreStatus === "submitted") return 2;
+    // Fallback: profile-based estimation
     const hasName = (profileForm.fullName || "").trim().length >= 2;
     const hasPhone = (profileForm.phone || "").trim().length >= 8;
     const hasAddress = (profileForm.address || "").trim().length >= 5 && (profileForm.address || "").trim() !== "Brazzaville, Congo";
-    if (hasName && hasPhone && hasAddress) return 3; // Complet
-    if (hasName && hasPhone) return 2; // Base
-    return 1; // Non vérifié
-  }, [profileForm.fullName, profileForm.phone, profileForm.address]);
+    if (hasName && hasPhone && hasAddress) return 2; // Base (pending real verification)
+    if (hasName && hasPhone) return 1;
+    return 0; // Non vérifié
+  }, [kycFirestoreStatus, profileForm.fullName, profileForm.phone, profileForm.address]);
 
   const kycConfig = useMemo(() => {
     if (kycLevel === 3) return { label: "Vérifié", color: "#22c55e", bg: "rgba(34,197,94,.15)", border: "rgba(34,197,94,.4)", text: "KYC Complet", pct: "100%" };
-    if (kycLevel === 2) return { label: "Base", color: "#eab308", bg: "rgba(234,179,8,.15)", border: "rgba(234,179,8,.4)", text: "KYC Partiel", pct: "50%" };
+    if (kycLevel === 2) return { label: "Base", color: "#eab308", bg: "rgba(234,179,8,.15)", border: "rgba(234,179,8,.4)", text: kycFirestoreStatus === "submitted" || kycFirestoreStatus === "under_review" ? "En cours de vérification" : "KYC Partiel", pct: "50%" };
+    if (kycLevel === 1) return { label: "Non vérifié", color: "#f97316", bg: "rgba(249,115,22,.12)", border: "rgba(249,115,22,.3)", text: "Non vérifié", pct: "25%" };
     return { label: "Non vérifié", color: "#64748b", bg: "rgba(100,116,139,.15)", border: "rgba(100,116,139,.3)", text: "Non vérifié", pct: "0%" };
-  }, [kycLevel]);
+  }, [kycLevel, kycFirestoreStatus]);
 
   const transactionNumericAmount = parseInt(transactionAmount || "0", 10) || 0;
   // MORALI FEES: Dépôt = 0% (gratuit), Retrait = 2% (identique à MTN Congo)
@@ -1888,6 +1922,115 @@ function App() {
     setCameraScannerOpen(false);
     setScannerStatus("idle");
     setScannedData(null);
+  };
+
+  // ── KYC Functions ──
+  const openKycModal = () => {
+    setKycStep(1);
+    setKycDocType("national_id");
+    setKycDocNumber("");
+    setKycDob("");
+    setKycDocFront(null);
+    setKycDocBack(null);
+    setKycSelfie(null);
+    setKycModalOpen(true);
+  };
+
+  const closeKycModal = () => {
+    // Stop selfie camera stream if active
+    if (kycSelfieStreamRef.current) {
+      kycSelfieStreamRef.current.getTracks().forEach(t => t.stop());
+      kycSelfieStreamRef.current = null;
+    }
+    setKycModalOpen(false);
+    setKycStep(1);
+  };
+
+  const captureKycImage = (file: File, setter: (v: string | null) => void) => {
+    // Compress and convert to base64
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 1200;
+        const scale = Math.min(1, MAX_WIDTH / img.width);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const compressed = canvas.toDataURL("image/jpeg", 0.7);
+          setter(compressed);
+        }
+      };
+      img.src = String(e.target?.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const startKycSelfieCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640, height: 480 } });
+      kycSelfieStreamRef.current = stream;
+      if (kycSelfieVideoRef.current) {
+        kycSelfieVideoRef.current.srcObject = stream;
+      }
+    } catch {
+      showToast("Caméra inaccessible. Vérifiez les permissions.");
+    }
+  };
+
+  const captureKycSelfie = () => {
+    const video = kycSelfieVideoRef.current;
+    const canvas = kycSelfieCanvasRef.current;
+    if (!video || !canvas) return;
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      setKycSelfie(canvas.toDataURL("image/jpeg", 0.7));
+    }
+    // Stop camera after capture
+    if (kycSelfieStreamRef.current) {
+      kycSelfieStreamRef.current.getTracks().forEach(t => t.stop());
+      kycSelfieStreamRef.current = null;
+    }
+  };
+
+  const submitKyc = async () => {
+    if (!authUid) return;
+    if (!kycDocFront) { showToast("Veuillez prendre la photo du recto de votre document"); return; }
+    if (!kycSelfie) { showToast("Veuillez prendre une photo selfie"); return; }
+    setKycSubmitting(true);
+    try {
+      const res = await fetch("/api/kyc", {
+        method: "POST",
+        headers: { ...await getAuthHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          documentType: kycDocType,
+          documentFront: kycDocFront,
+          documentBack: kycDocBack,
+          selfiePhoto: kycSelfie,
+          fullName: profileForm.fullName || dashboardName,
+          dateOfBirth: kycDob || null,
+          documentNumber: kycDocNumber || null,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setKycFirestoreStatus("submitted");
+        showToast("Documents soumis avec succès ! Vérification en cours...");
+        closeKycModal();
+      } else {
+        showToast(data.error || "Erreur lors de la soumission");
+      }
+    } catch {
+      showToast("Erreur réseau. Réessayez.");
+    } finally {
+      setKycSubmitting(false);
+    }
   };
 
   const showQuickNotif = (type: string, label: string, amount: string, icon: IconName, color: string) => {
@@ -6570,7 +6713,7 @@ function App() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div style={{ width: 28, height: 28, borderRadius: 8, background: kycConfig.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 900, color: "#fff" }}>
-                    {kycLevel === 3 ? "✓" : kycLevel === 2 ? "~" : "?"}
+                    {kycLevel === 3 ? "✓" : kycLevel >= 2 ? "~" : "?"}
                   </div>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>Niveau KYC</div>
@@ -6584,11 +6727,23 @@ function App() {
                   <div key={step} style={{ flex: 1, height: 4, borderRadius: 2, background: step <= kycLevel ? kycConfig.color : "rgba(255,255,255,.06)", transition: "background .3s" }} />
                 ))}
               </div>
-              <div style={{ display: "flex", gap: 8, fontSize: 9, color: "#64748b" }}>
+              <div style={{ display: "flex", gap: 8, fontSize: 9, color: "#64748b", marginBottom: 12 }}>
                 <span style={kycLevel >= 1 ? { color: kycConfig.color, fontWeight: 700 } : undefined}>Nom</span>
                 <span style={kycLevel >= 2 ? { color: kycConfig.color, fontWeight: 700 } : undefined}>Téléphone</span>
-                <span style={kycLevel >= 3 ? { color: kycConfig.color, fontWeight: 700 } : undefined}>Adresse</span>
+                <span style={kycLevel >= 3 ? { color: kycConfig.color, fontWeight: 700 } : undefined}>Document</span>
               </div>
+              {kycFirestoreStatus === "approved" ? (
+                <div style={{ fontSize: 11, color: "#22c55e", fontWeight: 600, padding: "8px 0" }}>Votre identité a été vérifiée avec succès.</div>
+              ) : kycFirestoreStatus === "submitted" || kycFirestoreStatus === "under_review" ? (
+                <div style={{ fontSize: 11, color: "#eab308", fontWeight: 600, padding: "8px 0" }}>Vos documents sont en cours de vérification par notre équipe.</div>
+              ) : kycFirestoreStatus === "rejected" ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ fontSize: 11, color: "#ef4444", fontWeight: 600 }}>Vérification rejetée. Veuillez soumettre de nouveaux documents.</div>
+                  <button className="btn-save-elite" onClick={openKycModal} style={{ fontSize: 12, padding: "8px 16px" }}>Ressoumettre mes documents</button>
+                </div>
+              ) : (
+                <button className="btn-save-elite" onClick={openKycModal} style={{ fontSize: 12, padding: "8px 16px" }}>Vérifier mon identité</button>
+              )}
             </div>
 
             <button className="btn-save-elite" onClick={saveProfileInfos}>Mettre à jour le profil</button>
@@ -7385,6 +7540,169 @@ function App() {
           onClose={closeCameraScanner}
           onRetry={openCameraScanner}
         />
+
+        {/* ── KYC Verification Modal ── */}
+        {kycModalOpen && (
+          <div className="card-modal-overlay" onClick={closeKycModal}>
+            <div className="bc-modal" onClick={(event) => event.stopPropagation()} style={{ maxHeight: "90vh", overflowY: "auto" }}>
+              <div className="bc-head">
+                <div className="bc-head-left">
+                  <div className="bc-kicker">Vérification</div>
+                  <div className="bc-title">Vérification d'identité KYC</div>
+                  <div className="bc-subtitle">
+                    {kycStep === 1 && "Étape 1/3 — Informations du document"}
+                    {kycStep === 2 && "Étape 2/3 — Photos du document"}
+                    {kycStep === 3 && "Étape 3/3 — Selfie de vérification"}
+                  </div>
+                </div>
+                <button className="btn-close-circle" onClick={closeKycModal} aria-label="Fermer">×</button>
+              </div>
+              <div className="bc-body" style={{ padding: 20 }}>
+                {/* Progress */}
+                <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+                  {[1, 2, 3].map((step) => (
+                    <div key={step} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+                        background: step < kycStep ? "#22c55e" : step === kycStep ? "#D4A437" : "rgba(255,255,255,.06)",
+                        color: step <= kycStep ? "#fff" : "#64748b", fontSize: 13, fontWeight: 800, transition: "all .3s",
+                      }}>
+                        {step < kycStep ? "✓" : step}
+                      </div>
+                      <span style={{ fontSize: 9, color: step === kycStep ? "#D4A437" : "#64748b", fontWeight: 600 }}>
+                        {step === 1 ? "Infos" : step === 2 ? "Document" : "Selfie"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Step 1: Document type + info */}
+                {kycStep === 1 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div className="input-group-glass">
+                      <label>Type de document</label>
+                      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                        {([
+                          { value: "national_id", label: "CNI / Passeport", icon: "🪪" },
+                          { value: "passport", label: "Passeport", icon: "📘" },
+                          { value: "driver_license", label: "Permis", icon: "🚗" },
+                        ] as const).map((opt) => (
+                          <button key={opt.value} onClick={() => setKycDocType(opt.value)} style={{
+                            flex: 1, padding: "10px 8px", borderRadius: 12, border: kycDocType === opt.value ? "2px solid #D4A437" : "1px solid rgba(255,255,255,.1)",
+                            background: kycDocType === opt.value ? "rgba(212,164,55,.12)" : "rgba(255,255,255,.04)",
+                            color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer", textAlign: "center", transition: "all .2s",
+                          }}>
+                            <div style={{ fontSize: 20, marginBottom: 4 }}>{opt.icon}</div>
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="input-group-glass">
+                      <label>Numéro du document</label>
+                      <input type="text" value={kycDocNumber} placeholder="Ex: D-12345678" onChange={(e) => setKycDocNumber(e.target.value)} style={{ background: "transparent", border: "none", color: "#fff", fontSize: 14, width: "100%", outline: "none", padding: "8px 0" }} />
+                    </div>
+                    <div className="input-group-glass">
+                      <label>Date de naissance</label>
+                      <input type="date" value={kycDob} onChange={(e) => setKycDob(e.target.value)} style={{ background: "transparent", border: "none", color: "#fff", fontSize: 14, width: "100%", outline: "none", padding: "8px 0" }} />
+                    </div>
+                    <div style={{ padding: "12px", borderRadius: 10, background: "rgba(59,130,246,.08)", border: "1px solid rgba(59,130,246,.2)" }}>
+                      <div style={{ fontSize: 10, color: "#60a5fa", fontWeight: 700, marginBottom: 4 }}>Pourquoi la vérification ?</div>
+                      <div style={{ fontSize: 11, color: "#94a3b8", lineHeight: 1.5 }}>La vérification KYC est obligatoire pour débloquer les limites de transaction élevées et accéder aux services premium (Carte Black, micro-crédit). Vos documents sont sécurisés et traités par notre équipe.</div>
+                    </div>
+                    <button className="hub-cta" onClick={() => setKycStep(2)} disabled={!kycDocType} style={{ background: "#D4A437", color: "#000", opacity: kycDocType ? 1 : 0.4, cursor: kycDocType ? "pointer" : "not-allowed" }}>
+                      Continuer
+                    </button>
+                  </div>
+                )}
+
+                {/* Step 2: Document photos */}
+                {kycStep === 2 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {/* Front */}
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", marginBottom: 8 }}>
+                        Recto du document {kycDocFront && <span style={{ color: "#22c55e" }}>✓</span>}
+                      </div>
+                      {kycDocFront ? (
+                        <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", border: "2px solid rgba(34,197,94,.3)" }}>
+                          <img src={kycDocFront} alt="Recto" style={{ width: "100%", height: 180, objectFit: "cover" }} />
+                          <button onClick={() => setKycDocFront(null)} style={{ position: "absolute", top: 8, right: 8, width: 28, height: 28, borderRadius: "50%", background: "rgba(239,68,68,.8)", color: "#fff", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>×</button>
+                        </div>
+                      ) : (
+                        <label style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: 24, borderRadius: 12, border: "2px dashed rgba(255,255,255,.15)", cursor: "pointer", transition: "border-color .2s", background: "rgba(255,255,255,.03)" }}>
+                          <input type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={(e) => { if (e.target.files?.[0]) captureKycImage(e.target.files[0], setKycDocFront); }} />
+                          <AppIcon name="camera" size={28} stroke="#64748b" />
+                          <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>Prendre ou choisir la photo</span>
+                        </label>
+                      )}
+                    </div>
+                    {/* Back */}
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", marginBottom: 8 }}>
+                        Verso du document {kycDocBack && <span style={{ color: "#22c55e" }}>✓</span>}
+                        <span style={{ fontSize: 10, color: "#64748b", fontWeight: 400, marginLeft: 6 }}>(optionnel)</span>
+                      </div>
+                      {kycDocBack ? (
+                        <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", border: "2px solid rgba(34,197,94,.3)" }}>
+                          <img src={kycDocBack} alt="Verso" style={{ width: "100%", height: 180, objectFit: "cover" }} />
+                          <button onClick={() => setKycDocBack(null)} style={{ position: "absolute", top: 8, right: 8, width: 28, height: 28, borderRadius: "50%", background: "rgba(239,68,68,.8)", color: "#fff", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>×</button>
+                        </div>
+                      ) : (
+                        <label style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: 24, borderRadius: 12, border: "2px dashed rgba(255,255,255,.15)", cursor: "pointer", transition: "border-color .2s", background: "rgba(255,255,255,.03)" }}>
+                          <input type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={(e) => { if (e.target.files?.[0]) captureKycImage(e.target.files[0], setKycDocBack); }} />
+                          <AppIcon name="camera" size={28} stroke="#64748b" />
+                          <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>Prendre ou choisir la photo</span>
+                        </label>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button className="hub-cta" onClick={() => setKycStep(1)} style={{ flex: 1, background: "rgba(255,255,255,.06)", color: "#94a3b8" }}>Retour</button>
+                      <button className="hub-cta" onClick={() => setKycStep(3)} disabled={!kycDocFront} style={{ flex: 2, background: "#D4A437", color: "#000", opacity: kycDocFront ? 1 : 0.4, cursor: kycDocFront ? "pointer" : "not-allowed" }}>Continuer</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 3: Selfie */}
+                {kycStep === 3 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
+                      Selfie de vérification {kycSelfie && <span style={{ color: "#22c55e" }}>✓</span>}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", lineHeight: 1.5 }}>
+                      Prenez une photo de votre visage, bien éclairé, de face. Assurez-vous que votre visage est clairement visible.
+                    </div>
+                    {kycSelfie ? (
+                      <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", border: "2px solid rgba(34,197,94,.3)" }}>
+                        <img src={kycSelfie} alt="Selfie" style={{ width: "100%", height: 300, objectFit: "cover" }} />
+                        <button onClick={() => { setKycSelfie(null); }} style={{ position: "absolute", top: 8, right: 8, width: 28, height: 28, borderRadius: "50%", background: "rgba(239,68,68,.8)", color: "#fff", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>×</button>
+                      </div>
+                    ) : (
+                      <div style={{ borderRadius: 12, overflow: "hidden", border: "2px solid rgba(255,255,255,.1)", background: "#000", minHeight: 240 }}>
+                        <video ref={kycSelfieVideoRef} autoPlay playsInline muted style={{ width: "100%", height: 240, objectFit: "cover" }} />
+                        <canvas ref={kycSelfieCanvasRef} style={{ display: "none" }} />
+                      </div>
+                    )}
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button className="hub-cta" onClick={() => setKycStep(2)} style={{ flex: 1, background: "rgba(255,255,255,.06)", color: "#94a3b8" }}>Retour</button>
+                      {!kycSelfie && (
+                        <button className="hub-cta" onClick={startKycSelfieCamera} style={{ flex: 1, background: "#3b82f6", color: "#fff" }}>Ouvrir caméra</button>
+                      )}
+                      {kycSelfie && (
+                        <button className="hub-cta" onClick={submitKyc} disabled={kycSubmitting} style={{ flex: 2, background: "#22c55e", color: "#fff", opacity: kycSubmitting ? 0.5 : 1, cursor: kycSubmitting ? "wait" : "pointer" }}>
+                          {kycSubmitting ? "Envoi en cours..." : "Soumettre mes documents"}
+                        </button>
+                      )}
+                      {!kycSelfie && (
+                        <button className="hub-cta" onClick={captureKycSelfie} style={{ flex: 1, background: "#D4A437", color: "#000" }}>Prendre la photo</button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {securityModalOpen && (
           <div className="card-modal-overlay" onClick={closeSecurityModal}>

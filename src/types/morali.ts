@@ -10,7 +10,7 @@ export type Screen =
   | "credit" | "internet" | "canalplus" | "electricity"
   | "water" | "tontine" | "crypto" | "savings" | "wallet" | "admin"
   | "eurWallet" | "usdWallet";
-export type AdminTab = "overview" | "users" | "transactions" | "analytics" | "settings" | "loans" | "audit";
+export type AdminTab = "overview" | "users" | "transactions" | "analytics" | "settings" | "loans" | "audit" | "kyc";
 export type NavItem = "Accueil" | "Cartes" | "Privilèges" | "Profil";
 export type TransactionType = "depot" | "retrait";
 export type OperatorKey = "mtn" | "airtel";

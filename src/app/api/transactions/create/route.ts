@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     if (!validation.success) {
       return NextResponse.json({ success: false, error: validation.error }, { status: 400 });
     }
-    const { receiptId, senderUid, senderMoraliId, senderName, recipientUid, recipientMoraliId, recipientName, amount, type, destination } = validation.data;
+    const { receiptId, senderUid, senderMoraliId, senderName, recipientUid, recipientMoraliId, recipientName, amount, fees, type, destination } = validation.data;
 
     // Guard: uid must be present after auth
     const callerUid = auth.uid;
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
           recipientMoraliId: String(recipientMoraliId || ""),
           recipientName: String(recipientName || "Utilisateur"),
           amount: Number(amount),
-          fees: 0,
+          fees: Number(fees) || 0,
           type: String(type || "virement"),
           status: "success",
           destination: destination ? String(destination) : null,
@@ -123,8 +123,36 @@ export async function POST(req: NextRequest) {
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         });
 
-        return { success: true, id: docRef.id };
+        return { success: true, id: docRef.id, fees: Number(fees) || 0 };
       });
+
+      // ── Track bank revenue server-side for fee-generating transactions ──
+      const txFees = (result as any).fees || 0;
+      if (txFees > 0 && (type === "retrait" || type === "depot")) {
+        try {
+          const feeType = type === "retrait" ? "withdrawal_fee" : "service_fee";
+          let sourceName = "Utilisateur";
+          try {
+            const userDoc = await adminDb.collection("moraliUsers").doc(callerUid).get();
+            if (userDoc.exists) {
+              sourceName = userDoc.data()?.fullName || userDoc.data()?.name || "Utilisateur";
+            }
+          } catch { /* ignore */ }
+          await adminDb.collection("bankRevenue").add({
+            type: feeType,
+            amount: Math.round(txFees),
+            sourceUid: callerUid,
+            sourceName,
+            referenceId: String(receiptId),
+            description: `${feeType === "withdrawal_fee" ? "Frais de retrait (2%)" : "Frais de service (2%)"} — ${Number(amount).toLocaleString("fr-FR")} FCFA`,
+            currency: "FCFA",
+            createdAt: new Date(),
+          });
+        } catch (revErr) {
+          // Revenue tracking best-effort — never block the transaction
+          console.error("[tx:create] Revenue tracking failed:", revErr);
+        }
+      }
 
       return NextResponse.json(result);
     } catch (err: unknown) {

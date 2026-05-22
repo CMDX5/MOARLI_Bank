@@ -920,6 +920,18 @@ function App() {
           const repairedIdentity = await persistMoraliProfile(user.uid);
           setBankingIdentity(repairedIdentity || immediateIdentity);
         }
+
+        // ── Check monthly maintenance fee (1000 FCFA/month from registration) ──
+        try {
+          const maintRes = await fetch("/api/account/maintenance", { method: "POST", headers: await getAuthHeaders() });
+          if (maintRes.ok) {
+            const maintData = await maintRes.json();
+            if (maintData.charged && maintData.amount > 0) {
+              const monthsLabel = maintData.monthsCharged === 1 ? "1 mois" : `${maintData.monthsCharged} mois`;
+              showToast(`Frais d'entretien : ${maintData.amount.toLocaleString("fr-FR")} FCFA (${monthsLabel})`);
+            }
+          }
+        } catch { /* maintenance check best-effort — never block login */ }
       } catch {
         const fallbackIdentity = getCachedIdentityForUid(user.uid) || generateMoraliIdentity(getIdentitySeed(user.email, user.uid));
         setBankingIdentity(fallbackIdentity);
@@ -2337,26 +2349,43 @@ function App() {
     finally { setServiceProcessing(false); }
   };
 
-  const executeServiceDebit = async (amount: number, label: string, icon: IconName) => {
+  const executeServiceDebit = async (amount: number, label: string, icon: IconName, applyFee: boolean = false) => {
     if (!authUid || amount <= 0) { showToast("Montant invalide"); return; }
+    // ── Service fee: 2% on bill payments (électricité, eau, Canal+, internet, etc.) ──
+    const SERVICE_FEE_RATE = 0.02;
+    const serviceFees = applyFee ? Math.floor(amount * SERVICE_FEE_RATE) : 0;
+    const totalDebit = amount + serviceFees;
     const userBalance = firestoreBalance !== null ? firestoreBalance : dashboardData.balance;
-    if (amount > userBalance) { showToast("Solde insuffisant pour cette opération"); return; }
+    if (totalDebit > userBalance) {
+      if (serviceFees > 0) {
+        showToast(`Solde insuffisant. Montant: ${formatCurrency(amount)} + Frais (2%): ${formatCurrency(serviceFees)} = ${formatCurrency(totalDebit)} FCFA`);
+      } else {
+        showToast("Solde insuffisant pour cette opération");
+      }
+      return;
+    }
     if (serviceProcessing) return;
     setServiceProcessing(true);
     try {
-      await serviceDebitBalance(amount);
+      await serviceDebitBalance(totalDebit);
       await createRealtimeTransaction({
         senderUid: authUid, senderMoraliId: bankingIdentity.id, senderName: dashboardName,
         recipientUid: authUid, recipientMoraliId: bankingIdentity.id, recipientName: dashboardName,
-        amount, fees: 0, type: "retrait", destination: "cash", status: "success",
+        amount, fees: serviceFees, type: "retrait", destination: "cash", status: "success",
         receiptId: "TX-" + Date.now().toString().slice(-8),
       });
       await createRealtimeNotification(authUid, {
-        title: `${label} — -${formatCurrency(amount)} FCFA`,
+        title: serviceFees > 0
+          ? `${label} — -${formatCurrency(amount)} FCFA (frais 2%: ${formatCurrency(serviceFees)})`
+          : `${label} — -${formatCurrency(amount)} FCFA`,
         time: "À l'instant", badge: "Débit", badgeClass: "nb-blue",
         icon, bg: "rgba(59,130,246,0.12)", read: false,
       });
-      showQuickNotif("debit", label, formatCurrency(amount), icon, "#f43f5e");
+      showQuickNotif("debit", label, formatCurrency(totalDebit), icon, "#f43f5e");
+      // ── Track service fee as bank revenue ──
+      if (serviceFees > 0) {
+        trackBankRevenue("service_fee", serviceFees, `Frais service ${label} — ${formatCurrency(amount)} FCFA`);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
       if (msg === "INSUFFICIENT_BALANCE") showToast("Solde insuffisant");

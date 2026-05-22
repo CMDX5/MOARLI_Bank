@@ -152,6 +152,7 @@ const [bankRevenue, setBankRevenue] = useState<{
   breakdown: Array<{ type: string; label: string; amount: number; percentage: number }>;
   recent: Array<{ id: string; type: string; amount: number; sourceName: string; description: string; createdAt: string }>;
 } | null>(null);
+const [revenuePeriod, setRevenuePeriod] = useState<"today" | "week" | "month" | "year" | "all">("month");
 
   // ── Admin Functions ──
 // ── Admin Functions ──
@@ -516,15 +517,17 @@ useEffect(() => {
   if (isAdminLoggedIn) {
     fetchAdminData();
     // Also fetch bank revenue data
-    (async () => {
+    const fetchRevenue = async () => {
       try {
-        const res = await fetch("/api/admin/revenue?period=month", { headers: await getAuthHeaders() });
+        const periodParam = revenuePeriod === "all" ? "year" : revenuePeriod;
+        const res = await fetch(`/api/admin/revenue?period=${periodParam}`, { headers: await getAuthHeaders() });
         const data = await res.json();
         if (data.success) setBankRevenue(data);
       } catch { /* silent */ }
-    })();
+    };
+    fetchRevenue();
   }
-}, [isAdminLoggedIn]);
+}, [isAdminLoggedIn, revenuePeriod]);
 
 // Load loan applications for admin loans tab
 useEffect(() => {
@@ -1837,12 +1840,62 @@ const handleAdminRejectLoan = async (loan: { id: string; senderUid: string; send
                         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                           <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>Aujourd'hui</span>
                           <span style={{ fontSize: 14, fontWeight: 800, color: "#22c55e" }}>{formatCurrency(bankRevenue.todayTotal)} F</span>
-                          <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, marginLeft: 8 }}>Ce mois</span>
-                          <span style={{ fontSize: 14, fontWeight: 800, color: "#D4A437" }}>{formatCurrency(bankRevenue.total)} F</span>
                           <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, marginLeft: 8 }}>Total</span>
                           <span style={{ fontSize: 14, fontWeight: 800, color: "#60a5fa" }}>{formatCurrency(bankRevenue.allTimeTotal)} F</span>
                         </div>
                       </div>
+
+                      {/* Period selector */}
+                      <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+                        {([
+                          { key: "today", label: "Aujourd'hui" },
+                          { key: "week", label: "7 jours" },
+                          { key: "month", label: "Ce mois" },
+                          { key: "year", label: "Cette année" },
+                        ] as const).map((p) => (
+                          <button
+                            key={p.key}
+                            onClick={() => setRevenuePeriod(p.key)}
+                            style={{
+                              padding: "5px 12px",
+                              borderRadius: 8,
+                              border: revenuePeriod === p.key ? "1px solid #D4A437" : "1px solid rgba(255,255,255,.1)",
+                              background: revenuePeriod === p.key ? "rgba(212,164,55,.12)" : "rgba(255,255,255,.04)",
+                              color: revenuePeriod === p.key ? "#D4A437" : "#94a3b8",
+                              fontSize: 11,
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              transition: "all .2s",
+                            }}
+                          >
+                            {p.label}
+                          </button>
+                        ))}
+                        <span style={{ marginLeft: "auto", fontSize: 13, fontWeight: 800, color: "#D4A437" }}>
+                          Période: {formatCurrency(bankRevenue.total)} F
+                        </span>
+                      </div>
+
+                      {/* Fee structure summary */}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 6, marginBottom: 16, padding: "10px 12px", background: "rgba(255,255,255,.03)", borderRadius: 10, border: "1px solid rgba(255,255,255,.06)" }}>
+                        {[
+                          { label: "Retrait", rate: "2%" },
+                          { label: "Services", rate: "2%" },
+                          { label: "Transfert", rate: "Gratuit" },
+                          { label: "Change", rate: "1.5%" },
+                          { label: "Entretien", rate: "1 000 F/mois" },
+                          { label: "Tontine", rate: "1%" },
+                          { label: "Micro-crédit", rate: "3%/mois" },
+                          { label: "Carte Black", rate: "15 000 F/an" },
+                        ].map((f) => (
+                          <div key={f.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0" }}>
+                            <span style={{ fontSize: 10, color: "#94a3b8" }}>{f.label}</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: f.rate === "Gratuit" ? "#22c55e" : "#D4A437" }}>{f.rate}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Revenue breakdown cards */}
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8, marginBottom: 16 }}>
                         {bankRevenue.breakdown.map((item) => (
                           <div key={item.type} style={{
@@ -1871,7 +1924,7 @@ const handleAdminRejectLoan = async (loan: { id: string; senderUid: string; send
                             <table className="admin-table">
                               <thead><tr><th>Date</th><th>Type</th><th>Montant</th><th>Utilisateur</th><th>Description</th></tr></thead>
                               <tbody>
-                                {bankRevenue.recent.slice(0, 8).map((entry) => (
+                                {bankRevenue.recent.slice(0, 12).map((entry) => (
                                   <tr key={entry.id}>
                                     <td style={{ color: "#94a3b8", fontSize: 12 }}>{entry.createdAt}</td>
                                     <td><span className="admin-badge" style={{ background: "rgba(34,197,94,.15)", color: "#22c55e" }}>{entry.type}</span></td>

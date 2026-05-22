@@ -590,90 +590,101 @@ export default function DashboardView({
           })()}
         </div>
 
-        {/* ── Full Transaction History Modal ── */}
-        {historyModalOpen && (
-          <div
-            style={{
-              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-              background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)",
-              zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center",
-              padding: 16,
-            }}
-            onClick={() => setHistoryModalOpen(false)}
-          >
-            <div
-              style={{
-                background: "linear-gradient(180deg, #0a1628 0%, #050b1a 100%)",
-                border: "1px solid rgba(212,164,55,0.18)",
-                borderRadius: 20, width: "100%", maxWidth: 420, maxHeight: "85dvh",
-                display: "flex", flexDirection: "column", overflow: "hidden",
-                boxShadow: "0 25px 60px rgba(0,0,0,0.6), 0 0 40px rgba(212,164,55,0.05)",
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Modal header */}
-              <div style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "16px 20px", borderBottom: "1px solid rgba(212,164,55,0.12)",
-              }}>
-                <span style={{ fontFamily: "Montserrat, sans-serif", fontSize: 16, fontWeight: 700, color: "var(--text)" }}>
-                  Historique des transactions
-                </span>
-                <button
-                  onClick={() => setHistoryModalOpen(false)}
-                  style={{
-                    width: 32, height: 32, borderRadius: 10, border: "1px solid rgba(212,164,55,0.25)",
-                    background: "rgba(212,164,55,0.08)", color: "var(--gold)", fontSize: 18,
-                    fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-              {/* Modal body */}
-              <div style={{
-                flex: 1, overflowY: "auto", padding: "8px 12px",
-                scrollbarWidth: "thin", scrollbarColor: "rgba(212,164,55,0.3) transparent",
-              }}>
-                {(() => {
-                  const allTx = liveTransactions.length ? liveTransactions : dashboardData.transactions;
-                  if (allTx.length === 0) {
-                    return (
-                      <div style={{ padding: "32px 16px", textAlign: "center" }}>
-                        <div style={{ width: 64, height: 64, margin: "0 auto 12px", borderRadius: 18, background: "linear-gradient(135deg, rgba(212,164,55,0.15), rgba(26,62,120,0.2))", border: "1px solid rgba(212,164,55,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#D4A437" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 8h20"/><path d="M8 3v4"/><path d="M16 3v4"/><circle cx="12" cy="14" r="2"/></svg>
-                        </div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--dim)", lineHeight: 1.5 }}>
-                          Aucune transaction pour le moment.
-                        </div>
+        {/* ── Full Transaction History Modal (Premium Bottom Sheet) ── */}
+        {historyModalOpen && (() => {
+          const allTx = liveTransactions.length ? liveTransactions : dashboardData.transactions;
+          const totalCredits = allTx.filter(t => t.type === "credit").reduce((s, t) => s + Math.abs(parseFloat(t.amount.replace(/[^0-9.-]/g, "")) || 0), 0);
+          const totalDebits = allTx.filter(t => t.type !== "credit").reduce((s, t) => s + Math.abs(parseFloat(t.amount.replace(/[^0-9.-]/g, "")) || 0), 0);
+
+          /* Group transactions by date */
+          const grouped: { label: string; items: typeof allTx }[] = [];
+          const seen = new Set<string>();
+          allTx.forEach(tx => {
+            const dateKey = tx.dateTimestamp
+              ? new Date(tx.dateTimestamp).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
+              : tx.date || "Date inconnue";
+            if (!seen.has(dateKey)) { seen.add(dateKey); grouped.push({ label: dateKey, items: [] }); }
+            grouped[grouped.length - 1].items.push(tx);
+          });
+
+          return (
+            <div className="hist-overlay" onClick={() => setHistoryModalOpen(false)}>
+              <div className="hist-sheet" onClick={(e) => e.stopPropagation()}>
+                <div className="hist-handle" />
+                <div className="hist-glow" />
+
+                {/* Header */}
+                <div className="hist-head">
+                  <div className="hist-head-left">
+                    <div className="hist-kicker">Activité</div>
+                    <div className="hist-title">Historique des transactions</div>
+                  </div>
+                  <button className="hist-close" onClick={() => setHistoryModalOpen(false)} aria-label="Fermer">&times;</button>
+                </div>
+
+                {/* Summary stats */}
+                {allTx.length > 0 && (
+                  <div className="hist-summary">
+                    <div className="hist-sum-card">
+                      <div className="hist-sum-label">Revenus</div>
+                      <div className="hist-sum-value pos">+{formatCurrency(totalCredits)}</div>
+                      <div className="hist-sum-count">{allTx.filter(t => t.type === "credit").length} opérations</div>
+                    </div>
+                    <div className="hist-sum-card">
+                      <div className="hist-sum-label">Dépenses</div>
+                      <div className="hist-sum-value neg">-{formatCurrency(totalDebits)}</div>
+                      <div className="hist-sum-count">{allTx.filter(t => t.type !== "credit").length} opérations</div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="hist-divider" />
+
+                {/* Transaction list */}
+                <div className="hist-list">
+                  {allTx.length === 0 ? (
+                    <div className="hist-empty">
+                      <div className="hist-empty-icon">
+                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#D4A437" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 8h20"/><path d="M8 3v4"/><path d="M16 3v4"/><circle cx="12" cy="14" r="2"/></svg>
                       </div>
-                    );
-                  }
-                  return allTx.map((tx, idx) => (
-                    <div className="tx-item" key={tx.receiptId || `${tx.name}-hist-${idx}`}>
-                      <div className="tx-ico" style={{ background: tx.bg }}>
-                        <AppIcon
-                          name={tx.icon}
-                          size={18}
-                          stroke={tx.type === "credit" ? "#60a5fa" : tx.icon === "bolt" ? "#D4A437" : "rgba(255,255,255,0.82)"}
-                        />
-                      </div>
-                      <div className="tx-info">
-                        <div className="tx-name">{tx.name}</div>
-                        <div className="tx-date">{tx.dateTimestamp ? timeAgo(tx.dateTimestamp) : tx.date}</div>
-                      </div>
-                      <div className="tx-right">
-                        <div className={`tx-amt ${tx.type === "credit" ? "cr" : "dr"}`}>{renderProtectedAmount(`hist-${tx.name}`, tx.amount)}</div>
-                        <div className="tx-cat">{tx.category}</div>
+                      <div className="hist-empty-text">
+                        Aucune transaction pour le moment.<br />
+                        Effectuez un dépôt ou un virement pour commencer.
                       </div>
                     </div>
-                  ));
-                })()}
+                  ) : (
+                    grouped.map(group => (
+                      <div key={group.label}>
+                        <div className="hist-date-label">{group.label}</div>
+                        {group.items.map((tx, idx) => (
+                          <div className="hist-tx-item" key={tx.receiptId || `${tx.name}-hist-${idx}`}>
+                            <div className="hist-tx-ico" style={{ background: tx.bg }}>
+                              <AppIcon
+                                name={tx.icon}
+                                size={18}
+                                stroke={tx.type === "credit" ? "#60a5fa" : tx.icon === "bolt" ? "#D4A437" : "rgba(255,255,255,0.82)"}
+                              />
+                            </div>
+                            <div className="hist-tx-info">
+                              <div className="hist-tx-name">{tx.name}</div>
+                              <div className="hist-tx-date">{tx.dateTimestamp ? timeAgo(tx.dateTimestamp) : tx.date}</div>
+                            </div>
+                            <div className="hist-tx-right">
+                              <div className={`hist-tx-amt ${tx.type === "credit" ? "cr" : "dr"}`}>
+                                {tx.type === "credit" ? "+" : "-"}{renderProtectedAmount(`hist-${tx.name}`, tx.amount)}
+                              </div>
+                              <div className="hist-tx-cat">{tx.category}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

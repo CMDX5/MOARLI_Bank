@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   typescript: {
@@ -32,13 +31,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
-  // Disable automatic Sentry source map upload during development
-  silent: true,
-
-  // Disable automatic wrapping of API handlers (we do manual instrumentation)
-  automaticVercelMonitors: false,
-
-  // Only enable SentryWebpackPlugin in production builds
-  disableLogger: process.env.NODE_ENV !== "production",
-});
+export default nextConfig;

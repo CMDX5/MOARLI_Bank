@@ -86,7 +86,7 @@ export const schemas = {
     recipientName: sanitizedString.pipe(z.string().max(100)).optional().default("Utilisateur"),
     amount: txAmount,
     fees: z.number().min(0).optional().default(0),
-    type: z.enum(["depot", "retrait", "virement", "remboursement"]).optional().default("virement"),
+    type: z.enum(["depot", "retrait", "virement", "remboursement", "recharge"]).optional().default("virement"),
     status: z.string().max(20).optional().default("success"),
     destination: z.enum(["cash", "airtime", "loan_request", "loan_granted"]).nullable().optional(),
   }),

@@ -40,8 +40,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
 
-    // Prevent self-transfer
-    if (senderUid === recipientUid) {
+    // Determine if this is a self-transaction (depot/retrait where senderUid === recipientUid)
+    const isSelfTransaction = senderUid === recipientUid;
+    const isDepositOrWithdrawal = type === "depot" || type === "retrait";
+
+    // Prevent self-transfer EXCEPT for depot/retrait (deposits and withdrawals are self-transactions by design)
+    if (isSelfTransaction && !isDepositOrWithdrawal) {
       return NextResponse.json({ error: "Impossible d'envoyer à soi-même" }, { status: 400 });
     }
 
@@ -55,14 +59,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Server-side fee calculation
-    // TODO: Calculate fees server-side based on transaction type and amount
-    const calculatedFees = 0;
-
     // SECURITY FIX: Use Firestore runTransaction for atomic duplicate detection + write
     // Prevents race condition where two simultaneous requests both pass the duplicate check
     const lockDocId = `receiptLock_${String(receiptId).replace(/[^a-zA-Z0-9_-]/g, "_")}`;
     const lockRef = adminDb.collection("txLocks").doc(lockDocId);
+
+    // Determine target collection: use "transactions" for depot/retrait (client reads from here)
+    // and "serverTransactions" for cross-user transfers (virement)
+    const txCollection = isDepositOrWithdrawal ? "transactions" : "serverTransactions";
 
     try {
       const result = await adminDb.runTransaction(async (transaction) => {
@@ -73,10 +77,17 @@ export async function POST(req: NextRequest) {
           // Already processed — return existing transaction ID (idempotent)
           const existingTxId = lockSnap.data()?.transactionId;
           if (existingTxId) {
-            // Verify the existing transaction exists
-            const existingTxRef = adminDb.collection("serverTransactions").doc(existingTxId);
+            // Verify the existing transaction exists in the target collection
+            const existingTxRef = adminDb.collection(txCollection).doc(existingTxId);
             const existingTxSnap = await transaction.get(existingTxRef);
             if (existingTxSnap.exists) {
+              return { success: true, id: existingTxId, duplicate: true };
+            }
+            // Also check the other collection in case of migration
+            const otherCollection = txCollection === "transactions" ? "serverTransactions" : "transactions";
+            const otherTxRef = adminDb.collection(otherCollection).doc(existingTxId);
+            const otherTxSnap = await transaction.get(otherTxRef);
+            if (otherTxSnap.exists) {
               return { success: true, id: existingTxId, duplicate: true };
             }
           }
@@ -84,7 +95,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Create the transaction document
-        const docRef = adminDb.collection("serverTransactions").doc();
+        const docRef = adminDb.collection(txCollection).doc();
         const txData = {
           receiptId: String(receiptId),
           senderUid: String(senderUid),

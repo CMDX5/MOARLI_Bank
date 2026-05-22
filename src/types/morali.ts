@@ -116,7 +116,7 @@ export type FirestoreTransfer = {
   recipientName: string;
   amount: number;
   fees: number;
-  type: "depot" | "retrait" | "virement" | "remboursement";
+  type: "depot" | "retrait" | "virement" | "remboursement" | "recharge";
   destination?: "cash" | "airtime" | "loan_request" | "loan_granted" | "savings";
   status: "success" | "contested" | "flagged" | "pending";
   creditPending?: boolean;

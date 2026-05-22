@@ -935,7 +935,7 @@ function App() {
       const data = docSnap.data() as FirestoreTransfer;
       // Skip directory entries
       if ((data as Record<string, unknown>).type === "__directory__" || (data as Record<string, unknown>).status === "directory") return null;
-      const isCredit = data.type === "depot" || (!isSent && data.type === "virement");
+      const isCredit = data.type === "depot" || data.type === "recharge" || (!isSent && data.type === "virement");
       const isIncoming = !isSent && data.type === "virement";
       // Compute real timestamp from Firestore createdAt
       let ts: number | undefined;
@@ -948,18 +948,45 @@ function App() {
       } else if (typeof rawTs === "number") {
         ts = rawTs;
       }
+      // Determine display name and category based on transaction type
+      const txType = data.type;
+      let txIcon: IconName;
+      let txName: string;
+      let txCategory: string;
+      let txChannel: string;
+      if (isIncoming) {
+        txIcon = "receive";
+        txName = `Virement de ${data.senderName}`;
+        txCategory = "Reçu";
+        txChannel = "Morali Transfer";
+      } else if (txType === "virement") {
+        txIcon = "send";
+        txName = `Virement vers ${data.recipientName}`;
+        txCategory = "Virement";
+        txChannel = "Morali Transfer";
+      } else if (txType === "depot" || txType === "recharge") {
+        txIcon = "wallet";
+        txName = txType === "recharge" ? "Recharge" : "Dépôt Mobile Money";
+        txCategory = "Revenus";
+        txChannel = data.destination === "cash" ? "Mobile Money" : txType === "recharge" ? "Recharge Admin" : "Mobile Money";
+      } else {
+        txIcon = "receive";
+        txName = "Retrait Mobile Money";
+        txCategory = "Retrait";
+        txChannel = "Mobile Money";
+      }
       return {
-        icon: isIncoming ? "receive" : data.type === "virement" ? "send" : data.type === "depot" ? "wallet" : "receive",
+        icon: txIcon,
         bg: isCredit ? "rgba(34,197,94,.12)" : "rgba(255,255,255,.04)",
-        name: isIncoming ? `Virement de ${data.senderName}` : data.type === "virement" ? `Virement vers ${data.recipientName}` : data.type === "depot" ? "Dépôt Mobile Money" : "Retrait Mobile Money",
+        name: txName,
         date: ts ? timeAgo(ts) : "Récent",
         dateTimestamp: ts,
         amount: formatAmount(data.amount, isCredit ? "credit" : "debit"),
         type: isCredit ? "credit" : "debit",
-        category: isIncoming ? "Reçu" : data.type === "virement" ? "Virement" : data.type === "depot" ? "Revenus" : "Retrait",
+        category: txCategory,
         receiptId: data.receiptId,
         status: data.status,
-        channel: isIncoming ? "Morali Transfer" : data.destination === "cash" ? "Mobile Money" : data.type === "virement" ? "Morali Transfer" : "Mobile Money",
+        channel: txChannel,
       };
     };
 
@@ -2088,7 +2115,7 @@ function App() {
 
   const createRealtimeNotification = async (targetUid: string, item: FirestoreNotification) => {
     try {
-      // Always send via API (Admin SDK bypasses Firestore rules for cross-user writes)
+      // Always send via API (Admin SDK writes to users/{uid}/notifications)
       const apiRes = await fetch("/api/notifications/create", {
         method: "POST",
         headers: await getAuthHeaders(),
@@ -2097,15 +2124,9 @@ function App() {
       const apiData = await apiRes.json().catch(() => ({}));
       const usedFallback = apiData.fallback;
 
-      // Also write locally for real-time display (own notifications only)
-      if (targetUid === authUid) {
-        await addDoc(collection(firebaseDb, "users", targetUid, "notifications"), {
-          ...item,
-          createdAt: serverTimestamp(),
-        });
-      }
-
       // FALLBACK: If Admin SDK was unavailable, write to serverNotifications (open read/write rules)
+      // NOTE: Do NOT also write locally to users/{uid}/notifications — the API already handles that.
+      // Writing locally caused duplicated notifications (both API and client wrote to same collection).
       if (usedFallback) {
         await addDoc(collection(firebaseDb, "serverNotifications"), {
           ...item,

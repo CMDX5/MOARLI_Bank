@@ -1459,8 +1459,10 @@ function App() {
     const expenses = 0;
     const savingsRate = "0%";
     const totalStats = "0 opération";
-    const holder = registerData.prenom && registerData.nom ? `${registerData.prenom} ${registerData.nom}`.toUpperCase() : firstName.toUpperCase();
-    const initials = `${(registerData.prenom || firstName).charAt(0)}${registerData.nom ? registerData.nom.charAt(0) : ""}`.toUpperCase() || "U";
+    const holder = (registerData.prenom && registerData.nom)
+      ? `${registerData.prenom} ${registerData.nom}`.toUpperCase()
+      : dashboardName !== "Utilisateur" ? dashboardName.toUpperCase() : firstName.toUpperCase();
+    const initials = `${(registerData.prenom || dashboardName || firstName).charAt(0)}${registerData.nom ? registerData.nom.charAt(0) : (dashboardName || firstName).split(" ").slice(1)[0]?.charAt(0) || ""}`.toUpperCase() || "U";
     const cardNumber = `4251 98${String(base).slice(0, 2)} ${String(1000 + (base % 9000)).slice(-4)} ${String(2000 + ((base * 3) % 8000)).slice(-4)}`;
     const blackCardNumber = `5399 12${String(base + 77).slice(0, 2)} ${String(1000 + ((base + 33) % 9000)).slice(-4)} ${String(3000 + ((base * 7) % 7000)).slice(-4)}`;
     const expMonth = String(((firstName.length * 3) % 12) + 1).padStart(2, "0");

@@ -187,6 +187,21 @@ service cloud.firestore {
   }
 
   // ─────────────────────────────────────────────
+  //  BANK REVENUE — Admin reads, Admin SDK writes
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/bankRevenue/{revId} {
+    allow read: if isAdmin();
+    allow create, update, delete: if false; // Admin SDK only (via API routes)
+  }
+
+  // ─────────────────────────────────────────────
+  //  ACCOUNT MAINTENANCE TRACKING — Admin SDK only
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/accountMaintenance/{docId} {
+    allow read, write: if false; // Admin SDK only
+  }
+
+  // ─────────────────────────────────────────────
   //  DELETION REQUESTS — Users create own, Admin reads all
   // ─────────────────────────────────────────────
   match /databases/{db}/documents/accountDeletionRequests/{docId} {

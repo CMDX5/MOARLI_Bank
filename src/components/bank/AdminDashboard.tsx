@@ -144,6 +144,15 @@ const [adminUserLimits, setAdminUserLimits] = useState<{ dailyLimit: string; txL
 const [adminLimitEditOpen, setAdminLimitEditOpen] = useState(false);
 const adminRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+// ── Revenue tracking state ──
+const [bankRevenue, setBankRevenue] = useState<{
+  total: number;
+  todayTotal: number;
+  allTimeTotal: number;
+  breakdown: Array<{ type: string; label: string; amount: number; percentage: number }>;
+  recent: Array<{ id: string; type: string; amount: number; sourceName: string; description: string; createdAt: string }>;
+} | null>(null);
+
   // ── Admin Functions ──
 // ── Admin Functions ──
 const handleAdminLongPressStart = () => {
@@ -506,6 +515,14 @@ const fetchAdminData = async () => {
 useEffect(() => {
   if (isAdminLoggedIn) {
     fetchAdminData();
+    // Also fetch bank revenue data
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/revenue?period=month", { headers: await getAuthHeaders() });
+        const data = await res.json();
+        if (data.success) setBankRevenue(data);
+      } catch { /* silent */ }
+    })();
   }
 }, [isAdminLoggedIn]);
 
@@ -1811,6 +1828,65 @@ const handleAdminRejectLoan = async (loan: { id: string; senderUid: string; send
                       </div>
                     </div>
                   </div>
+
+                  {/* ── Revenus Bancaires ── */}
+                  {bankRevenue && (
+                    <div className="admin-section">
+                      <div className="admin-section-header">
+                        <div className="admin-section-title">Revenus Bancaires</div>
+                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>Aujourd'hui</span>
+                          <span style={{ fontSize: 14, fontWeight: 800, color: "#22c55e" }}>{formatCurrency(bankRevenue.todayTotal)} F</span>
+                          <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, marginLeft: 8 }}>Ce mois</span>
+                          <span style={{ fontSize: 14, fontWeight: 800, color: "#D4A437" }}>{formatCurrency(bankRevenue.total)} F</span>
+                          <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, marginLeft: 8 }}>Total</span>
+                          <span style={{ fontSize: 14, fontWeight: 800, color: "#60a5fa" }}>{formatCurrency(bankRevenue.allTimeTotal)} F</span>
+                        </div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8, marginBottom: 16 }}>
+                        {bankRevenue.breakdown.map((item) => (
+                          <div key={item.type} style={{
+                            background: "rgba(255,255,255,.04)", borderRadius: 12, padding: "10px 12px",
+                            border: "1px solid rgba(255,255,255,.08)",
+                          }}>
+                            <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600, marginBottom: 4 }}>{item.label}</div>
+                            <div style={{ fontSize: 15, fontWeight: 800, color: item.amount > 0 ? "#22c55e" : "#64748b" }}>
+                              {formatCurrency(item.amount)} F
+                            </div>
+                            {item.percentage > 0 && (
+                              <div style={{
+                                fontSize: 9, fontWeight: 700, color: "#D4A437",
+                                background: "rgba(212,164,55,.12)", borderRadius: 6,
+                                display: "inline-block", padding: "2px 6px", marginTop: 4,
+                              }}>
+                                {item.percentage}%
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {bankRevenue.recent.length > 0 && (
+                        <div className="admin-table-wrap">
+                          <div className="admin-table-scroll">
+                            <table className="admin-table">
+                              <thead><tr><th>Date</th><th>Type</th><th>Montant</th><th>Utilisateur</th><th>Description</th></tr></thead>
+                              <tbody>
+                                {bankRevenue.recent.slice(0, 8).map((entry) => (
+                                  <tr key={entry.id}>
+                                    <td style={{ color: "#94a3b8", fontSize: 12 }}>{entry.createdAt}</td>
+                                    <td><span className="admin-badge" style={{ background: "rgba(34,197,94,.15)", color: "#22c55e" }}>{entry.type}</span></td>
+                                    <td style={{ color: "#22c55e", fontWeight: 700 }}>+{formatCurrency(entry.amount)} F</td>
+                                    <td style={{ color: "#fff", fontWeight: 600 }}>{entry.sourceName}</td>
+                                    <td style={{ color: "#94a3b8", fontSize: 11, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.description}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="admin-section">
                     <div className="admin-section-header">

@@ -423,6 +423,16 @@ function App() {
     return headers;
   };
 
+  // Helper: track bank revenue (fees) via API — fire-and-forget
+  const trackBankRevenue = (type: string, amount: number, description?: string) => {
+    if (amount <= 0) return;
+    fetch("/api/revenue/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, amount: Math.round(amount), description: description || `${type} — ${Math.round(amount)} FCFA` }),
+    }).catch(() => { /* revenue tracking best-effort — never block user flow */ });
+  };
+
   const [authUid, setAuthUid] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [accountSuspended, setAccountSuspended] = useState(false);
@@ -4145,6 +4155,11 @@ function App() {
             bg: transactionType === "depot" ? "rgba(34,197,94,0.12)" : "rgba(59,130,246,0.12)", read: false,
           });
         } catch { /* notification best-effort */ }
+
+        // ── Track bank revenue for withdrawals (2% fee) ──
+        if (transactionType === "retrait" && fees > 0) {
+          trackBankRevenue("withdrawal_fee", fees, `Frais retrait ${transactionMethod === "mtn" ? "MTN" : "Airtel"} — ${formatCurrency(transactionNumericAmount)} FCFA`);
+        }
       }
       window.setTimeout(() => {
         setTransactionProcessing(false);
@@ -5316,6 +5331,10 @@ function App() {
                       });
                       await createRealtimeTransaction({ senderUid: authUid, senderMoraliId: bankingIdentity.id, senderName: dashboardName, recipientUid: authUid, recipientMoraliId: bankingIdentity.id, recipientName: dashboardName, amount: amt, fees: feeAmount, type: "retrait", destination: "cash", status: "success", receiptId: "FX-" + Date.now().toString().slice(-8) });
                       await createRealtimeNotification(authUid, { title: `Change ${targetCurrency} — ${formatCurrency(amt)} FCFA → ${convertedAmt.toFixed(2)} ${targetCurrency}`, time: "À l'instant", badge: "Change", badgeClass: "nb-blue", icon: "swap", bg: "rgba(59,130,246,0.12)", read: false });
+                      // ── Track exchange commission (1.5%) ──
+                      if (feeAmount > 0) {
+                        trackBankRevenue("exchange_fee", feeAmount, `Commission change FCFA → ${targetCurrency} — ${formatCurrency(amt)} FCFA`);
+                      }
                       showToast(`Change réussi ! +${convertedAmt.toFixed(2)} ${targetCurrency} crédités`);
                       setCurrencyAmount("");
                     } catch (err: unknown) {
@@ -5347,6 +5366,11 @@ function App() {
                       });
                       await createRealtimeTransaction({ senderUid: authUid, senderMoraliId: bankingIdentity.id, senderName: dashboardName, recipientUid: authUid, recipientMoraliId: bankingIdentity.id, recipientName: dashboardName, amount: convertedXaf, fees: 0, type: "depot", destination: "cash", status: "success", receiptId: "FX-" + Date.now().toString().slice(-8) });
                       await createRealtimeNotification(authUid, { title: `Change ${targetCurrency} — ${amt.toFixed(2)} ${targetCurrency} → ${formatCurrency(convertedXaf)} FCFA`, time: "À l'instant", badge: "Change", badgeClass: "nb-blue", icon: "swap", bg: "rgba(59,130,246,0.12)", read: false });
+                      // ── Track exchange commission (1.5% on currency amount) ──
+                      if (feeCurrency > 0) {
+                        const feeXaf = Math.round(feeCurrency / currencyRates[targetCurrency]);
+                        trackBankRevenue("exchange_fee", feeXaf, `Commission change ${targetCurrency} → FCFA — ${amt.toFixed(2)} ${targetCurrency}`);
+                      }
                       showToast(`Change réussi ! +${formatCurrency(convertedXaf)} FCFA crédités`);
                       setCurrencyAmount("");
                     } catch (err: unknown) {

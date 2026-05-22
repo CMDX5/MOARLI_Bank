@@ -1408,9 +1408,11 @@ function App() {
     return { label: "Non vérifié", color: "#64748b", bg: "rgba(100,116,139,.15)", border: "rgba(100,116,139,.3)", text: "Non vérifié", pct: "0%" };
   }, [kycLevel]);
 
-  const fees = transactionAmount ? Math.floor((parseInt(transactionAmount, 10) || 0) * 0.01) : 0;
   const transactionNumericAmount = parseInt(transactionAmount || "0", 10) || 0;
-  const transactionTotal = transactionType === "depot" ? transactionNumericAmount + fees : Math.max(transactionNumericAmount - fees, 0);
+  // MORALI FEES: Dépôt = 0% (gratuit), Retrait = 2% (identique à MTN Congo)
+  const WITHDRAWAL_FEE_RATE = 0.02;
+  const fees = transactionType === "depot" ? 0 : Math.floor(transactionNumericAmount * WITHDRAWAL_FEE_RATE);
+  const transactionTotal = transactionType === "depot" ? transactionNumericAmount : Math.max(transactionNumericAmount - fees, 0);
 
   // ── MTN & Airtel Money limits (Congo-Brazzaville) ──
   type OperatorKey = "mtn" | "airtel";
@@ -4302,6 +4304,7 @@ function App() {
               onPhoneChange={setTransactionPhone}
               balance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
               total={transactionTotal}
+              fees={fees}
               onClose={closeTransaction}
               onSubmit={openTransactionChoice}
             />

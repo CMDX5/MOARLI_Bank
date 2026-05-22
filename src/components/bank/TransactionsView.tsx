@@ -14,6 +14,7 @@ export interface TransactionsViewProps {
   onPhoneChange: (val: string) => void;
   balance: number;
   total: number;
+  fees: number;
   onClose: () => void;
   onSubmit: () => void;
 }
@@ -28,6 +29,7 @@ export default function TransactionsView({
   onPhoneChange,
   balance,
   total,
+  fees,
   onClose,
   onSubmit,
 }: TransactionsViewProps) {
@@ -106,8 +108,9 @@ export default function TransactionsView({
           <div className="transaction-footer">
             <div className="transaction-recap">
               <div>
-                <small>Frais (1% inclus)</small>
+                <small>{type === 'depot' ? 'Frais' : `Frais (2% — ${formatCurrency(fees)} XAF)`}</small>
                 <strong>{formatCurrency(total)} XAF</strong>
+                <div style={{ fontSize: 10, color: type === 'depot' ? '#22c55e' : 'var(--dim)', fontWeight: 600, marginTop: 2 }}>{type === 'depot' ? 'Gratuit — 0% de frais' : `Net reçu: ${formatCurrency(total)} XAF`}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <span>Estimation</span>

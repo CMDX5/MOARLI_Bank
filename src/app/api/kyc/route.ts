@@ -3,7 +3,7 @@ import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
 import { getAdminFirestore } from "@/lib/admin-firestore";
 
-// POST: Submit KYC documents
+// POST: Submit KYC documents for automatic verification
 export async function POST(req: NextRequest) {
   const clientId = getClientId(req);
   const rl = rateLimitByIp(`kyc:submit:${clientId}`, { maxRequests: 5, windowSec: 60 });
@@ -41,10 +41,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Image recto trop volumineuse (max 5 MB)" }, { status: 400 });
     }
 
-    // Upsert KYC record via Firestore set with merge
+    // Store KYC record
     const kycData = {
       uid: auth.uid,
-      status: "submitted",
+      status: "pending",
       documentType: String(documentType).slice(0, 30),
       documentFront: String(documentFront).slice(0, 10_000_000),
       documentBack: documentBack ? String(documentBack).slice(0, 10_000_000) : null,
@@ -59,8 +59,35 @@ export async function POST(req: NextRequest) {
 
     await adminDb.collection("kycRecords").doc(auth.uid).set(kycData, { merge: true });
 
-    return NextResponse.json({ success: true, status: "submitted" });
-  } catch {
+    // Trigger automatic verification (call verify endpoint)
+    try {
+      const verifyRes = await fetch(new URL("/api/kyc/verify", req.url).toString(), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": req.headers.get("authorization") || "",
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (verifyRes.ok) {
+        const verifyData = await verifyRes.json();
+        return NextResponse.json({
+          success: true,
+          status: verifyData.status,
+          autoVerified: true,
+          score: verifyData.score,
+          reasons: verifyData.reasons,
+        });
+      }
+    } catch (error) {
+      console.error("Auto-verification error:", error);
+      // Continue without auto-verification
+    }
+
+    return NextResponse.json({ success: true, status: "pending", autoVerified: false });
+  } catch (error) {
+    console.error("KYC submission error:", error);
     return NextResponse.json({ error: "Erreur interne" }, { status: 500 });
   }
 }
@@ -98,7 +125,8 @@ export async function GET(req: NextRequest) {
       reviewedAt: data?.reviewedAt || null,
       reviewerNotes: data?.reviewerNotes || null,
     });
-  } catch {
+  } catch (error) {
+    console.error("KYC fetch error:", error);
     return NextResponse.json({ verified: false, status: "none" });
   }
 }

@@ -6382,14 +6382,14 @@ function App() {
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 2px" }}>
-                    <p className="tab-kicker" style={{ color: "var(--gold)" }}>Activité récente</p>
+                    <p className="tab-kicker">Activité récente</p>
                     <span style={{ fontSize: 10, color: "#3b82f6", fontWeight: 800, cursor: "pointer" }} onClick={() => setHistoryModalOpen(true)}>Voir tout →</span>
                   </div>
                   <div className="activity-wrap">
                     {(() => {
                       // In the Transfers tab, only show transfer-related transactions (send/receive)
                       const allTx = liveTransactions.length ? liveTransactions : dashboardData.transactions;
-                      const transferOnly = allTx.filter((tx) => tx.icon === "send" || tx.icon === "receive" || tx.name.toLowerCase().includes("virement"));
+                      const transferOnly = allTx.filter((tx) => (tx.icon === "send" || tx.icon === "receive" || tx.name.toLowerCase().includes("virement")) && !tx.name.toLowerCase().includes("retrait"));
                       if (transferOnly.length === 0) {
                         return (
                           <div style={{ padding: "28px 16px", textAlign: "center" }}>

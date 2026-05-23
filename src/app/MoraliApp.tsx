@@ -6830,14 +6830,15 @@ function App() {
               ) : kycFirestoreStatus === "submitted" || kycFirestoreStatus === "under_review" ? (
                 <div style={{ fontSize: 11, color: "#eab308", fontWeight: 600, padding: "8px 0" }}>Vos documents sont en cours de vérification par notre équipe.</div>
               ) : kycFirestoreStatus === "rejected" ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ fontSize: 11, color: "#ef4444", fontWeight: 600 }}>Vérification rejetée. Veuillez soumettre de nouveaux documents.</div>
-                  <button className="btn-save-elite" onClick={openKycModal} style={{ fontSize: 12, padding: "8px 16px" }}>Ressoumettre mes documents</button>
-                </div>
-              ) : (
-                <button className="btn-save-elite" onClick={openKycModal} style={{ fontSize: 12, padding: "8px 16px" }}>Vérifier mon identité</button>
-              )}
+                <div style={{ fontSize: 11, color: "#ef4444", fontWeight: 600 }}>Vérification rejetée. Veuillez soumettre de nouveaux documents.</div>
+              ) : null}
             </div>
+
+            {kycFirestoreStatus === "rejected" ? (
+              <button className="btn-save-elite" onClick={openKycModal}>Ressoumettre mes documents</button>
+            ) : kycFirestoreStatus !== "approved" && kycFirestoreStatus !== "submitted" && kycFirestoreStatus !== "under_review" ? (
+              <button className="btn-save-elite" onClick={openKycModal}>Vérifier mon identité</button>
+            ) : null}
 
             <button className="btn-save-elite" onClick={saveProfileInfos}>Mettre à jour le profil</button>
           </div>

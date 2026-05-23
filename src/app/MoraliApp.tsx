@@ -8246,7 +8246,7 @@ function App() {
         setLogoutModalOpen={setLogoutModalOpen}
         openTransactionChoice={() => setTransactionChoiceOpen(true)}
       />
-    </>
+
           {/* Unified Logout Confirmation Modal */}
           {logoutModalOpen && (
             <div onClick={() => setLogoutModalOpen(false)} style={{position: "fixed", inset: 0, zIndex: 200000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "60px 20px 20px", background: "rgba(3,8,16,.72)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)"}}>
@@ -8334,6 +8334,7 @@ function App() {
               </div>
             </div>
           )}
+    </>
     </RenderGuard>
   );
 }

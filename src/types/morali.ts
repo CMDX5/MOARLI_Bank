@@ -9,7 +9,9 @@ export type Screen =
   | "microcredit" | "personalloan" | "loans" | "currency"
   | "credit" | "internet" | "canalplus" | "electricity"
   | "water" | "tontine" | "crypto" | "savings" | "wallet" | "admin"
-  | "eurWallet" | "usdWallet";
+  | "eurWallet" | "usdWallet"
+  | "goalSavings" | "budget" | "leaderboard" | "payLinks"
+  | "business" | "chat" | "onboarding";
 export type AdminTab = "overview" | "users" | "transactions" | "analytics" | "settings" | "loans" | "audit" | "kyc";
 export type NavItem = "Accueil" | "Cartes" | "Privilèges" | "Profil";
 export type TransactionType = "depot" | "retrait";
@@ -34,7 +36,10 @@ export type IconName =
   | "piggy" | "coins" | "swap" | "users" | "flash"
   | "crypto" | "camera" | "request" | "pin" | "snowflake"
   | "receipt" | "headset" | "document" | "chevronRight"
-  | "refresh" | "arrow-down";
+  | "refresh" | "arrow-down"
+  | "target" | "chart" | "trophy" | "link" | "palette"
+  | "messageCircle" | "check-circle" | "trending-up" | "download"
+  | "sun" | "moon" | "monitor" | "star" | "crown" | "gift";
 
 export type Transaction = {
   icon: IconName;
@@ -163,6 +168,97 @@ export type VirtualCardDoc = {
   provider?: string;
   createdAt?: unknown;
   updatedAt?: unknown;
+};
+
+// ── Theme System ──
+export type ThemeMode = "base" | "dark" | "light";
+
+// ── Goal Savings ──
+export type SavingsGoal = {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  deadline: string;
+  icon: IconName;
+  color: string;
+  createdAt: unknown;
+};
+
+// ── Monthly Budget ──
+export type BudgetCategory = {
+  id: string;
+  name: string;
+  icon: IconName;
+  allocated: number;
+  spent: number;
+ color: string;
+};
+export type MonthlyBudget = {
+  id: string;
+  month: string;
+  totalBudget: number;
+  totalSpent: number;
+  categories: BudgetCategory[];
+  alertsEnabled: boolean;
+  mtnLimit: number;
+  airtelLimit: number;
+};
+
+// ── Leaderboard / Gamification ──
+export type LeaderboardEntry = {
+  uid: string;
+  name: string;
+  avatar: string;
+  score: number;
+  level: number;
+  badge: string;
+};
+export type UserAchievement = {
+  id: string;
+  name: string;
+  description: string;
+  icon: IconName;
+  unlockedAt?: unknown;
+  progress?: number;
+};
+
+// ── Pay Links ──
+export type PayLink = {
+  id: string;
+  amount: number;
+  currency: string;
+  description: string;
+  shortCode: string;
+  active: boolean;
+  createdAt: unknown;
+  totalPaid: number;
+  payerCount: number;
+};
+
+// ── Business Dashboard ──
+export type BusinessStats = {
+  totalRevenue: number;
+  totalTransactions: number;
+  avgTransaction: number;
+ topProducts: Array<{ name: string; count: number; revenue: number }>;
+};
+
+// ── Chat Support ──
+export type ChatMessage = {
+  id: string;
+  sender: "user" | "support";
+  text: string;
+  timestamp: unknown;
+  read: boolean;
+};
+
+// ── Onboarding ──
+export type OnboardingStep = {
+  id: number;
+  title: string;
+  description: string;
+  icon: IconName;
 };
 
 export type BlackCardDoc = {

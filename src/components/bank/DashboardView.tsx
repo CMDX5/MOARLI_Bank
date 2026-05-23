@@ -104,6 +104,9 @@ export interface DashboardViewProps {
   historyModalOpen: boolean;
   setHistoryModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
 
+  /* Navigation */
+  onNavigateProfile: () => void;
+
   /* Callbacks */
   renderProtectedAmount: (key: string, text: string, className?: string) => React.ReactNode;
   showToast: (message: string) => void;
@@ -144,6 +147,7 @@ export default function DashboardView({
   setNotificationsOpen,
   historyModalOpen,
   setHistoryModalOpen,
+  onNavigateProfile,
   renderProtectedAmount,
   showToast,
   openTransaction,
@@ -176,7 +180,7 @@ export default function DashboardView({
               <AppIcon name="bell" size={17} stroke="rgba(255,255,255,0.72)" />
               {unreadNotificationsCount > 0 && <div className="notif-dot" />}
             </button>
-            <div className="icon-pill">
+            <div className="icon-pill" onClick={onNavigateProfile} style={{ cursor: "pointer" }}>
               <div style={{ width: 25, height: 25, borderRadius: "50%", background: "linear-gradient(135deg,#1A3E78,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Montserrat, sans-serif", fontSize: 9.5, fontWeight: 800, color: "#fff" }}>
                 {dashboardData.initials || "U"}
               </div>
@@ -553,7 +557,7 @@ export default function DashboardView({
         {/* ── Recent Transactions ── */}
         <div className="section-header" style={{ marginTop: 8 }}>
           <span className="section-title" style={{ color: "var(--gold)" }}>Transactions récentes</span>
-          <span className="section-action" onClick={() => setHistoryModalOpen(true)}>Voir tout</span>
+          <span className="section-action" onClick={() => setNotificationsOpen(true)}>Voir tout</span>
         </div>
         <div className="tx-section">
           {(() => {

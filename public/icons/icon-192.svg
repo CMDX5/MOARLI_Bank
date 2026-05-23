@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <!-- Background circle -->
+  <circle cx="96" cy="96" r="96" fill="#050b1a"/>
+  <circle cx="96" cy="96" r="92" fill="none" stroke="#1A3E78" stroke-width="2"/>
+  <circle cx="96" cy="96" r="88" fill="none" stroke="rgba(59,130,246,0.15)" stroke-width="1"/>
+  
+  <!-- Shield shape -->
+  <path d="M96 20L36 44V100C36 136 62.4 166.8 96 180C129.6 166.8 156 136 156 100V44L96 20Z" fill="#1A3E78"/>
+  <path d="M96 20L36 44V100C36 136 62.4 166.8 96 180C129.6 166.8 156 136 156 100V44L96 20Z" fill="none" stroke="#D4A437" stroke-width="4"/>
+  
+  <!-- Inner glow -->
+  <path d="M96 30L44 52V100C44 131.2 67 158.4 96 170C125 158.4 148 131.2 148 100V52L96 30Z" fill="none" stroke="rgba(59,130,246,0.12)" stroke-width="1.5"/>
+  
+  <!-- M letter mark -->
+  <path d="M60 128V72L96 100L132 72V128" stroke="#D4A437" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M60 72L96 100L132 72" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  
+  <!-- Subtle corner accents -->
+  <path d="M44 30L20 20" stroke="rgba(212,164,55,0.3)" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M20 20L20 44" stroke="rgba(212,164,55,0.3)" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M148 30L172 20" stroke="rgba(212,164,55,0.3)" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M172 20L172 44" stroke="rgba(212,164,55,0.3)" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

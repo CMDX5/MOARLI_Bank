@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="256" fill="#050b1a"/>
+  <circle cx="256" cy="256" r="248" fill="none" stroke="#1A3E78" stroke-width="3"/>
+  <circle cx="256" cy="256" r="240" fill="none" stroke="rgba(59,130,246,0.12)" stroke-width="1.5"/>
+  
+  <!-- Shield shape -->
+  <path d="M256 52L96 120V268C96 362 165 446 256 480C347 446 416 362 416 268V120L256 52Z" fill="#1A3E78"/>
+  <path d="M256 52L96 120V268C96 362 165 446 256 480C347 446 416 362 416 268V120L256 52Z" fill="none" stroke="#D4A437" stroke-width="8"/>
+  
+  <!-- Inner glow -->
+  <path d="M256 72L116 134V268C116 350 178 426 256 456C334 426 396 350 396 268V134L256 72Z" fill="none" stroke="rgba(59,130,246,0.10)" stroke-width="2"/>
+  
+  <!-- M letter mark -->
+  <path d="M152 344V188L256 268L360 188V344" stroke="#D4A437" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M152 188L256 268L360 188" stroke="#ffffff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  
+  <!-- Subtle corner accents -->
+  <path d="M116 74L48 48" stroke="rgba(212,164,55,0.25)" stroke-width="3" stroke-linecap="round"/>
+  <path d="M48 48L48 120" stroke="rgba(212,164,55,0.25)" stroke-width="3" stroke-linecap="round"/>
+  <path d="M396 74L464 48" stroke="rgba(212,164,55,0.25)" stroke-width="3" stroke-linecap="round"/>
+  <path d="M464 48L464 120" stroke="rgba(212,164,55,0.25)" stroke-width="3" stroke-linecap="round"/>
+</svg>

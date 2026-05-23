@@ -75,18 +75,6 @@ import PrivacyPolicy from "@/components/bank/PrivacyPolicy";
 import AdminDashboard, { type AdminDashboardHandle, type AdminDashboardProps } from "@/components/bank/AdminDashboard";
 import { useToast } from "@/hooks/useToast";
 
-// ── New Feature Components ──
-import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
-import ThemeToggle from "@/components/bank/ThemeToggle";
-import GoalSavingsView from "@/components/bank/GoalSavingsView";
-import BudgetView from "@/components/bank/BudgetView";
-import LeaderboardView from "@/components/bank/LeaderboardView";
-import PayLinksView from "@/components/bank/PayLinksView";
-import ChatSupportView from "@/components/bank/ChatSupportView";
-import BusinessDashboardView from "@/components/bank/BusinessDashboardView";
-import OnboardingView from "@/components/bank/OnboardingView";
-import type { ThemeMode } from "@/types/morali";
-
 // ── All types are imported from @/types/morali ──
 // AuthTab, ForgotStep, Screen, AdminTab, NavItem, TransactionType, RegisterData, IconName,
 // Transaction, NotificationItem, PaymentContact, SearchServiceItem, SearchContactItem,
@@ -166,19 +154,13 @@ const quickActions = [
 
 const navItems: NavItem[] = ["Accueil", "Cartes", "Privilèges", "Profil"];
 
-const serviceTiles: Array<{ icon: IconName; name: string; desc: string; accent: string; badge?: string; screen?: Screen }> = [
+const serviceTiles: Array<{ icon: IconName; name: string; desc: string; accent: string; badge?: string }> = [
   { icon: "phone", name: "Crédit", desc: "MTN & Airtel", badge: "-5%", accent: "#60a5fa" },
   { icon: "globe", name: "Internet", desc: "Pass Data", accent: "#60a5fa" },
   { icon: "tv", name: "Canal+", desc: "Réabonnement", accent: "#a78bfa" },
   { icon: "bolt", name: "Électricité", desc: "Factures & Jetons", accent: "#fbbf24" },
   { icon: "droplet", name: "Eau", desc: "SNDE / LCDE", accent: "#38bdf8" },
   { icon: "qr", name: "Marchand", desc: "Payer par QR", accent: "#22c55e" },
-  { icon: "target", name: "Épargne Cible", desc: "Objectifs d'épargne", badge: "Nouveau", accent: "#D4A437", screen: "goalSavings" },
-  { icon: "chart", name: "Budget", desc: "Suivi mensuel", accent: "#f472b6", screen: "budget" },
-  { icon: "trophy", name: "Classement", desc: "Défis & Badges", accent: "#fbbf24", screen: "leaderboard" },
-  { icon: "link", name: "Pay Links", desc: "Liens de paiement", accent: "#22c55e", screen: "payLinks" },
-  { icon: "messageCircle", name: "Chat Support", desc: "Aide en temps réel", accent: "#60a5fa", screen: "chat" },
-  { icon: "briefcase", name: "Business", desc: "Dashboard Pro", badge: "Pro", accent: "#a78bfa", screen: "business" },
 ];
 
 const initialPaymentContacts: PaymentContact[] = [];
@@ -222,12 +204,6 @@ const myServices: SearchServiceItem[] = [
   { id: "savings", name: "Épargne", category: "Finance", icon: "piggy" },
   { id: "utility-elec", name: "Électricité", category: "Quotidien", icon: "bolt" },
   { id: "utility-water", name: "Eau", category: "Quotidien", icon: "droplet" },
-  { id: "goalSavings", name: "Épargne Cible", category: "Épargne", icon: "target" },
-  { id: "budget", name: "Budget Mensuel", category: "Finance", icon: "chart" },
-  { id: "leaderboard", name: "Classement", category: "Social", icon: "trophy" },
-  { id: "payLinks", name: "Pay Links", category: "Paiement", icon: "link" },
-  { id: "chat", name: "Chat Support", category: "Aide", icon: "messageCircle" },
-  { id: "business", name: "Business", category: "Pro", icon: "briefcase" },
 ];
 
 const myContacts: SearchContactItem[] = [];
@@ -346,25 +322,6 @@ function AppIcon({ name, size = 20, stroke = "currentColor" }: { name: IconName;
   if (name === "document") return <svg {...common}><path d="M8 3h6l4 4v14H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" /><path d="M14 3v5h5" /><path d="M9 13h6" /><path d="M9 17h6" /></svg>;
   if (name === "chevronRight") return <svg {...common}><path d="m9 6 6 6-6 6" /></svg>;
 
-  // ── New Feature Icons ──
-  if (name === "target") return <svg {...common}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg>;
-  if (name === "chart") return <svg {...common}><path d="M18 20V10" /><path d="M12 20V4" /><path d="M6 20v-6" /></svg>;
-  if (name === "trophy") return <svg {...common}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></svg>;
-  if (name === "link") return <svg {...common}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>;
-  if (name === "palette") return <svg {...common}><circle cx="13.5" cy="6.5" r=".5" fill={stroke} /><circle cx="17.5" cy="10.5" r=".5" fill={stroke} /><circle cx="8.5" cy="7.5" r=".5" fill={stroke} /><circle cx="6.5" cy="12.5" r=".5" fill={stroke} /><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" /></svg>;
-  if (name === "messageCircle") return <svg {...common}><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /></svg>;
-  if (name === "check-circle") return <svg {...common}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="m9 11 3 3L22 4" /></svg>;
-  if (name === "trending-up") return <svg {...common}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>;
-  if (name === "download") return <svg {...common}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>;
-  if (name === "sun") return <svg {...common}><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" /></svg>;
-  if (name === "moon") return <svg {...common}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>;
-  if (name === "monitor") return <svg {...common}><rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>;
-  if (name === "star") return <svg {...common}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>;
-  if (name === "crown") return <svg {...common}><path d="M2 20h20" /><path d="M2 20 7 4l5 8 5-8 5 16" /></svg>;
-  if (name === "gift") return <svg {...common}><polyline points="20 12 20 22 4 22 4 12" /><rect x="2" y="7" width="20" height="5" /><line x1="12" y1="22" x2="12" y2="7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>;
-  if (name === "refresh") return <svg {...common}><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>;
-  if (name === "arrow-down") return <svg {...common}><path d="M12 5v14" /><path d="M19 12l-7 7-7-7" /></svg>;
-
   return <svg {...common}><circle cx="12" cy="12" r="8" /></svg>;
 }
 
@@ -423,15 +380,6 @@ class RenderGuard extends React.Component<{children: React.ReactNode}, {hasError
 }
 
 function App() {
-  // ── Theme ──
-  const { theme, setTheme } = useTheme();
-
-  // ── Onboarding ──
-  const [showOnboarding, setShowOnboarding] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return !localStorage.getItem("morali-onboarding-done");
-  });
-
   const adminRef = useRef<AdminDashboardHandle>(null);
   const [screen, setScreen] = useState<Screen>("auth");
   const [transactionReturnScreen, setTransactionReturnScreen] = useState<Screen>("dashboard");
@@ -4165,36 +4113,6 @@ function App() {
       openWallet();
       return;
     }
-    if (id === "goalSavings") {
-      setScreen("goalSavings");
-      setNavActive("Accueil");
-      return;
-    }
-    if (id === "budget") {
-      setScreen("budget");
-      setNavActive("Accueil");
-      return;
-    }
-    if (id === "leaderboard") {
-      setScreen("leaderboard");
-      setNavActive("Accueil");
-      return;
-    }
-    if (id === "payLinks") {
-      setScreen("payLinks");
-      setNavActive("Accueil");
-      return;
-    }
-    if (id === "chat") {
-      setScreen("chat");
-      setNavActive("Accueil");
-      return;
-    }
-    if (id === "business") {
-      setScreen("business");
-      setNavActive("Accueil");
-      return;
-    }
   };
 
   const openSavings = () => {
@@ -4676,10 +4594,6 @@ function App() {
                           }
                           if (tile.name === "Marchand") {
                             openMerchant();
-                            return;
-                          }
-                          if (tile.screen) {
-                            setScreen(tile.screen);
                             return;
                           }
                           showToast(`${tile.name} bientôt disponible`);
@@ -6260,70 +6174,6 @@ function App() {
             </div>
           </div>
 
-          {/* ── Goal Savings Screen ── */}
-          <div className={`app-screen ${screen === "goalSavings" ? "active" : ""}`}>
-            <GoalSavingsView
-              authUid={authUid}
-              firestoreBalance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
-              onBack={closeHub}
-              showToast={showToast}
-              getAuthHeaders={getAuthHeaders}
-              createRealtimeTransaction={createRealtimeTransaction}
-            />
-          </div>
-
-          {/* ── Budget Screen ── */}
-          <div className={`app-screen ${screen === "budget" ? "active" : ""}`}>
-            <BudgetView
-              authUid={authUid}
-              firestoreBalance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
-              onBack={closeHub}
-              showToast={showToast}
-              getAuthHeaders={getAuthHeaders}
-            />
-          </div>
-
-          {/* ── Leaderboard Screen ── */}
-          <div className={`app-screen ${screen === "leaderboard" ? "active" : ""}`}>
-            <LeaderboardView
-              authUid={authUid}
-              onBack={closeHub}
-              showToast={showToast}
-              getAuthHeaders={getAuthHeaders}
-            />
-          </div>
-
-          {/* ── Pay Links Screen ── */}
-          <div className={`app-screen ${screen === "payLinks" ? "active" : ""}`}>
-            <PayLinksView
-              authUid={authUid}
-              onBack={closeHub}
-              showToast={showToast}
-              getAuthHeaders={getAuthHeaders}
-            />
-          </div>
-
-          {/* ── Chat Support Screen ── */}
-          <div className={`app-screen ${screen === "chat" ? "active" : ""}`}>
-            <ChatSupportView
-              authUid={authUid}
-              onBack={closeHub}
-              showToast={showToast}
-              getAuthHeaders={getAuthHeaders}
-            />
-          </div>
-
-          {/* ── Business Dashboard Screen ── */}
-          <div className={`app-screen ${screen === "business" ? "active" : ""}`}>
-            <BusinessDashboardView
-              authUid={authUid}
-              firestoreBalance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
-              onBack={closeHub}
-              showToast={showToast}
-              getAuthHeaders={getAuthHeaders}
-            />
-          </div>
-
           <div className={`app-screen ${screen === "payments" ? "active" : ""}`}>
             <div className="content-scrollable nav-safe">
               <div className="payments-screen">
@@ -6506,7 +6356,7 @@ function App() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 2px" }}>
                     <p className="tab-kicker" style={{ color: "var(--gold)" }}>Activité récente</p>
-                    <span style={{ fontSize: 10, color: "#3b82f6", fontWeight: 800, cursor: "pointer" }} onClick={() => setNotificationsOpen(true)}>Voir tout →</span>
+                    <span style={{ fontSize: 10, color: "#3b82f6", fontWeight: 800, cursor: "pointer" }} onClick={() => setHistoryModalOpen(true)}>Voir tout →</span>
                   </div>
                   <div className="activity-wrap">
                     {(() => {
@@ -6753,12 +6603,12 @@ function App() {
             setNotificationsOpen={setNotificationsOpen}
             historyModalOpen={historyModalOpen}
             setHistoryModalOpen={setHistoryModalOpen}
-            onNavigateProfile={() => { setScreen("profile"); setNavActive("Profil"); }}
             renderProtectedAmount={renderProtectedAmount}
             showToast={showToast}
             openTransaction={openTransaction}
             openServices={openServices}
             openPaymentsTab={openPaymentsTab}
+            onNavigateProfile={() => { setScreen("profile"); setNavActive("Profil"); }}
           />
           )}
         </div>
@@ -6895,10 +6745,10 @@ function App() {
               ) : kycFirestoreStatus === "rejected" ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <div style={{ fontSize: 11, color: "#ef4444", fontWeight: 600 }}>Vérification rejetée. Veuillez soumettre de nouveaux documents.</div>
-                  <button className="btn-save-elite" onClick={openKycModal}>Ressoumettre mes documents</button>
+                  <button className="btn-save-elite" onClick={openKycModal} style={{ fontSize: 12, padding: "8px 16px" }}>Ressoumettre mes documents</button>
                 </div>
               ) : (
-                <button className="btn-save-elite" onClick={openKycModal}>Vérifier mon identité</button>
+                <button className="btn-save-elite" onClick={openKycModal} style={{ fontSize: 12, padding: "8px 16px" }}>Vérifier mon identité</button>
               )}
             </div>
 
@@ -7746,18 +7596,16 @@ function App() {
                       <label>Type de document</label>
                       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                         {([
-                          { value: "national_id", label: "CNI / Passeport" },
-                          { value: "passport", label: "Passeport" },
-                          { value: "driver_license", label: "Permis" },
+                          { value: "national_id", label: "CNI / Passeport", icon: "🪪" },
+                          { value: "passport", label: "Passeport", icon: "📘" },
+                          { value: "driver_license", label: "Permis", icon: "🚗" },
                         ] as const).map((opt) => (
                           <button key={opt.value} onClick={() => setKycDocType(opt.value)} style={{
                             flex: 1, padding: "10px 8px", borderRadius: 12, border: kycDocType === opt.value ? "2px solid #D4A437" : "1px solid rgba(255,255,255,.1)",
                             background: kycDocType === opt.value ? "rgba(212,164,55,.12)" : "rgba(255,255,255,.04)",
                             color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer", textAlign: "center", transition: "all .2s",
                           }}>
-                            <div style={{ width: 36, height: 36, margin: "0 auto 6px", borderRadius: 12, background: kycDocType === opt.value ? "rgba(212,164,55,.15)" : "rgba(255,255,255,.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                              <AppIcon name={opt.value === "national_id" ? "card" : opt.value === "passport" ? "globe" : "shield"} size={18} stroke={kycDocType === opt.value ? "#D4A437" : "#64748b"} />
-                            </div>
+                            <div style={{ fontSize: 20, marginBottom: 4 }}>{opt.icon}</div>
                             {opt.label}
                           </button>
                         ))}
@@ -8215,21 +8063,36 @@ function App() {
 
         {/* ── Transfer confirm sheet removed — moved to TransferView ── */}
 
-        {/* ── Onboarding Overlay ── */}
-        {showOnboarding && (
-          <OnboardingView
-            onComplete={() => { setShowOnboarding(false); localStorage.setItem("morali-onboarding-done", "true"); }}
-            onSkip={() => { setShowOnboarding(false); localStorage.setItem("morali-onboarding-done", "true"); }}
-          />
-        )}
-
-        {/* ── Theme Toggle ── */}
-        {screen !== "auth" && screen !== "onboarding" && (
-          <ThemeToggle currentTheme={theme} onThemeChange={setTheme} />
-        )}
-
         <div className={`toast ${toastVisible ? "show" : ""}`} role="status" aria-live="polite">{toastMessage}</div>
-      </div>
+        {quickNotif && (
+          <div className="quick-notif-overlay">
+            <div className="quick-notif-card">
+              <div className="quick-notif-ring" style={{ borderColor: quickNotif.color }}>
+                <div className="quick-notif-ring" style={{ borderColor: quickNotif.color }}>
+                  <div className="quick-notif-icon-wrap" style={{ borderColor: quickNotif.color, background: `${quickNotif.color}15` }}>
+                    <AppIcon name={quickNotif.icon} size={28} stroke={quickNotif.color} />
+                  </div>
+                </div>
+              </div>
+              <div className="quick-notif-amount">
+                {quickNotif.type === "credit" ? "+" : "-"}{quickNotif.amount}<span>FCFA</span>
+              </div>
+              <div className="quick-notif-label">{quickNotif.label}</div>
+              <div className="quick-notif-badge" style={{ background: `${quickNotif.color}18`, color: quickNotif.color, border: `1px solid ${quickNotif.color}30` }}>
+                {quickNotif.type === "credit" ? (
+                  <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                  Montant reçu</>
+                ) : (
+                  <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
+                  Montant envoyé</>
+                )}
+              </div>
+              <div className="quick-notif-progress">
+                <div className="quick-notif-progress-bar" style={{ background: quickNotif.color }} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       )}
 
@@ -8246,7 +8109,7 @@ function App() {
         setLogoutModalOpen={setLogoutModalOpen}
         openTransactionChoice={() => setTransactionChoiceOpen(true)}
       />
-
+    </>
           {/* Unified Logout Confirmation Modal */}
           {logoutModalOpen && (
             <div onClick={() => setLogoutModalOpen(false)} style={{position: "fixed", inset: 0, zIndex: 200000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "60px 20px 20px", background: "rgba(3,8,16,.72)", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)"}}>
@@ -8334,15 +8197,8 @@ function App() {
               </div>
             </div>
           )}
-    </>
     </RenderGuard>
   );
 }
 
-export default function AppWithTheme() {
-  return (
-    <ThemeProvider>
-      <App />
-    </ThemeProvider>
-  );
-}
+export default App;

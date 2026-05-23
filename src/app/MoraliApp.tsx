@@ -6383,7 +6383,7 @@ function App() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 2px" }}>
                     <p className="tab-kicker" style={{ color: "var(--gold)" }}>Activité récente</p>
-                    <span style={{ fontSize: 10, color: "#3b82f6", fontWeight: 800, cursor: "pointer" }} onClick={() => setHistoryModalOpen(true)}>Voir tout →</span>
+                    <span style={{ fontSize: 10, color: "#3b82f6", fontWeight: 800, cursor: "pointer" }} onClick={() => { setScreen("dashboard"); setNavActive("Accueil"); setNotificationsOpen(true); }}>Voir tout →</span>
                   </div>
                   <div className="activity-wrap">
                     {(() => {
@@ -8117,7 +8117,7 @@ function App() {
           </div>
         )}
 
-        <NotificationsPanel notifications={notifications} open={notificationsOpen} unreadCount={unreadNotificationsCount} onClose={() => setNotificationsOpen(false)} onMarkAllRead={markAllNotificationsAsRead} onMarkRead={markNotificationAsRead} />
+        <NotificationsPanel notifications={notifications} transactions={liveTransactions.length ? liveTransactions : dashboardData.transactions} open={notificationsOpen} unreadCount={unreadNotificationsCount} onClose={() => setNotificationsOpen(false)} onMarkAllRead={markAllNotificationsAsRead} onMarkRead={markNotificationAsRead} />
 
         {/* ── Device alert banner ── */}
         {deviceAlertShown && (

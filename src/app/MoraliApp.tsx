@@ -7613,7 +7613,7 @@ function App() {
         {/* ── KYC Verification Modal ── */}
         {kycModalOpen && (
           <div className="card-modal-overlay" onClick={closeKycModal}>
-            <div className="bc-modal" onClick={(event) => event.stopPropagation()} style={{ maxHeight: "90vh", overflowY: "auto" }}>
+            <div className="bc-modal" onClick={(event) => event.stopPropagation()} style={{ maxHeight: "72vh", overflowY: "auto" }}>
               <div className="bc-head">
                 <div className="bc-head-left">
                   <div className="bc-kicker">Vérification</div>
@@ -7626,13 +7626,13 @@ function App() {
                 </div>
                 <button className="btn-close-circle" onClick={closeKycModal} aria-label="Fermer">×</button>
               </div>
-              <div className="bc-body" style={{ padding: 20 }}>
+              <div className="bc-body" style={{ padding: 14 }}>
                 {/* Progress */}
-                <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+                <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
                   {[1, 2, 3].map((step) => (
-                    <div key={step} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                    <div key={step} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
                       <div style={{
-                        width: 36, height: 36, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+                        width: 28, height: 28, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
                         background: step < kycStep ? "rgba(34,197,94,.15)" : step === kycStep ? "rgba(212,164,55,.15)" : "rgba(255,255,255,.04)",
                         border: step < kycStep ? "1.5px solid rgba(34,197,94,.4)" : step === kycStep ? "1.5px solid rgba(212,164,55,.4)" : "1.5px solid rgba(255,255,255,.08)",
                         transition: "all .3s",
@@ -7686,9 +7686,9 @@ function App() {
                       <label>Date de naissance</label>
                       <input type="date" value={kycDob} onChange={(e) => setKycDob(e.target.value)} style={{ background: "transparent", border: "none", color: "#fff", fontSize: 14, width: "100%", outline: "none", padding: "8px 0" }} />
                     </div>
-                    <div style={{ padding: "12px", borderRadius: 10, background: "rgba(59,130,246,.08)", border: "1px solid rgba(59,130,246,.2)" }}>
-                      <div style={{ fontSize: 10, color: "#60a5fa", fontWeight: 700, marginBottom: 4 }}>Pourquoi la vérification ?</div>
-                      <div style={{ fontSize: 11, color: "#94a3b8", lineHeight: 1.5 }}>La vérification KYC est obligatoire pour débloquer les limites de transaction élevées et accéder aux services premium (Carte Black, micro-crédit). Vos documents sont sécurisés et traités par notre équipe.</div>
+                    <div style={{ padding: "10px 12px", borderRadius: 10, background: "rgba(59,130,246,.08)", border: "1px solid rgba(59,130,246,.2)" }}>
+                      <div style={{ fontSize: 9, color: "#60a5fa", fontWeight: 700, marginBottom: 2 }}>Pourquoi la vérification ?</div>
+                      <div style={{ fontSize: 10, color: "#94a3b8", lineHeight: 1.4 }}>La vérification KYC est obligatoire pour débloquer les limites de transaction élevées et accéder aux services premium. Vos documents sont sécurisés.</div>
                     </div>
                     <button className="hub-cta" onClick={() => setKycStep(2)} disabled={!kycDocType} style={{ background: "#D4A437", color: "#000", opacity: kycDocType ? 1 : 0.4, cursor: kycDocType ? "pointer" : "not-allowed" }}>
                       Continuer
@@ -7706,7 +7706,7 @@ function App() {
                       </div>
                       {kycDocFront ? (
                         <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", border: "2px solid rgba(34,197,94,.3)" }}>
-                          <img src={kycDocFront} alt="Recto" style={{ width: "100%", height: 180, objectFit: "cover" }} />
+                          <img src={kycDocFront} alt="Recto" style={{ width: "100%", height: 140, objectFit: "cover" }} />
                           <button onClick={() => setKycDocFront(null)} style={{ position: "absolute", top: 8, right: 8, width: 28, height: 28, borderRadius: "50%", background: "rgba(239,68,68,.8)", color: "#fff", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>×</button>
                         </div>
                       ) : (
@@ -7725,7 +7725,7 @@ function App() {
                       </div>
                       {kycDocBack ? (
                         <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", border: "2px solid rgba(34,197,94,.3)" }}>
-                          <img src={kycDocBack} alt="Verso" style={{ width: "100%", height: 180, objectFit: "cover" }} />
+                          <img src={kycDocBack} alt="Verso" style={{ width: "100%", height: 140, objectFit: "cover" }} />
                           <button onClick={() => setKycDocBack(null)} style={{ position: "absolute", top: 8, right: 8, width: 28, height: 28, borderRadius: "50%", background: "rgba(239,68,68,.8)", color: "#fff", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>×</button>
                         </div>
                       ) : (
@@ -7754,12 +7754,12 @@ function App() {
                     </div>
                     {kycSelfie ? (
                       <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", border: "2px solid rgba(34,197,94,.3)" }}>
-                        <img src={kycSelfie} alt="Selfie" style={{ width: "100%", height: 300, objectFit: "cover" }} />
+                        <img src={kycSelfie} alt="Selfie" style={{ width: "100%", height: 200, objectFit: "cover" }} />
                         <button onClick={() => { setKycSelfie(null); }} style={{ position: "absolute", top: 8, right: 8, width: 28, height: 28, borderRadius: "50%", background: "rgba(239,68,68,.8)", color: "#fff", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 700 }}>×</button>
                       </div>
                     ) : (
-                      <div style={{ borderRadius: 12, overflow: "hidden", border: "2px solid rgba(255,255,255,.1)", background: "#000", minHeight: 240 }}>
-                        <video ref={kycSelfieVideoRef} autoPlay playsInline muted style={{ width: "100%", height: 240, objectFit: "cover" }} />
+                      <div style={{ borderRadius: 12, overflow: "hidden", border: "2px solid rgba(255,255,255,.1)", background: "#000", minHeight: 180 }}>
+                        <video ref={kycSelfieVideoRef} autoPlay playsInline muted style={{ width: "100%", height: 180, objectFit: "cover" }} />
                         <canvas ref={kycSelfieCanvasRef} style={{ display: "none" }} />
                       </div>
                     )}

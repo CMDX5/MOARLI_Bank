@@ -23,17 +23,10 @@ const THEME_OPTIONS: Array<{
     bgHint: '#050b1a',
   },
   {
-    mode: 'dark',
-    label: 'MOARLI Dark',
-    primaryColor: '#059669',
-    secondaryColor: '#D4A437',
-    bgHint: '#050e0a',
-  },
-  {
     mode: 'light',
     label: 'MOARLI Light',
-    primaryColor: '#D4A437',
-    secondaryColor: '#059669',
+    primaryColor: '#2563eb',
+    secondaryColor: '#3b82f6',
     bgHint: '#f8fafc',
   },
 ];
@@ -126,7 +119,7 @@ export default function ThemeToggle({ currentTheme, onThemeChange }: ThemeToggle
                   ? `1.5px solid ${opt.primaryColor}`
                   : '1px solid transparent',
                 background: isActive
-                  ? (currentTheme === 'light' ? 'rgba(212,164,55,0.08)' : 'rgba(255,255,255,0.04)')
+                  ? (currentTheme === 'light' ? 'rgba(37,99,235,0.08)' : 'rgba(255,255,255,0.04)')
                   : 'transparent',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',

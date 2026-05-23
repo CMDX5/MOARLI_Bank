@@ -171,7 +171,7 @@ export type VirtualCardDoc = {
 };
 
 // ── Theme System ──
-export type ThemeMode = "base" | "dark" | "light";
+export type ThemeMode = "base" | "light";
 
 // ── Goal Savings ──
 export type SavingsGoal = {

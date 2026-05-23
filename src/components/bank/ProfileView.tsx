@@ -72,8 +72,32 @@ export default function ProfileView({
               {group.items.map((item) => (
                 <button key={item.label} className="profile-item" onClick={() => onAction(item.label)}>
                   <div className="profile-item-left">
-                    <div className="tab-card-icon" style={{ background: "rgba(255,255,255,.03)", color: "#cbd5e1" }}>
-                      <AppIcon name={item.icon} size={18} stroke={item.icon === "shield" ? "#60a5fa" : "#cbd5e1"} />
+                    <div className="tab-card-icon" style={{
+                      background: item.icon === "shield" ? "rgba(96,165,250,.12)" :
+                        item.icon === "user" ? "rgba(59,130,246,.12)" :
+                        item.icon === "lock" ? "rgba(212,164,55,.12)" :
+                        item.icon === "receipt" ? "rgba(34,197,94,.12)" :
+                        item.icon === "headset" ? "rgba(168,85,247,.12)" :
+                        item.icon === "document" ? "rgba(251,191,36,.12)" :
+                        "rgba(255,255,255,.05)",
+                      borderColor: item.icon === "shield" ? "rgba(96,165,250,.2)" :
+                        item.icon === "user" ? "rgba(59,130,246,.2)" :
+                        item.icon === "lock" ? "rgba(212,164,55,.2)" :
+                        item.icon === "receipt" ? "rgba(34,197,94,.2)" :
+                        item.icon === "headset" ? "rgba(168,85,247,.2)" :
+                        item.icon === "document" ? "rgba(251,191,36,.2)" :
+                        "rgba(255,255,255,.06)",
+                    }}>
+                      <AppIcon name={item.icon} size={20} stroke={
+                        item.icon === "shield" ? "#60a5fa" :
+                        item.icon === "user" ? "#3b82f6" :
+                        item.icon === "lock" ? "#D4A437" :
+                        item.icon === "receipt" ? "#22c55e" :
+                        item.icon === "headset" ? "#a855f7" :
+                        item.icon === "document" ? "#fbbf24" :
+                        item.icon === "eye-off" ? "#94a3b8" :
+                        "#cbd5e1"
+                      } />
                     </div>
                     <div style={{ textAlign: "left" }}>
                       <div className="profile-item-label">{item.label}</div>

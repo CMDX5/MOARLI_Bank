@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import "./globals.css";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -52,7 +53,9 @@ export default async function RootLayout({
             __html: `if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}`,
           }}
         />
-        {children}
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

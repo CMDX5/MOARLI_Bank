@@ -73,6 +73,15 @@ import TransferView from "@/components/bank/TransferView";
 import LegalTerms from "@/components/bank/LegalTerms";
 import PrivacyPolicy from "@/components/bank/PrivacyPolicy";
 import AdminDashboard, { type AdminDashboardHandle, type AdminDashboardProps } from "@/components/bank/AdminDashboard";
+import GoalSavingsView from "@/components/bank/GoalSavingsView";
+import BudgetView from "@/components/bank/BudgetView";
+import ChatSupportView from "@/components/bank/ChatSupportView";
+import LeaderboardView from "@/components/bank/LeaderboardView";
+import OnboardingView from "@/components/bank/OnboardingView";
+import PayLinksView from "@/components/bank/PayLinksView";
+import BusinessDashboardView from "@/components/bank/BusinessDashboardView";
+import ThemeToggle from "@/components/bank/ThemeToggle";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useToast } from "@/hooks/useToast";
 
 // ── All types are imported from @/types/morali ──
@@ -321,6 +330,7 @@ function AppIcon({ name, size = 20, stroke = "currentColor" }: { name: IconName;
   if (name === "headset") return <svg {...common}><path d="M4 12a8 8 0 0 1 16 0" /><rect x="3" y="12" width="4" height="7" rx="2" /><rect x="17" y="12" width="4" height="7" rx="2" /><path d="M19 19a3 3 0 0 1-3 3h-2" /></svg>;
   if (name === "document") return <svg {...common}><path d="M8 3h6l4 4v14H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" /><path d="M14 3v5h5" /><path d="M9 13h6" /><path d="M9 17h6" /></svg>;
   if (name === "chevronRight") return <svg {...common}><path d="m9 6 6 6-6 6" /></svg>;
+  if (name === "eye-off") return <svg {...common}><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" /><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" /><line x1="1" y1="1" x2="23" y2="23" /></svg>;
 
   return <svg {...common}><circle cx="12" cy="12" r="8" /></svg>;
 }
@@ -403,6 +413,7 @@ function App() {
   const [regPinSaving, setRegPinSaving] = useState(false);
   const [navActive, setNavActive] = useState<NavItem>("Accueil");
   const { toastMessage, toastVisible, showToast, toastTimerRef } = useToast();
+  const { theme, setTheme, isDark } = useTheme();
   const pendingCreditsClaimedRef = useRef(false);
   const otpInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -942,6 +953,10 @@ function App() {
 
           setScreen("dashboard");
           setNavActive("Accueil");
+          const onboardingDone = typeof localStorage !== 'undefined' && localStorage.getItem("morali-onboarding-done");
+          if (!onboardingDone) {
+            setScreen("onboarding");
+          }
         } else {
           const immediateIdentity = getCachedIdentityForUid(user.uid) || generateMoraliIdentity(getIdentitySeed(user.email, user.uid));
           setBankingIdentity(immediateIdentity);
@@ -4195,6 +4210,13 @@ function App() {
     setNavActive("Accueil");
   };
 
+  const openGoalSavings = () => { setScreen("goalSavings"); setNavActive("Accueil"); };
+  const openBudget = () => { setScreen("budget"); setNavActive("Accueil"); };
+  const openChatSupport = () => { setScreen("chat"); setNavActive("Accueil"); };
+  const openLeaderboard = () => { setScreen("leaderboard"); setNavActive("Accueil"); };
+  const openPayLinks = () => { setScreen("payLinks"); setNavActive("Accueil"); };
+  const openBusiness = () => { setScreen("business"); setNavActive("Accueil"); };
+
   const closeHub = () => {
     setScreen("services");
     setNavActive("Accueil");
@@ -6552,6 +6574,13 @@ function App() {
             />
           )}
 
+          {screen === "onboarding" && (
+<OnboardingView
+  onComplete={() => { setScreen("dashboard"); setNavActive("Accueil"); try { localStorage.setItem("morali-onboarding-done", "1"); } catch {} }}
+  onSkip={() => { setScreen("dashboard"); setNavActive("Accueil"); try { localStorage.setItem("morali-onboarding-done", "1"); } catch {} }}
+/>
+)}
+
           {screen === "profile" && (
             <ProfileView
               holder={dashboardData.holder}
@@ -6573,6 +6602,59 @@ function App() {
               onLogout={() => setLogoutModalOpen(true)}
             />
           )}
+
+          {screen === "goalSavings" && (
+<GoalSavingsView
+  authUid={authUid}
+  firestoreBalance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
+  onBack={openDashboard}
+  showToast={showToast}
+  getAuthHeaders={getAuthHeaders}
+  createRealtimeTransaction={createRealtimeTransaction}
+/>
+)}
+{screen === "budget" && (
+<BudgetView
+  authUid={authUid}
+  firestoreBalance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
+  onBack={openDashboard}
+  showToast={showToast}
+  getAuthHeaders={getAuthHeaders}
+/>
+)}
+{screen === "chat" && (
+<ChatSupportView
+  authUid={authUid}
+  onBack={openDashboard}
+  showToast={showToast}
+  getAuthHeaders={getAuthHeaders}
+/>
+)}
+{screen === "leaderboard" && (
+<LeaderboardView
+  authUid={authUid}
+  onBack={openDashboard}
+  showToast={showToast}
+  getAuthHeaders={getAuthHeaders}
+/>
+)}
+{screen === "payLinks" && (
+<PayLinksView
+  authUid={authUid}
+  onBack={openDashboard}
+  showToast={showToast}
+  getAuthHeaders={getAuthHeaders}
+/>
+)}
+{screen === "business" && (
+<BusinessDashboardView
+  authUid={authUid}
+  firestoreBalance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
+  onBack={openDashboard}
+  showToast={showToast}
+  getAuthHeaders={getAuthHeaders}
+/>
+)}
 
           {(screen === "dashboard" || historyModalOpen) && (
           <DashboardView
@@ -6714,34 +6796,34 @@ function App() {
             </div>
 
             {/* KYC Status */}
-            <div style={{ padding: "14px 16px", borderRadius: 16, background: `${kycConfig.bg}`, border: `1px solid ${kycConfig.border}` }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 8, background: kycConfig.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
+            <div style={{ padding: "18px 18px", borderRadius: 18, background: `${kycConfig.bg}`, border: `1px solid ${kycConfig.border}` }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 42, height: 42, borderRadius: 14, background: kycConfig.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", border: "2px solid rgba(255,255,255,.1)" }}>
                     {kycLevel === 3 ? (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      <AppIcon name="shield" size={22} stroke="#fff" />
                     ) : kycLevel >= 2 ? (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                      <AppIcon name="shield" size={22} stroke="#fff" />
                     ) : (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+                      <AppIcon name="shield" size={22} stroke="#fff" />
                     )}
                   </div>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>Niveau KYC</div>
-                    <div style={{ fontSize: 10, color: kycConfig.color, fontWeight: 700 }}>{kycConfig.text}</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>Niveau KYC</div>
+                    <div style={{ fontSize: 11, color: kycConfig.color, fontWeight: 700 }}>{kycConfig.text}</div>
                   </div>
                 </div>
-                <div style={{ fontSize: 11, fontWeight: 800, color: kycConfig.color }}>{kycConfig.pct}</div>
+                <div style={{ fontSize: 13, fontWeight: 900, color: kycConfig.color }}>{kycConfig.pct}</div>
               </div>
-              <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+              <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
                 {[1, 2, 3].map((step) => (
-                  <div key={step} style={{ flex: 1, height: 4, borderRadius: 2, background: step <= kycLevel ? kycConfig.color : "rgba(255,255,255,.06)", transition: "background .3s" }} />
+                  <div key={step} style={{ flex: 1, height: 5, borderRadius: 3, background: step <= kycLevel ? kycConfig.color : "rgba(255,255,255,.06)", transition: "background .3s" }} />
                 ))}
               </div>
-              <div style={{ display: "flex", gap: 8, fontSize: 9, color: "#64748b", marginBottom: 12 }}>
-                <span style={kycLevel >= 1 ? { color: kycConfig.color, fontWeight: 700 } : undefined}>Nom</span>
-                <span style={kycLevel >= 2 ? { color: kycConfig.color, fontWeight: 700 } : undefined}>Téléphone</span>
-                <span style={kycLevel >= 3 ? { color: kycConfig.color, fontWeight: 700 } : undefined}>Document</span>
+              <div style={{ display: "flex", gap: 8, fontSize: 10, color: "#64748b", marginBottom: 14, fontWeight: 600 }}>
+                <span style={kycLevel >= 1 ? { color: kycConfig.color, fontWeight: 800 } : undefined}>Nom</span>
+                <span style={kycLevel >= 2 ? { color: kycConfig.color, fontWeight: 800 } : undefined}>Téléphone</span>
+                <span style={kycLevel >= 3 ? { color: kycConfig.color, fontWeight: 800 } : undefined}>Document</span>
               </div>
               {kycFirestoreStatus === "approved" ? (
                 <div style={{ fontSize: 11, color: "#22c55e", fontWeight: 600, padding: "8px 0" }}>Votre identité a été vérifiée avec succès.</div>
@@ -7214,36 +7296,12 @@ function App() {
         )}
 
         {supportOpen && (
-          <div className="card-modal-overlay" onClick={closeSupportModal}>
-            <div className="bc-modal" onClick={(event) => event.stopPropagation()}>
-              <div className="bc-head">
-                <div className="bc-head-left">
-                  <div className="bc-kicker">Support</div>
-                  <div className="bc-title">Support Client</div>
-                  <div className="bc-subtitle">Décrivez votre besoin. Morali enregistrera un ticket et le suivra depuis votre compte.</div>
-                </div>
-                <button className="bc-close" onClick={closeSupportModal} aria-label="Fermer">&times;</button>
-              </div>
-              <div className="input-group-glass">
-                <label>Votre message</label>
-                <textarea value={supportMessage} onChange={(event) => setSupportMessage(event.target.value)} placeholder="Ex : Virement non reçu, carte refusée, besoin d'assistance..." style={{ width: "100%", minHeight: 120, background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 16, padding: 14, color: "#fff", outline: "none", fontSize: 15, resize: "none" }} />
-              </div>
-              {supportThreads.length > 0 && (
-                <div className="card-manage-stack">
-                  {supportThreads.map((thread) => (
-                    <div key={thread.id} className="card-setting-row">
-                      <div style={{ flex: 1 }}>
-                        <div className="card-setting-title">{thread.message}</div>
-                        <div className="card-setting-copy">{thread.createdAtLabel}</div>
-                      </div>
-                      <span className="profile-badge">{thread.status}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <button className="bc-btn-full" onClick={submitSupportMessage} disabled={supportSending}>{supportSending ? "Envoi..." : "Envoyer au support"}</button>
-            </div>
-          </div>
+          <ChatSupportView
+            authUid={authUid}
+            onBack={closeSupportModal}
+            showToast={showToast}
+            getAuthHeaders={getAuthHeaders}
+          />
         )}
 
         {termsOpen && (
@@ -7601,16 +7659,20 @@ function App() {
                       <label>Type de document</label>
                       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                         {([
-                          { value: "national_id", label: "CNI / Passeport", icon: "🪪" },
-                          { value: "passport", label: "Passeport", icon: "📘" },
-                          { value: "driver_license", label: "Permis", icon: "🚗" },
+                          { value: "national_id", label: "CNI / Passeport", icon: "document" as IconName },
+                          { value: "passport", label: "Passeport", icon: "globe" as IconName },
+                          { value: "driver_license", label: "Permis", icon: "building" as IconName },
                         ] as const).map((opt) => (
                           <button key={opt.value} onClick={() => setKycDocType(opt.value)} style={{
                             flex: 1, padding: "10px 8px", borderRadius: 12, border: kycDocType === opt.value ? "2px solid #D4A437" : "1px solid rgba(255,255,255,.1)",
                             background: kycDocType === opt.value ? "rgba(212,164,55,.12)" : "rgba(255,255,255,.04)",
                             color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer", textAlign: "center", transition: "all .2s",
                           }}>
-                            <div style={{ fontSize: 20, marginBottom: 4 }}>{opt.icon}</div>
+                            <div style={{ marginBottom: 4, display: "flex", justifyContent: "center" }}>
+                              <div style={{ width: 32, height: 32, borderRadius: 10, background: kycDocType === opt.value ? "rgba(212,164,55,.2)" : "rgba(255,255,255,.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <AppIcon name={opt.icon} size={18} stroke={kycDocType === opt.value ? "#D4A437" : "#64748b"} />
+                              </div>
+                            </div>
                             {opt.label}
                           </button>
                         ))}
@@ -7910,6 +7972,10 @@ function App() {
               </div>
 
               <div className="security-summary">
+                <div className="security-stat">
+                  <div className="security-stat-kicker">Apparence</div>
+                  <ThemeToggle currentTheme={theme} onThemeChange={setTheme} />
+                </div>
                 <div className="security-stat">
                   <div className="security-stat-kicker">Centre de données</div>
                   <div className="security-stat-value privacy-region"><AppIcon name="shield" size={14} stroke="#60a5fa" />Région Afrique Centrale</div>

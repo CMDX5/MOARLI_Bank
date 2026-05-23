@@ -35,7 +35,7 @@ export type IconName =
   | "search" | "globe" | "tv" | "droplet" | "qr"
   | "piggy" | "coins" | "swap" | "users" | "flash"
   | "crypto" | "camera" | "request" | "pin" | "snowflake"
-  | "receipt" | "headset" | "document" | "chevronRight"
+  | "receipt" | "headset" | "document" | "chevronRight" | "eye-off"
   | "refresh" | "arrow-down"
   | "target" | "chart" | "trophy" | "link" | "palette"
   | "messageCircle" | "check-circle" | "trending-up" | "download"

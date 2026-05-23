@@ -6382,7 +6382,7 @@ function App() {
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 2px" }}>
-                    <p className="tab-kicker">Activité récente</p>
+                    <p className="tab-kicker" style={{ color: "var(--gold)" }}>Activité récente</p>
                     <span style={{ fontSize: 10, color: "#3b82f6", fontWeight: 800, cursor: "pointer" }} onClick={() => setHistoryModalOpen(true)}>Voir tout →</span>
                   </div>
                   <div className="activity-wrap">

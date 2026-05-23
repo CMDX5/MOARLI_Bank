@@ -14,14 +14,17 @@ import { getAdminFirestore } from "@/lib/admin-firestore";
  * Returns 503 only if Admin SDK is not configured AND no cached result.
  */
 
-function formatResult(d: { uid: string; fullName?: string; pseudo?: string; moraliId?: string; phone?: string }) {
+function formatResult(d: { uid: string; fullName?: string; pseudo?: string; moraliId?: string; phone?: string }, requesterUid?: string) {
+  // SECURITY: Only expose uid when the requester is authenticated (required for transfers)
+  // SECURITY: phone is masked — only last 2 digits shown
+  const isRequesterSelf = requesterUid && d.uid === requesterUid;
   return {
     found: true,
     name: d.fullName || "Utilisateur",
     pseudo: d.pseudo?.startsWith("@") ? d.pseudo : `@${d.pseudo || ""}`,
     account: d.moraliId || "",
-    // SECURITY: uid is NEVER exposed to client (prevents IDOR / user enumeration)
-    // SECURITY: phone is masked — only last 2 digits shown
+    ...(requesterUid ? { uid: d.uid } : {}),
+    ...(isRequesterSelf ? { isSelf: true } : {}),
     ...(d.phone ? { phone: `******${String(d.phone).slice(-2)}` } : {}),
   };
 }
@@ -72,14 +75,14 @@ export async function GET(req: NextRequest) {
     if (normalizedMoraliId.startsWith("MORALI") && /^MORALI\d{1,20}$/.test(normalizedMoraliId)) {
       const lookupDoc = await adminDb.collection("directoryLookup").doc(`morali_${normalizedMoraliId}`).get();
       if (lookupDoc.exists) {
-        return NextResponse.json(formatResult(lookupDoc.data()! as Parameters<typeof formatResult>[0]));
+        return NextResponse.json(formatResult(lookupDoc.data()! as Parameters<typeof formatResult>[0], auth.uid));
       }
     }
 
     if (normalizedPseudo.length >= 2) {
       const lookupDoc = await adminDb.collection("directoryLookup").doc(`pseudo_${normalizedPseudo}`).get();
       if (lookupDoc.exists) {
-        return NextResponse.json(formatResult(lookupDoc.data()! as Parameters<typeof formatResult>[0]));
+        return NextResponse.json(formatResult(lookupDoc.data()! as Parameters<typeof formatResult>[0], auth.uid));
       }
 
       // Prefix search — limited to 3 results max
@@ -92,7 +95,7 @@ export async function GET(req: NextRequest) {
       if (!prefixResults.empty) {
         // SECURITY: return first match only — never expose full user list
         const firstMatch = prefixResults.docs[0].data()! as Parameters<typeof formatResult>[0];
-        return NextResponse.json(formatResult(firstMatch));
+        return NextResponse.json(formatResult(firstMatch, auth.uid));
       }
     }
 
@@ -127,7 +130,7 @@ export async function GET(req: NextRequest) {
             }
           }
 
-          return NextResponse.json(formatResult({ uid: d.uid, fullName: d.fullName, pseudo: d.pseudo, moraliId: d.moraliId, phone: d.phone }));
+          return NextResponse.json(formatResult({ uid: d.uid, fullName: d.fullName, pseudo: d.pseudo, moraliId: d.moraliId, phone: d.phone }, auth.uid));
         }
       }
     } catch {

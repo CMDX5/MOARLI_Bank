@@ -278,7 +278,6 @@ export function validateBody<T extends z.ZodTypeAny>(
   // This prevents property injection attacks where an attacker adds
   // unexpected fields (e.g., { pin: "1234", isAdmin: true }).
   // Zod v4: z.object({...}).strip() removes unrecognized keys.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const strictSchema = (schema as any).strip ? (schema as any).strip() : schema;
   const result = strictSchema.safeParse(body);
   if (result.success) {

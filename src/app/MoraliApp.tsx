@@ -2212,9 +2212,14 @@ function App() {
       const res = await fetch(`/api/directory/search?q=${encodeURIComponent(source)}`, { headers: await getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
-        if (data.found && data.uid) {
-          const isSelf = data.uid === authUid;
-          return { user: buildMoraliUser({ uid: data.uid, fullName: data.name, pseudo: data.pseudo, moraliId: data.account }), isSelf };
+        if (data.found) {
+          if (data.isSelf) {
+            return { user: null, isSelf: true };
+          }
+          if (data.uid) {
+            return { user: buildMoraliUser({ uid: data.uid, fullName: data.name, pseudo: data.pseudo, moraliId: data.account }), isSelf: false };
+          }
+          // API found user but no uid (shouldn't happen with auth) — fall through to Method 2
         }
       }
     } catch {

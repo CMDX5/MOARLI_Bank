@@ -55,7 +55,6 @@ export async function GET(req: NextRequest) {
       .limit(100);
     const snapshot = await q.get();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const credits = snapshot.docs.map((d): Record<string, any> => ({
       id: d.id,
       ...d.data(),

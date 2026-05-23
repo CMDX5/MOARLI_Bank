@@ -1180,3 +1180,159 @@ body.lock-scroll{overflow:hidden;position:fixed}
 /* ── Transfer Modal Overrides (late specificity) ── */
 .transfer-overlay{z-index:10030 !important;display:flex !important;align-items:flex-start !important;justify-content:center !important;padding:60px 20px 20px !important;inset:0 !important;height:auto !important;overflow:hidden !important;}
 .transfer-modal{position:relative !important;transform:none !important;opacity:1 !important;border-radius:28px !important;max-height:100% !important;overflow:hidden !important;-webkit-overflow-scrolling:touch !important;width:100% !important;max-width:100% !important;margin:0 !important;padding:22px 20px calc(4px + env(safe-area-inset-bottom,0px)) !important;scrollbar-width:none !important;animation:none !important;}
+
+/* ══════════════════════════════════════════════════════
+   LIGHT THEME OVERRIDES
+   (color-scheme: light is set on <html> by ThemeContext)
+   ══════════════════════════════════════════════════════ */
+
+html[style*="color-scheme: light"] .qa-circle {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06), inset 0 1px 1px rgba(255,255,255,0.5);
+}
+html[style*="color-scheme: light"] .qa-circle svg {
+  stroke: #1e40af;
+  filter: none;
+}
+html[style*="color-scheme: light"] .qa-btn.active-blue .qa-circle {
+  background: rgba(59,130,246,0.12);
+  border-color: rgba(59,130,246,0.5);
+  box-shadow: 0 0 16px rgba(59,130,246,0.15), 0 2px 8px rgba(0,0,0,0.06);
+}
+html[style*="color-scheme: light"] .qa-btn.active-blue .qa-circle svg {
+  stroke: #2563eb;
+  filter: none;
+}
+html[style*="color-scheme: light"] .qa-lbl {
+  color: #475569;
+}
+html[style*="color-scheme: light"] .qa-btn.active-blue .qa-lbl {
+  color: #2563eb;
+}
+
+/* Transaction items */
+html[style*="color-scheme: light"] .tx-name {
+  color: #0f172a;
+}
+html[style*="color-scheme: light"] .tx-amt.dr {
+  color: #475569;
+}
+
+/* Notification items */
+html[style*="color-scheme: light"] .notif-title {
+  color: #0f172a;
+}
+
+/* Chart neutral bars */
+html[style*="color-scheme: light"] .chart-bar[style*="rgba(255,255,255,0.12)"] {
+  background: rgba(0,0,0,0.08) !important;
+}
+
+/* Dashboard text colors */
+html[style*="color-scheme: light"] .vc-brand-name {
+  color: #0f172a;
+}
+
+/* Section titles with var(--gold) — fine in both modes */
+
+/* Stat card text */
+html[style*="color-scheme: light"] .bc-stat-v {
+  color: #0f172a;
+}
+
+/* Profile items */
+html[style*="color-scheme: light"] .profile-name {
+  color: #0f172a;
+}
+html[style*="color-scheme: light"] .profile-item-label {
+  color: #0f172a;
+}
+html[style*="color-scheme: light"] .tab-title {
+  color: #0f172a;
+}
+
+/* Services / hub / savings backgrounds */
+html[style*="color-scheme: light"] .services-screen,
+html[style*="color-scheme: light"] .hub-screen,
+html[style*="color-scheme: light"] .savings-screen,
+html[style*="color-scheme: light"] .payments-screen,
+html[style*="color-scheme: light"] .cards-screen,
+html[style*="color-scheme: light"] .profile-screen {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Service tiles */
+html[style*="color-scheme: light"] .service-name,
+html[style*="color-scheme: light"] .service-wide-title,
+html[style*="color-scheme: light"] .tab-card-title,
+html[style*="color-scheme: light"] .hub-metric-value,
+html[style*="color-scheme: light"] .hub-title,
+html[style*="color-scheme: light"] .services-title {
+  color: var(--text);
+}
+html[style*="color-scheme: light"] .service-desc,
+html[style*="color-scheme: light"] .service-wide-sub,
+html[style*="color-scheme: light"] .tab-card-sub,
+html[style*="color-scheme: light"] .hub-metric-label,
+html[style*="color-scheme: light"] .services-kicker,
+html[style*="color-scheme: light"] .tontine-sub {
+  color: var(--muted);
+}
+
+/* Activity / transaction items */
+html[style*="color-scheme: light"] .activity-name,
+html[style*="color-scheme: light"] .activity-amount,
+html[style*="color-scheme: light"] .transac-name,
+html[style*="color-scheme: light"] .amount-positive,
+html[style*="color-scheme: light"] .amount-negative {
+  color: var(--text);
+}
+
+/* Finance cards */
+html[style*="color-scheme: light"] .finance-card-title {
+  color: var(--text);
+}
+
+/* Input fields */
+html[style*="color-scheme: light"] .input-group-glass input {
+  color: var(--text);
+}
+html[style*="color-scheme: light"] .input-group-glass label {
+  color: var(--muted);
+}
+
+/* Contact circles */
+html[style*="color-scheme: light"] .contact-circle {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.08);
+  color: var(--text);
+}
+html[style*="color-scheme: light"] .contact-name {
+  color: var(--muted);
+}
+
+/* Modal drawer light */
+html[style*="color-scheme: light"] .modal-drawer-content {
+  background: rgba(255,255,255,0.97);
+  border-top-color: rgba(0,0,0,0.1);
+}
+html[style*="color-scheme: light"] .modal-drawer-header h3,
+html[style*="color-scheme: light"] .banking-identity-value {
+  color: var(--text);
+}
+html[style*="color-scheme: light"] .banking-identity-label {
+  color: var(--muted);
+}
+html[style*="color-scheme: light"] .banking-identity-card {
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.08);
+}
+
+/* Card hero stays dark — it's a physical card */
+
+/* Toast */
+html[style*="color-scheme: light"] .toast {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+}

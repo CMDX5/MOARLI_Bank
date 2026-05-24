@@ -16,8 +16,9 @@ interface NotificationsPanelProps {
   onPin?: (id: string) => void;
 }
 
-const SWIPE_THRESHOLD = 40;
+const SWIPE_THRESHOLD = 25;
 const MAX_SWIPE = 88;
+const VELOCITY_THRESHOLD = 0.35; // px/ms — fast flick triggers reveal
 
 export default function NotificationsPanel({
   notifications,
@@ -32,33 +33,61 @@ export default function NotificationsPanel({
 }: NotificationsPanelProps) {
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set());
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
-  const swipeRefs = useRef<Map<string, { startX: number; currentX: number; isSwiping: boolean }>>(new Map());
+  const swipeRefs = useRef<Map<string, {
+    startX: number;
+    startY: number;
+    currentX: number;
+    startTime: number;
+    isSwiping: boolean;
+    direction: 'none' | 'horizontal' | 'vertical';
+  }>>(new Map());
 
   const handleTouchStart = useCallback((id: string, e: React.TouchEvent) => {
-    const swipeState = swipeRefs.current.get(id);
-    if (swipeState) {
-      swipeState.startX = e.touches[0].clientX;
-      swipeState.currentX = e.touches[0].clientX;
-      swipeState.isSwiping = true;
-    } else {
-      swipeRefs.current.set(id, {
-        startX: e.touches[0].clientX,
-        currentX: e.touches[0].clientX,
-        isSwiping: true,
-      });
-    }
+    const touch = e.touches[0];
+    swipeRefs.current.set(id, {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      currentX: touch.clientX,
+      startTime: Date.now(),
+      isSwiping: true,
+      direction: 'none',
+    });
   }, []);
 
   const handleTouchMove = useCallback((id: string, e: React.TouchEvent) => {
     const swipeState = swipeRefs.current.get(id);
     if (!swipeState || !swipeState.isSwiping) return;
-    swipeState.currentX = e.touches[0].clientX;
-    const diff = swipeState.startX - swipeState.currentX;
-    const clamped = Math.min(Math.max(diff, 0), MAX_SWIPE);
+
+    const touch = e.touches[0];
+    const dx = swipeState.startX - touch.clientX;
+    const dy = touchState => Math.abs(touch.clientY - swipeState.startY);
+
+    // Lock direction after 8px of movement
+    if (swipeState.direction === 'none') {
+      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+        swipeState.direction = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
+      }
+      return;
+    }
+
+    // Only handle horizontal swipes (left direction only)
+    if (swipeState.direction === 'vertical') return;
+    if (dx < 0) return; // only left swipe
+
+    swipeState.currentX = touch.clientX;
+    const clamped = Math.min(dx, MAX_SWIPE);
+
     const el = document.getElementById(`notif-swipe-${id}`);
+    const wrap = el?.parentElement;
     if (el) {
       el.style.transform = `translateX(-${clamped}px)`;
       el.style.transition = 'none';
+      // Progressive action reveal: actions opacity follows swipe progress
+      const progress = clamped / MAX_SWIPE;
+      const actions = wrap?.querySelector('.notif-swipe-actions') as HTMLElement;
+      if (actions) {
+        actions.style.opacity = String(Math.min(progress * 2, 1));
+      }
     }
   }, []);
 
@@ -66,18 +95,28 @@ export default function NotificationsPanel({
     const swipeState = swipeRefs.current.get(id);
     if (!swipeState || !swipeState.isSwiping) return;
     swipeState.isSwiping = false;
+
     const diff = swipeState.startX - swipeState.currentX;
+    const elapsed = Date.now() - swipeState.startTime;
+    const velocity = diff / (elapsed || 1); // px/ms
+
+    const shouldReveal = diff > SWIPE_THRESHOLD || (diff > 10 && velocity > VELOCITY_THRESHOLD);
+
     const el = document.getElementById(`notif-swipe-${id}`);
     const wrap = el?.parentElement;
     if (el) {
-      if (diff > SWIPE_THRESHOLD) {
-        el.style.transition = 'transform .25s cubic-bezier(.4,0,.2,1)';
+      if (shouldReveal) {
+        el.style.transition = 'transform .28s cubic-bezier(.32,.72,.27,1.01)';
         el.style.transform = `translateX(-${MAX_SWIPE}px)`;
         wrap?.classList.add('revealed');
+        const actions = wrap?.querySelector('.notif-swipe-actions') as HTMLElement;
+        if (actions) actions.style.opacity = '1';
       } else {
-        el.style.transition = 'transform .25s cubic-bezier(.4,0,.2,1)';
+        el.style.transition = 'transform .3s cubic-bezier(.32,.72,.27,1)';
         el.style.transform = 'translateX(0)';
         wrap?.classList.remove('revealed');
+        const actions = wrap?.querySelector('.notif-swipe-actions') as HTMLElement;
+        if (actions) actions.style.opacity = '0';
       }
     }
   }, []);
@@ -108,9 +147,11 @@ export default function NotificationsPanel({
     const el = document.getElementById(`notif-swipe-${id}`);
     const wrap = el?.parentElement;
     if (el) {
-      el.style.transition = 'transform .25s cubic-bezier(.4,0,.2,1)';
+      el.style.transition = 'transform .3s cubic-bezier(.32,.72,.27,1)';
       el.style.transform = 'translateX(0)';
       wrap?.classList.remove('revealed');
+      const actions = wrap?.querySelector('.notif-swipe-actions') as HTMLElement;
+      if (actions) actions.style.opacity = '0';
     }
   };
 

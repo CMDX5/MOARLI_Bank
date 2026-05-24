@@ -4679,7 +4679,7 @@ function App() {
 
                     <button className="finance-card blue" onClick={openBudget}>
                       <div className="finance-card-icon blue">
-                        <AppIcon name="chart-bar" size={22} stroke="#60a5fa" />
+                        <AppIcon name="chart" size={22} stroke="#60a5fa" />
                       </div>
                       <div className="finance-card-title">Budget</div>
                       <div className="finance-card-sub blue">Suivi mensuel</div>

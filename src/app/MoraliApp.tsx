@@ -70,6 +70,7 @@ import QrScanner from "@/components/bank/QrScanner";
 import CardsView from "@/components/bank/CardsView";
 import TransactionsView from "@/components/bank/TransactionsView";
 import TransferView from "@/components/bank/TransferView";
+import RequestMoneyView from "@/components/bank/RequestMoneyView";
 import LegalTerms from "@/components/bank/LegalTerms";
 import PrivacyPolicy from "@/components/bank/PrivacyPolicy";
 import AdminDashboard, { type AdminDashboardHandle, type AdminDashboardProps } from "@/components/bank/AdminDashboard";
@@ -539,6 +540,7 @@ function App() {
   const [verifiedMoraliUser, setVerifiedMoraliUser] = useState<MoraliUser | null>(null);
   const [paymentContacts, setPaymentContacts] = useState<PaymentContact[]>(initialPaymentContacts);
   const [requestQrOpen, setRequestQrOpen] = useState(false);
+  const [requestMoneyOpen, setRequestMoneyOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const transferInitialQueryRef = useRef<string | undefined>(undefined);
 
@@ -746,6 +748,8 @@ function App() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [liveTransactions, setLiveTransactions] = useState<Transaction[]>([]);
   const [firestoreBalance, setFirestoreBalance] = useState<number | null>(null);
+  const [pendingMoneyRequests, setPendingMoneyRequests] = useState<{ id: string; senderName: string; senderMoraliId: string; amount: number; message?: string; createdAt?: unknown; isIncoming?: boolean }[]>([]);
+  const [payingRequestId, setPayingRequestId] = useState<string | null>(null);
 
   // Tick every 30s to refresh relative timestamps
   useEffect(() => {
@@ -848,13 +852,14 @@ function App() {
         if (cardPinOpen) { closePinModal(); return; }
         if (infoDrawerOpen) { setInfoDrawerOpen(false); return; }
         if (transferOpen) { setTransferOpen(false); return; }
+        if (requestMoneyOpen) { setRequestMoneyOpen(false); return; }
         const serviceScreens: Screen[] = ["credit", "internet", "canalplus", "electricity", "water", "crypto", "tontine", "merchant", "microcredit", "personalloan", "loans", "currency", "savings", "wallet"];
         if (serviceScreens.includes(screen)) { setScreen("dashboard"); return; }
       }
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [blackCardOpen, cameraScannerOpen, securityModalOpen, privacyModalOpen, contactModalOpen, historyModalOpen, receiptsOpen, supportOpen, termsOpen, virtualCardOpen, cardLimitsOpen, cardManageOpen, cardPinOpen, infoDrawerOpen, transferOpen, screen]);
+  }, [blackCardOpen, cameraScannerOpen, securityModalOpen, privacyModalOpen, contactModalOpen, historyModalOpen, receiptsOpen, supportOpen, termsOpen, virtualCardOpen, cardLimitsOpen, cardManageOpen, cardPinOpen, infoDrawerOpen, transferOpen, requestMoneyOpen, screen]);
 
   useEffect(() => {
     getRedirectResult(firebaseAuth).catch((err: unknown) => {
@@ -1146,6 +1151,72 @@ function App() {
       unsubSupport();
     };
   }, [authUid]);
+
+  // Fetch pending money requests for current user
+  useEffect(() => {
+    if (!authUid) return;
+    const fetchPendingRequests = async () => {
+      try {
+        const res = await fetch(`/api/money-request?uid=${authUid}`, {
+          headers: await getAuthHeaders(),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && (data.incoming || data.outgoing)) {
+            const incoming = (data.incoming || []).filter((r: { status: string }) => r.status === "pending").map((r: Record<string, unknown>) => ({ ...r, isIncoming: true }));
+            const outgoing = (data.outgoing || []).filter((r: { status: string }) => r.status === "pending").map((r: Record<string, unknown>) => ({ ...r, isIncoming: false }));
+            setPendingMoneyRequests([...incoming, ...outgoing]);
+          }
+        }
+      } catch {
+        // silent
+      }
+    };
+    fetchPendingRequests();
+    const interval = setInterval(fetchPendingRequests, 15000);
+    return () => clearInterval(interval);
+  }, [authUid]);
+
+  const payMoneyRequest = async (requestId: string) => {
+    setPayingRequestId(requestId);
+    try {
+      const res = await fetch("/api/money-request", {
+        method: "POST",
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ action: "pay", requestId, senderUid: authUid }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.success) {
+        showToast("Paiement envoyé avec succès");
+        setPendingMoneyRequests((prev) => prev.filter((r) => r.id !== requestId));
+      } else {
+        showToast(data.error || "Erreur lors du paiement");
+      }
+    } catch {
+      showToast("Erreur de connexion");
+    } finally {
+      setPayingRequestId(null);
+    }
+  };
+
+  const cancelMoneyRequest = async (requestId: string) => {
+    try {
+      const res = await fetch("/api/money-request", {
+        method: "POST",
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ action: "cancel", requestId, senderUid: authUid }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.success) {
+        showToast("Demande annulée");
+        setPendingMoneyRequests((prev) => prev.filter((r) => r.id !== requestId));
+      } else {
+        showToast(data.error || "Erreur");
+      }
+    } catch {
+      showToast("Erreur de connexion");
+    }
+  };
 
   // Process pending transfer credits — polls every 3 seconds while logged in
   useEffect(() => {
@@ -2039,6 +2110,10 @@ function App() {
   };
 
   // ── openTransferModal: simplified — TransferView handles internal reset ──
+  const openRequestMoney = () => {
+    setRequestMoneyOpen(true);
+  };
+
   const openTransferModal = () => {
     transferInitialQueryRef.current = undefined;
     setTransferOpen(true);
@@ -6380,6 +6455,20 @@ function App() {
                   initialRecipientQuery={transferInitialQueryRef.current}
                 />
 
+                {/* ── Request Money modal ── */}
+                <RequestMoneyView
+                  open={requestMoneyOpen}
+                  onClose={() => setRequestMoneyOpen(false)}
+                  authUid={authUid || ""}
+                  dashboardName={dashboardName}
+                  bankingIdentity={bankingIdentity}
+                  balance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
+                  showToast={showToast}
+                  getAuthHeaders={getAuthHeaders}
+                  findMoraliUser={findMoraliUser}
+                  createRealtimeNotification={createRealtimeNotification}
+                />
+
                 <div className="tab-grid-two">
                   <button className="service-card virement" onClick={openTransferModal}>
                     <div className="service-icon-box">
@@ -6390,18 +6479,105 @@ function App() {
                       <p className="tab-card-sub">Vers banque ou mobile</p>
                     </div>
                   </button>
-                  <button className="service-card demander" onClick={openRequestQr}>
+                  <button className="service-card demander" onClick={openRequestMoney}>
                     <div className="service-icon-box">
                       <AppIcon name="request" size={18} stroke="#4ade80" />
                     </div>
                     <div>
                       <p className="tab-card-title">Demander</p>
-                      <p className="tab-card-sub">Lien de paiement QR</p>
+                      <p className="tab-card-sub">Demander de l'argent</p>
                     </div>
                   </button>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  {/* ── Pending Money Requests ── */}
+                  {pendingMoneyRequests.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 2px" }}>
+                        <p className="tab-kicker" style={{ color: "#fbbf24" }}>💸 Demandes d'argent</p>
+                        <span style={{ fontSize: 10, color: "#fbbf24", fontWeight: 800 }}>{pendingMoneyRequests.length} en attente</span>
+                      </div>
+                      {pendingMoneyRequests.map((req) => (
+                        <div key={req.id} style={{
+                          padding: "14px 16px", borderRadius: 18,
+                          background: req.isIncoming
+                            ? "linear-gradient(135deg, rgba(251,191,36,0.08), rgba(212,164,55,0.04))"
+                            : "linear-gradient(135deg, rgba(59,130,246,0.06), rgba(59,130,246,0.02))",
+                          border: req.isIncoming
+                            ? "1px solid rgba(251,191,36,0.2)"
+                            : "1px solid rgba(59,130,246,0.15)",
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 2 }}>
+                                {req.isIncoming ? req.senderName : "Envoyée"}
+                              </div>
+                              <div style={{ fontSize: 11, color: "var(--dim)" }}>
+                                {req.isIncoming ? "vous demande" : "votre demande en attente"}
+                              </div>
+                            </div>
+                            <div style={{ fontSize: 18, fontWeight: 900, color: req.isIncoming ? "#fbbf24" : "#60a5fa", fontFamily: "'Montserrat',sans-serif" }}>
+                              {formatCurrency(req.amount)} <span style={{ fontSize: 11, fontWeight: 600 }}>FCFA</span>
+                            </div>
+                          </div>
+                          {req.message && (
+                            <div style={{ fontSize: 11, color: "var(--muted)", fontStyle: "italic", marginBottom: 10, lineHeight: 1.4 }}>
+                              &ldquo;{req.message}&rdquo;
+                            </div>
+                          )}
+                          {req.isIncoming ? (
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <button
+                                disabled={payingRequestId === req.id}
+                                onClick={() => payMoneyRequest(req.id)}
+                                style={{
+                                  flex: 1, height: 40, borderRadius: 12, border: "none",
+                                  background: payingRequestId === req.id ? "rgba(255,255,255,0.1)" : "linear-gradient(135deg, #22c55e, #16a34a)",
+                                  color: "#fff", fontSize: 13, fontWeight: 800,
+                                  fontFamily: "'Montserrat',sans-serif", cursor: payingRequestId === req.id ? "not-allowed" : "pointer",
+                                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                                  opacity: payingRequestId === req.id ? 0.6 : 1,
+                                }}
+                              >
+                                {payingRequestId === req.id ? (
+                                  <><span className="transfer-search-spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> Paiement...</>
+                                ) : (
+                                  <><AppIcon name="send" size={14} stroke="#fff" /> Payer</>
+                                )}
+                              </button>
+                              <button
+                                onClick={() => cancelMoneyRequest(req.id)}
+                                style={{
+                                  width: 40, height: 40, borderRadius: 12,
+                                  border: "1px solid rgba(255,255,255,0.1)",
+                                  background: "rgba(255,255,255,0.04)",
+                                  color: "var(--dim)", fontSize: 16, cursor: "pointer",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                }}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => cancelMoneyRequest(req.id)}
+                              style={{
+                                height: 36, borderRadius: 10, border: "1px solid rgba(239,68,68,0.25)",
+                                background: "rgba(239,68,68,0.06)",
+                                color: "#f87171", fontSize: 12, fontWeight: 700,
+                                fontFamily: "'Montserrat',sans-serif", cursor: "pointer",
+                                display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+                              }}
+                            >
+                              Annuler la demande
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 2px" }}>
                     <p className="tab-kicker" style={{ color: "var(--gold)" }}>Activité récente</p>
                     <span style={{ fontSize: 10, color: "#3b82f6", fontWeight: 800, cursor: "pointer" }} onClick={() => { setScreen("dashboard"); setNavActive("Accueil"); setNotificationsOpen(true); }}>Voir tout →</span>

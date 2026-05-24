@@ -1862,17 +1862,16 @@ const handleAdminRejectLoan = async (loan: { id: string; senderUid: string; send
                   </div>
 
                   {/* ── Revenus Bancaires ── */}
-                  {bankRevenue && (
-                    <div className="admin-section">
-                      <div className="admin-section-header">
-                        <div className="admin-section-title">Revenus Bancaires</div>
-                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                          <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>Aujourd'hui</span>
-                          <span style={{ fontSize: 14, fontWeight: 800, color: "#22c55e" }}>{formatCurrency(bankRevenue.todayTotal)} F</span>
-                          <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, marginLeft: 8 }}>Total</span>
-                          <span style={{ fontSize: 14, fontWeight: 800, color: "#60a5fa" }}>{formatCurrency(bankRevenue.allTimeTotal)} F</span>
-                        </div>
+                  <div className="admin-section">
+                    <div className="admin-section-header">
+                      <div className="admin-section-title">💰 Revenus Bancaires</div>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>Aujourd'hui</span>
+                        <span style={{ fontSize: 14, fontWeight: 800, color: "#22c55e" }}>{formatCurrency(bankRevenue?.todayTotal || 0)} F</span>
+                        <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, marginLeft: 8 }}>Total</span>
+                        <span style={{ fontSize: 14, fontWeight: 800, color: "#60a5fa" }}>{formatCurrency(bankRevenue?.allTimeTotal || 0)} F</span>
                       </div>
+                    </div>
 
                       {/* Period selector */}
                       <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
@@ -1901,7 +1900,7 @@ const handleAdminRejectLoan = async (loan: { id: string; senderUid: string; send
                           </button>
                         ))}
                         <span style={{ marginLeft: "auto", fontSize: 13, fontWeight: 800, color: "#D4A437" }}>
-                          Période: {formatCurrency(bankRevenue.total)} F
+                          Période: {formatCurrency(bankRevenue?.total || 0)} F
                         </span>
                       </div>
 
@@ -1925,8 +1924,9 @@ const handleAdminRejectLoan = async (loan: { id: string; senderUid: string; send
                       </div>
 
                       {/* Revenue breakdown cards */}
+                      {(bankRevenue?.breakdown || []).length > 0 ? (
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8, marginBottom: 16 }}>
-                        {bankRevenue.breakdown.map((item) => (
+                        {(bankRevenue?.breakdown || []).map((item) => (
                           <div key={item.type} style={{
                             background: "rgba(255,255,255,.04)", borderRadius: 12, padding: "10px 12px",
                             border: "1px solid rgba(255,255,255,.08)",
@@ -1947,13 +1947,18 @@ const handleAdminRejectLoan = async (loan: { id: string; senderUid: string; send
                           </div>
                         ))}
                       </div>
-                      {bankRevenue.recent.length > 0 && (
+                      ) : (
+                        <div style={{ textAlign: "center", padding: 20, color: "#64748b", fontSize: 13 }}>
+                          Aucun revenu enregistré pour cette période.
+                        </div>
+                      )}
+                      {(bankRevenue?.recent || []).length > 0 && (
                         <div className="admin-table-wrap">
                           <div className="admin-table-scroll">
                             <table className="admin-table">
                               <thead><tr><th>Date</th><th>Type</th><th>Montant</th><th>Utilisateur</th><th>Description</th></tr></thead>
                               <tbody>
-                                {bankRevenue.recent.slice(0, 12).map((entry) => (
+                                {(bankRevenue?.recent || []).slice(0, 12).map((entry) => (
                                   <tr key={entry.id}>
                                     <td style={{ color: "#94a3b8", fontSize: 12 }}>{entry.createdAt}</td>
                                     <td><span className="admin-badge" style={{ background: "rgba(34,197,94,.15)", color: "#22c55e" }}>{entry.type}</span></td>
@@ -1968,7 +1973,6 @@ const handleAdminRejectLoan = async (loan: { id: string; senderUid: string; send
                         </div>
                       )}
                     </div>
-                  )}
 
                   <div className="admin-section">
                     <div className="admin-section-header">

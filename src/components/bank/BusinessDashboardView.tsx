@@ -63,7 +63,6 @@ export default function BusinessDashboardView({ authUid, firestoreBalance, onBac
   const [stats, setStats] = useState<BusinessStats>(DEFAULT_STATS);
   const [loading, setLoading] = useState(true);
   const [chartPeriod, setChartPeriod] = useState<'daily' | 'weekly'>('daily');
-  const [activeQuickAction, setActiveQuickAction] = useState<string | null>(null);
 
   // Real-time stats listener
   useEffect(() => {
@@ -117,17 +116,8 @@ export default function BusinessDashboardView({ authUid, firestoreBalance, onBac
 
   const maxRevenue = Math.max(...chartData.map((d) => d.revenue), 1);
 
-  const handleQuickAction = useCallback((action: string) => {
-    setActiveQuickAction(action);
-    showToast(`${action} — fonctionnalité bientôt disponible`);
-    setTimeout(() => setActiveQuickAction(null), 1500);
-  }, [showToast]);
-
   const handleExportReport = useCallback(() => {
-    showToast('Rapport PDF en cours de génération...');
-    setTimeout(() => {
-      showToast('Rapport exporté avec succès ✓');
-    }, 2000);
+    showToast('Export disponible prochainement');
   }, [showToast]);
 
   const topCategories = stats.topProducts.length > 0
@@ -214,14 +204,7 @@ export default function BusinessDashboardView({ authUid, firestoreBalance, onBac
             <div style={{ fontSize: 34, fontWeight: 900, fontFamily: 'Montserrat, sans-serif', color: '#fff', letterSpacing: -1, marginBottom: 4, position: 'relative' }}>
               {formatCurrency(stats.totalRevenue || 375000)} <span style={{ fontSize: 16, fontWeight: 700, color: '#60a5fa' }}>FCFA</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round">
-                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
-                <polyline points="17 6 23 6 23 12" />
-              </svg>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#22c55e' }}>+12.5%</span>
-              <span style={{ fontSize: 11, color: '#64748b' }}>vs mois dernier</span>
-            </div>
+
           </div>
 
           {/* Analytics Grid */}
@@ -346,39 +329,6 @@ export default function BusinessDashboardView({ authUid, firestoreBalance, onBac
             </div>
           </div>
 
-          {/* Quick Actions */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 12 }}>
-              Actions rapides
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {[
-                { icon: '🔗', label: 'Créer un lien de paiement', color: '#3b82f6' },
-                { icon: '📊', label: 'Voir les statistiques', color: '#22c55e' },
-                { icon: '💰', label: 'Gérer les retraits', color: '#D4A437' },
-              ].map((action) => (
-                <button
-                  key={action.label}
-                  onClick={() => handleQuickAction(action.label)}
-                  style={{
-                    width: '100%', padding: '14px 16px', borderRadius: 16, border: 'none',
-                    background: `${action.color}10`,
-                    borderLeft: `3px solid ${action.color}`,
-                    color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
-                    transition: 'all 0.2s', opacity: activeQuickAction === action.label ? 0.6 : 1,
-                  }}
-                >
-                  <span style={{ fontSize: 18 }}>{action.icon}</span>
-                  <span style={{ flex: 1 }}>{action.label}</span>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2.5" strokeLinecap="round">
-                    <path d="m9 6 6 6-6 6" />
-                  </svg>
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Customer Count */}
           <div style={{
             padding: 18, borderRadius: 20, marginBottom: 20,
@@ -402,9 +352,7 @@ export default function BusinessDashboardView({ authUid, firestoreBalance, onBac
                   {stats.customerCount || 37}
                 </div>
               </div>
-              <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#22c55e' }}>+8 ce mois</div>
-              </div>
+
             </div>
           </div>
 

@@ -185,10 +185,10 @@ const profileGroups = [
     title: "Mon Compte",
     items: [
       { icon: "user" as IconName, label: "Informations Personnelles" },
-      { icon: "shield" as IconName, label: "Sécurité & Biométrie", badge: "Activé" },
+      { icon: "shield" as IconName, label: "Sécurité & Biométrie" },
       { icon: "eye-off" as IconName, label: "Confidentialité" },
       { icon: "receipt" as IconName, label: "Historique des Reçus" },
-      { icon: "headset" as IconName, label: "Support Client", sub: "Réponse en 5min" },
+      { icon: "headset" as IconName, label: "Support Client", sub: "Assistance instantanée" },
     ],
   },
   {
@@ -528,6 +528,7 @@ function App() {
   const [tontineName, setTontineName] = useState("");
   const [tontineContributionAmount, setTontineContributionAmount] = useState("");
   const [tontineNewMemberName, setTontineNewMemberName] = useState("");
+  // Indicative USDT/XAF rate — not fetched from a live API (crypto pairs unsupported by frankfurter.app)
   const [cryptoRate, setCryptoRate] = useState(650);
   const [merchantAmount, setMerchantAmount] = useState("");
   const [servicesQuery, setServicesQuery] = useState("");
@@ -691,16 +692,10 @@ function App() {
   // Dynamic security level for profile badge
   const secLevelCount = Object.values(securitySettings).filter(Boolean).length;
   const [privacySettings, setPrivacySettings] = useState({
-    profileVisible: false,
     activityMasking: false,
-    analyticsConsent: false,
-    marketingConsent: false,
   });
   const [savedPrivacySettings, setSavedPrivacySettings] = useState({
-    profileVisible: false,
     activityMasking: false,
-    analyticsConsent: false,
-    marketingConsent: false,
   });
   const [privacySaveState, setPrivacySaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [privacyAccessLogOpen, setPrivacyAccessLogOpen] = useState(false);
@@ -1429,10 +1424,8 @@ function App() {
         if (privSnap.exists()) {
           const d = privSnap.data();
           setPrivacySettings((prev) => ({
-            profileVisible: d.profileVisible !== undefined ? d.profileVisible : prev.profileVisible,
+            ...prev,
             activityMasking: d.activityMasking !== undefined ? d.activityMasking : prev.activityMasking,
-            analyticsConsent: d.analyticsConsent !== undefined ? d.analyticsConsent : prev.analyticsConsent,
-            marketingConsent: d.marketingConsent !== undefined ? d.marketingConsent : prev.marketingConsent,
           }));
           setSavedPrivacySettings(privacySettings);
         }
@@ -6221,7 +6214,7 @@ function App() {
                     <div className="exchange-box receive">
                       <div className="exchange-kicker">
                         <span>Vous recevez</span>
-                        <span>Taux: 1 USDT = {cryptoRate} F</span>
+                        <span>Taux indicatif: 1 USDT ≈ {cryptoRate} F</span>
                       </div>
                       <div className="exchange-row">
                         <div style={{ fontSize: 30, fontWeight: 800, fontFamily: "Montserrat, sans-serif" }}>{cryptoUsdtValue}</div>
@@ -6491,16 +6484,16 @@ function App() {
                   <div className="priv-section-label">En chiffres</div>
                   <div className="priv-stats-row">
                     <div className="priv-stat-card">
-                      <div className="priv-stat-value">5M+</div>
-                      <div className="priv-stat-label">Plafond mensuel</div>
+                      <div className="priv-stat-value">★</div>
+                      <div className="priv-stat-label">Programme exclusif</div>
                     </div>
                     <div className="priv-stat-card">
-                      <div className="priv-stat-value">3.5%</div>
-                      <div className="priv-stat-label">Cashback premium</div>
+                      <div className="priv-stat-value">24h</div>
+                      <div className="priv-stat-label">Support prioritaire</div>
                     </div>
                     <div className="priv-stat-card">
-                      <div className="priv-stat-value">24/7</div>
-                      <div className="priv-stat-label">Conciergerie dédiée</div>
+                      <div className="priv-stat-value">%</div>
+                      <div className="priv-stat-label">Offres partenaires</div>
                     </div>
                   </div>
 
@@ -7245,23 +7238,9 @@ function App() {
               </div>
 
               <div className="pin-display" style={{ background: "linear-gradient(145deg,rgba(59,130,246,.06),rgba(10,14,23,.18))", borderColor: "rgba(59,130,246,.12)" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 14, textAlign: "left" }}>
-                  <div style={{ padding: "12px 14px", borderRadius: 16, background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)" }}>
-                    <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: ".16em", textTransform: "uppercase", color: "#64748b", marginBottom: 6 }}>Virement / transaction</div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: "#fff" }}>500 000 FCFA</div>
-                  </div>
-                  <div style={{ padding: "12px 14px", borderRadius: 16, background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)" }}>
-                    <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: ".16em", textTransform: "uppercase", color: "#64748b", marginBottom: 6 }}>Paiement marchand</div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: "#fff" }}>1 000 000 FCFA</div>
-                  </div>
-                  <div style={{ padding: "12px 14px", borderRadius: 16, background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)" }}>
-                    <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: ".16em", textTransform: "uppercase", color: "#64748b", marginBottom: 6 }}>Quotidien conseillé</div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: "#fff" }}>1 500 000 FCFA</div>
-                  </div>
-                  <div style={{ padding: "12px 14px", borderRadius: 16, background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.06)" }}>
-                    <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: ".16em", textTransform: "uppercase", color: "#64748b", marginBottom: 6 }}>Solde maximum</div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: "#fff" }}>5 000 000 FCFA</div>
-                  </div>
+                <div style={{ padding: "20px 16px", textAlign: "center" }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "#fff", marginBottom: 8 }}>Limites variables selon le forfait</div>
+                  <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.6 }}>Les plafonds appliqués dépendent de votre opérateur Mobile Money et de votre niveau KYC. Consultez la section ci-dessous pour les références observées.</div>
                 </div>
               </div>
 
@@ -7975,31 +7954,10 @@ function App() {
               <div className="security-modal-grid">
                 <div className="security-feature">
                   <div>
-                    <div className="security-feature-title">Profil visible aux autres clients</div>
-                    <div className="security-feature-copy">Autoriser la découverte de votre pseudo Morali lors d’une recherche de virement.</div>
-                  </div>
-                  <div className={`mini-switch ${privacySettings.profileVisible ? "active" : ""}`} role="switch" aria-checked={privacySettings.profileVisible} tabIndex={0} onClick={() => setPrivacySettings((current) => ({ ...current, profileVisible: !current.profileVisible }))} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setPrivacySettings((current) => ({ ...current, profileVisible: !current.profileVisible })); } }} />
-                </div>
-                <div className="security-feature">
-                  <div>
                     <div className="security-feature-title">Masquage des activités sensibles</div>
                     <div className="security-feature-copy">Masquer automatiquement les montants sur les aperçus et reçus rapides.</div>
                   </div>
                   <div className={`mini-switch ${privacySettings.activityMasking ? "active" : ""}`} role="switch" aria-checked={privacySettings.activityMasking} tabIndex={0} onClick={() => setPrivacySettings((current) => ({ ...current, activityMasking: !current.activityMasking }))} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setPrivacySettings((current) => ({ ...current, activityMasking: !current.activityMasking })); } }} />
-                </div>
-                <div className="security-feature">
-                  <div>
-                    <div className="security-feature-title">Analyses d’usage</div>
-                    <div className="security-feature-copy">Partager des données anonymisées pour améliorer l’expérience Morali Pay.</div>
-                  </div>
-                  <div className={`mini-switch ${privacySettings.analyticsConsent ? "active" : ""}`} role="switch" aria-checked={privacySettings.analyticsConsent} tabIndex={0} onClick={() => setPrivacySettings((current) => ({ ...current, analyticsConsent: !current.analyticsConsent }))} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setPrivacySettings((current) => ({ ...current, analyticsConsent: !current.analyticsConsent })); } }} />
-                </div>
-                <div className="security-feature">
-                  <div>
-                    <div className="security-feature-title">Communications marketing</div>
-                    <div className="security-feature-copy">Recevoir des offres, nouveautés et invitations premium de Morali Pay.</div>
-                  </div>
-                  <div className={`mini-switch ${privacySettings.marketingConsent ? "active" : ""}`} role="switch" aria-checked={privacySettings.marketingConsent} tabIndex={0} onClick={() => setPrivacySettings((current) => ({ ...current, marketingConsent: !current.marketingConsent }))} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setPrivacySettings((current) => ({ ...current, marketingConsent: !current.marketingConsent })); } }} />
                 </div>
               </div>
 

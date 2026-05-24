@@ -4644,35 +4644,53 @@ function App() {
                     <span className="services-premium-badge">PREMIUM</span>
                   </div>
 
-                  <div className="finance-grid">
-                    <button className="finance-card emerald" onClick={openSavings}>
-                      <div className="finance-card-title">Épargne</div>
-                      <div className="finance-card-sub emerald">Taux annuel +4.5%</div>
+                  <div className="services-grid">
+                    <button className="service-tile" onClick={openSavings}>
+                      <div className="service-icon-box">
+                        <AppIcon name="piggy" size={20} stroke="#34d399" />
+                      </div>
+                      <div className="service-name">Épargne</div>
+                      <div className="service-desc">Taux annuel +4.5%</div>
                     </button>
 
-                    <button className="finance-card amber" onClick={() => { setScreen("loans"); setNavActive("Accueil"); }}>
-                      <div className="finance-card-title">Prêt</div>
-                      <div className="finance-card-sub amber">Personnel & rapide</div>
+                    <button className="service-tile" onClick={() => { setScreen("loans"); setNavActive("Accueil"); }}>
+                      <div className="service-icon-box">
+                        <AppIcon name="bank" size={20} stroke="#fbbf24" />
+                      </div>
+                      <div className="service-name">Prêt</div>
+                      <div className="service-desc">Personnel & rapide</div>
                     </button>
 
-                    <button className="finance-card blue" onClick={openWallet}>
-                      <div className="finance-card-title">Portefeuilles</div>
-                      <div className="finance-card-sub blue">EUR / USD</div>
+                    <button className="service-tile" onClick={openWallet}>
+                      <div className="service-icon-box">
+                        <AppIcon name="wallet" size={20} stroke="#60a5fa" />
+                      </div>
+                      <div className="service-name">Portefeuilles</div>
+                      <div className="service-desc">EUR / USD</div>
                     </button>
 
-                    <button className="finance-card rose" onClick={openTontine}>
-                      <div className="finance-card-title">Tontine</div>
-                      <div className="finance-card-sub rose">Collectif sécurisé</div>
+                    <button className="service-tile" onClick={openTontine}>
+                      <div className="service-icon-box">
+                        <AppIcon name="users" size={20} stroke="#fb7185" />
+                      </div>
+                      <div className="service-name">Tontine</div>
+                      <div className="service-desc">Collectif sécurisé</div>
                     </button>
 
-                    <button className="finance-card blue" onClick={openBudget}>
-                      <div className="finance-card-title">Budget</div>
-                      <div className="finance-card-sub blue">Suivi mensuel</div>
+                    <button className="service-tile" onClick={openBudget}>
+                      <div className="service-icon-box">
+                        <AppIcon name="receipt" size={20} stroke="#60a5fa" />
+                      </div>
+                      <div className="service-name">Budget</div>
+                      <div className="service-desc">Suivi mensuel</div>
                     </button>
 
-                    <button className="finance-card rose" onClick={openLeaderboard}>
-                      <div className="finance-card-title">Classement</div>
-                      <div className="finance-card-sub rose">Badges & défis</div>
+                    <button className="service-tile" onClick={openLeaderboard}>
+                      <div className="service-icon-box">
+                        <AppIcon name="spark" size={20} stroke="#fb7185" />
+                      </div>
+                      <div className="service-name">Classement</div>
+                      <div className="service-desc">Badges & défis</div>
                     </button>
                   </div>
                 </section>

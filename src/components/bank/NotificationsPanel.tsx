@@ -288,7 +288,7 @@ export default function NotificationsPanel({
             {filteredNotifications.length > 0 && (
               <>
                 {filteredTransactions.length > 0 && (
-                  <div style={{ padding: "12px 4px 8px", fontSize: 10, fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase", color: "#64748b" }}>
+                  <div style={{ padding: "12px 4px 8px", fontSize: 10, fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase", color: "#D4A437" }}>
                     Messages
                   </div>
                 )}

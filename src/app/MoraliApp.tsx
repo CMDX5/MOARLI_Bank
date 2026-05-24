@@ -213,6 +213,9 @@ const myServices: SearchServiceItem[] = [
   { id: "savings", name: "Épargne", category: "Finance", icon: "piggy" },
   { id: "utility-elec", name: "Électricité", category: "Quotidien", icon: "bolt" },
   { id: "utility-water", name: "Eau", category: "Quotidien", icon: "droplet" },
+  { id: "budget", name: "Budget", category: "Finance", icon: "receipt" },
+  { id: "classement", name: "Classement", category: "Finance", icon: "spark" },
+  { id: "currency", name: "Change Devise", category: "Finance", icon: "swap" },
 ];
 
 const myContacts: SearchContactItem[] = [];
@@ -4133,6 +4136,14 @@ function App() {
       openWallet();
       return;
     }
+    if (id === "budget") {
+      openBudget();
+      return;
+    }
+    if (id === "classement") {
+      openLeaderboard();
+      return;
+    }
   };
 
   const openSavings = () => {
@@ -4541,7 +4552,7 @@ function App() {
                     </span>
                     <input
                       type="text"
-                      placeholder="Rechercher un service ou marchand..."
+                      placeholder="Rechercher un service ou finance..."
                       value={servicesQuery}
                       onFocus={() => setServicesFocused(true)}
                       onBlur={() => window.setTimeout(() => setServicesFocused(false), 180)}
@@ -4559,25 +4570,35 @@ function App() {
                     )}
 
                     {servicesFocused && servicesQuery.trim().length > 0 && (
-                      <div style={{ position: "absolute", top: 64, left: 0, width: "100%", background: "rgba(22,28,44,.95)", backdropFilter: "blur(24px)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 28, boxShadow: "0 24px 48px rgba(0,0,0,.35)", overflow: "hidden" }}>
+                      <div style={{ position: "absolute", top: 64, left: 0, width: "100%", background: "rgba(22,28,44,.95)", backdropFilter: "blur(24px)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 28, boxShadow: "0 24px 48px rgba(0,0,0,.35)", overflow: "hidden", maxHeight: "60vh", overflowY: "auto", scrollbarWidth: "none" }}>
                         {filteredServices.length > 0 && (
                           <div style={{ padding: 16, borderBottom: filteredContacts.length ? "1px solid rgba(255,255,255,.05)" : "none" }}>
-                            <p style={{ fontSize: 10, color: "#64748b", fontWeight: 900, textTransform: "uppercase", letterSpacing: ".18em", marginBottom: 10, padding: "0 8px" }}>Services & Actions</p>
+                            <p style={{ fontSize: 10, color: "#64748b", fontWeight: 900, textTransform: "uppercase", letterSpacing: ".18em", marginBottom: 10, padding: "0 8px" }}>Services & Finance</p>
                             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                              {filteredServices.map((service) => (
+                              {filteredServices.map((service) => {
+                                const iconColorMap: Record<string, string> = {
+                                  phone: "#60a5fa", globe: "#60a5fa", tv: "#a78bfa", bolt: "#fbbf24", droplet: "#38bdf8",
+                                  qr: "#22c55e", crypto: "#60a5fa", flash: "#fbbf24", bank: "#fbbf24", wallet: "#60a5fa",
+                                  users: "#fb7185", piggy: "#34d399", receipt: "#60a5fa", spark: "#fb7185", swap: "#60a5fa",
+                                };
+                                const iconColor = iconColorMap[service.icon] || "#60a5fa";
+                                return (
                                 <button
                                   key={service.id}
                                   type="button"
                                   onClick={() => { openFromSearch(service.id); setServicesQuery(""); }}
-                                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: 12, borderRadius: 14, border: "none", background: "transparent", color: "white", cursor: "pointer", textAlign: "left" }}
+                                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: 10, borderRadius: 14, border: "none", background: "transparent", color: "white", cursor: "pointer", textAlign: "left" }}
                                 >
                                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                    <AppIcon name={service.icon} size={18} stroke="#60a5fa" />
+                                    <div style={{ width: 34, height: 34, borderRadius: 10, background: `${iconColor}18`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                      <AppIcon name={service.icon} size={18} stroke={iconColor} />
+                                    </div>
                                     <span style={{ fontSize: 14, fontWeight: 800 }}>{service.name}</span>
                                   </div>
-                                  <span style={{ fontSize: 10, color: "#64748b", fontWeight: 800, textTransform: "uppercase" }}>{service.category}</span>
+                                  <span style={{ fontSize: 9, color: service.category === "Finance" ? "#D4A437" : "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em" }}>{service.category}</span>
                                 </button>
-                              ))}
+                                );
+                              })}
                             </div>
                           </div>
                         )}

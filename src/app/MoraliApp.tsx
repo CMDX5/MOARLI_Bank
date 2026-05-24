@@ -185,7 +185,7 @@ const profileGroups = [
     title: "Mon Compte",
     items: [
       { icon: "user" as IconName, label: "Informations Personnelles" },
-      { icon: "shield" as IconName, label: "Sécurité & Biométrie" },
+      { icon: "shield" as IconName, label: "Sécurité & Face ID" },
       { icon: "eye-off" as IconName, label: "Confidentialité" },
       { icon: "receipt" as IconName, label: "Historique des Reçus" },
       { icon: "headset" as IconName, label: "Support Client", sub: "Assistance instantanée" },
@@ -600,7 +600,6 @@ function App() {
   scannerStatusRef.current = scannerStatus;
   const [quickNotif, setQuickNotif] = useState<{ open: boolean; type: string; label: string; amount: string; icon: IconName; color: string } | null>(null);
   const [connectedDevices, setConnectedDevices] = useState<Array<{ id: string; device: string; browser: string; time: string; current: boolean }>>([]);
-  const [biometricSupported, setBiometricSupported] = useState(false);
   const [platformAuthSupported, setPlatformAuthSupported] = useState(false);
   const [deviceAlertShown, setDeviceAlertShown] = useState(false);
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
@@ -635,14 +634,12 @@ function App() {
     })();
   }, [authUid]);
 
-  // Check biometric & platform auth support on mount
+  // Check Face ID / platform auth support on mount
   useEffect(() => {
     if (typeof window !== "undefined" && window.PublicKeyCredential) {
       PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then((avail) => {
-        setBiometricSupported(avail);
         setPlatformAuthSupported(avail);
       }).catch(() => {
-        setBiometricSupported(false);
         setPlatformAuthSupported(false);
       });
     }
@@ -684,7 +681,6 @@ function App() {
     }
   }, [authUid]);
   const [securitySettings, setSecuritySettings] = useState({
-    biometrics: false,
     faceId: false,
     deviceAlerts: true,
     transactionValidation: true,
@@ -1414,7 +1410,7 @@ function App() {
         if (secSnap.exists()) {
           const d = secSnap.data();
           setSecuritySettings((prev) => ({
-            biometrics: d.biometrics !== undefined ? d.biometrics : prev.biometrics,
+            // biometrics removed — only faceId used now
             faceId: d.faceId !== undefined ? d.faceId : prev.faceId,
             deviceAlerts: d.deviceAlerts !== undefined ? d.deviceAlerts : prev.deviceAlerts,
             transactionValidation: d.transactionValidation !== undefined ? d.transactionValidation : prev.transactionValidation,
@@ -2618,13 +2614,13 @@ function App() {
     }
   };
 
-  // ── Real biometric prompt via WebAuthn ──
+  // ── Face ID / WebAuthn prompt ──
   const promptBiometric = async (): Promise<boolean> => {
     try {
       if (!window.PublicKeyCredential) return false;
       const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
       if (!available) return false;
-      // Create a dummy challenge for biometric verification
+      // Create a challenge for Face ID verification
       const challenge = new Uint8Array(32);
       crypto.getRandomValues(challenge);
       const credential = await navigator.credentials.create({
@@ -2770,7 +2766,7 @@ function App() {
       window.localStorage.setItem("morali_security_settings", JSON.stringify(securitySettings));
     }
     setSecurityModalOpen(false);
-    showToast("Sécurité et biométrie mises à jour");
+    showToast("Paramètres de sécurité mis à jour");
   };
 
   const openPrivacyModal = () => {
@@ -6606,7 +6602,7 @@ function App() {
               profileGroups={profileGroups}
               onAction={(label) => {
                 if (label === "Informations Personnelles") openInfoDrawer();
-                else if (label === "Sécurité & Biométrie") openSecurityModal();
+                else if (label === "Sécurité & Face ID") openSecurityModal();
                 else if (label === "Historique des Reçus") openReceiptsModal();
                 else if (label === "Support Client") openSupportModal();
                 else if (label === "Conditions d'utilisation") openTermsModal();
@@ -7764,31 +7760,13 @@ function App() {
               <div className="bc-head">
                 <div className="bc-head-left">
                   <div className="bc-kicker">Sécurité</div>
-                  <div className="bc-title">Sécurité & Biométrie</div>
+                  <div className="bc-title">Sécurité & Face ID</div>
                   <div className="bc-subtitle">Pilotez les protections d’accès et les validations sensibles de votre compte Morali.</div>
                 </div>
                 <button className="bc-close" onClick={closeSecurityModal} aria-label="Fermer">&times;</button>
               </div>
 
               <div className="security-modal-grid">
-                <div className="security-feature" style={!biometricSupported ? { opacity: 0.55 } : {}}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <div className="security-feature-title">Authentification biométrique</div>
-                      {biometricSupported && <span style={{ fontSize: 9, padding: "2px 6px", borderRadius: 6, background: "rgba(34,197,94,.15)", color: "#4ade80", fontWeight: 800 }}>Disponible</span>}
-                    </div>
-                    <div className="security-feature-copy">{biometricSupported ? "Vérification par empreinte ou visage avant chaque transfert." : "Non disponible sur cet appareil ou navigateur."}</div>
-                  </div>
-                  <div
-                    className={`mini-switch ${securitySettings.biometrics ? "active" : ""}`}
-                    role="switch"
-                    aria-checked={securitySettings.biometrics}
-                    tabIndex={0}
-                    style={!biometricSupported ? { pointerEvents: "none" } : {}}
-                    onClick={() => biometricSupported && setSecuritySettings((c) => ({ ...c, biometrics: !c.biometrics }))}
-                    onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && biometricSupported) { e.preventDefault(); setSecuritySettings((c) => ({ ...c, biometrics: !c.biometrics })); } }}
-                  />
-                </div>
                 <div className="security-feature" style={!platformAuthSupported ? { opacity: 0.55 } : {}}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -7832,13 +7810,13 @@ function App() {
               <div className="security-summary">
                 <div className="security-stat">
                   <div className="security-stat-kicker">Niveau de sécurité</div>
-                  <div className="security-stat-value" style={{ color: Object.values(securitySettings).filter(Boolean).length === 4 ? "#22c55e" : Object.values(securitySettings).filter(Boolean).length >= 2 ? "#eab308" : "#ef4444" }}>
-                    {Object.values(securitySettings).filter(Boolean).length === 4 ? "Élevé" : Object.values(securitySettings).filter(Boolean).length >= 2 ? "Moyen" : "Faible"}
+                  <div className="security-stat-value" style={{ color: Object.values(securitySettings).filter(Boolean).length === 3 ? "#22c55e" : Object.values(securitySettings).filter(Boolean).length >= 2 ? "#eab308" : "#ef4444" }}>
+                    {Object.values(securitySettings).filter(Boolean).length === 3 ? "Élevé" : Object.values(securitySettings).filter(Boolean).length >= 2 ? "Moyen" : "Faible"}
                   </div>
                 </div>
                 <div className="security-stat">
                   <div className="security-stat-kicker">Sécurités actives</div>
-                  <div className="security-stat-value">{Object.values(securitySettings).filter(Boolean).length} / 4</div>
+                  <div className="security-stat-value">{Object.values(securitySettings).filter(Boolean).length} / 3</div>
                 </div>
               </div>
 

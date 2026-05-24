@@ -30,7 +30,7 @@ export interface TransferViewProps {
   dashboardName: string;
   bankingIdentity: { id: string; rib: string };
   balance: number;
-  securitySettings: { biometrics: boolean; faceId: boolean; transactionValidation: boolean };
+  securitySettings: { faceId: boolean; deviceAlerts: boolean; transactionValidation: boolean };
   showToast: (msg: string) => void;
   showQuickNotif: (type: string, label: string, amount: string, icon: IconName, color: string) => void;
   promptBiometric: () => Promise<boolean>;
@@ -459,11 +459,11 @@ export default function TransferView({
       showToast("Saisissez un montant");
       return;
     }
-    // ── Biometric check if enabled ──
-    if (securitySettings.biometrics || securitySettings.faceId) {
-      const bioOk = await promptBiometric();
-      if (!bioOk) {
-        showToast("Authentification biométrique annulée");
+    // Face ID check if enabled
+    if (securitySettings.faceId) {
+      const faceOk = await promptBiometric();
+      if (!faceOk) {
+        showToast("Authentification Face ID annulée");
         return;
       }
     }

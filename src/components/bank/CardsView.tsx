@@ -140,21 +140,13 @@ export default function CardsView({
               </div>
               <div className="cards-duo-info">
                 <div className="cards-duo-stat">
-                  <div className="cards-duo-stat-val val-up">200K</div>
-                  <div className="cards-duo-stat-lbl">Plafond / mois</div>
-                </div>
-                <div className="cards-duo-stat">
-                  <div className="cards-duo-stat-val">50K</div>
-                  <div className="cards-duo-stat-lbl">Max / tx</div>
-                </div>
-                <div className="cards-duo-stat">
                   <button onClick={onHistoryClick} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
                     <div className="cards-duo-stat-val val-up">Dépenses</div>
                     <div className="cards-duo-stat-lbl">Historique</div>
                   </button>
                 </div>
               </div>
-              <p className="cards-duo-desc">Paiements SNE, SNDE, Canal+, recharges MTN & Airtel, tontine numérique, micro-épargne et plus encore.</p>
+              <p className="cards-duo-desc">Votre carte Morali pour les paiements quotidiens, recharges et transferts.</p>
             </div>
 
             <div className="cards-duo-divider" />
@@ -233,21 +225,13 @@ export default function CardsView({
               </div>
               <div className="cards-duo-info">
                 <div className="cards-duo-stat">
-                  <div className="cards-duo-stat-val val-gold">5M</div>
-                  <div className="cards-duo-stat-lbl">Plafond / mois</div>
-                </div>
-                <div className="cards-duo-stat">
-                  <div className="cards-duo-stat-val">1M</div>
-                  <div className="cards-duo-stat-lbl">Max / tx</div>
-                </div>
-                <div className="cards-duo-stat">
                   <button onClick={onHistoryClick} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
                     <div className="cards-duo-stat-val val-gold">Dépenses</div>
                     <div className="cards-duo-stat-lbl">Historique</div>
                   </button>
                 </div>
               </div>
-              <p className="cards-duo-desc">Lounge Maya-Maya, virements transfrontaliers, conciergerie 24/7, cashback Congo et accès événements exclusifs.</p>
+              <p className="cards-duo-desc">Carte premium Morali Black pour des avantages exclusifs.</p>
             </div>
           </div>
 

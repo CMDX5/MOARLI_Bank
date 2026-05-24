@@ -105,7 +105,7 @@ export default function ProfileView({
                       {item.sub && <div className="profile-item-sub">{item.sub}</div>}
                     </div>
                   </div>
-                  {item.label === "Sécurité & Biométrie" ? (
+                  {item.label === "Sécurité & Face ID" ? (
                     <span className="profile-badge" style={{ background: secLevelCount >= 3 ? "rgba(34,197,94,.12)" : secLevelCount >= 2 ? "rgba(234,179,8,.12)" : "rgba(239,68,68,.12)", color: secLevelCount >= 3 ? "#22c55e" : secLevelCount >= 2 ? "#eab308" : "#ef4444" }}>{secLevelCount >= 3 ? "Sécurisé" : secLevelCount >= 2 ? "Moyen" : "Faible"}</span>
                   ) : item.badge ? (
                     <span className="profile-badge">{item.badge}</span>

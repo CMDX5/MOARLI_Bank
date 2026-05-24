@@ -64,7 +64,7 @@ function MedalIcon({ rank, size = 18 }: { rank: number; size?: number }) {
 
 // ── SVG Level Icons (pro, no emojis) ──
 function LevelIcon({ level, size = 16, color = "currentColor" }: { level: number; size?: number; color?: string }) {
-  const icons: Record<number, JSX.Element> = {
+  const icons: Record<number, React.ReactNode> = {
     1: ( // Débutant — seedling
       <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M12 22v-8" /><path d="M7 14c0-3.5 2.5-6.5 5-8 2.5 1.5 5 4.5 5 8" /><path d="M9 10c1-2 3-3.5 3-3.5s2 1.5 3 3.5" />

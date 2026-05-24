@@ -60,11 +60,11 @@ export default function NotificationsPanel({
 
     const touch = e.touches[0];
     const dx = swipeState.startX - touch.clientX;
-    const dy = touchState => Math.abs(touch.clientY - swipeState.startY);
+    const dy = Math.abs(touch.clientY - swipeState.startY);
 
     // Lock direction after 8px of movement
     if (swipeState.direction === 'none') {
-      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+      if (Math.abs(dx) > 8 || dy > 8) {
         swipeState.direction = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
       }
       return;

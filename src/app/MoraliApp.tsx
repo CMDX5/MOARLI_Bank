@@ -6634,7 +6634,7 @@ function App() {
 <BudgetView
   authUid={authUid}
   firestoreBalance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
-  onBack={openDashboard}
+  onBack={closeHub}
   showToast={showToast}
   getAuthHeaders={getAuthHeaders}
 />
@@ -6650,7 +6650,7 @@ function App() {
 {screen === "leaderboard" && (
 <LeaderboardView
   authUid={authUid}
-  onBack={openDashboard}
+  onBack={closeHub}
   showToast={showToast}
   getAuthHeaders={getAuthHeaders}
 />

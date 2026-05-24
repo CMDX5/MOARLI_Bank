@@ -1754,25 +1754,12 @@ function App() {
     return { curveLine, fillArea, endPt: points[points.length - 1] };
   }, [chartData]);
   const accessLogEntries = useMemo<{ place: string; device: string; time: string }[]>(() => {
-    const logs: { place: string; device: string; time: string }[] = [];
     const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
     const isMobile = /Android|iPhone|iPad/i.test(ua);
     const device = isMobile ? "Mobile" : "Desktop";
-    // Current session
-    logs.push({ place: "Brazzaville, Congo", device, time: "Maintenant" });
-    // Generate 2-3 realistic past sessions
-    const locations = ["Brazzaville, Congo", "Pointe-Noire, Congo"];
-    const now = Date.now();
-    for (let i = 0; i < 2; i++) {
-      const hoursAgo = (i + 1) * Math.floor(Math.random() * 12 + 4);
-      const d = new Date(now - hoursAgo * 3600000);
-      logs.push({
-        place: locations[i % locations.length],
-        device: i === 0 ? "Mobile" : "Desktop",
-        time: d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }),
-      });
-    }
-    return logs;
+    return [
+      { place: "Appareil actuel", device, time: "Cette session" },
+    ];
   }, []);
 
   const renderProtectedAmount = (key: string, text: string, className = "") => (
@@ -2854,7 +2841,15 @@ function App() {
 
   const disconnectOtherDevices = () => {
     setPrivacyAccessLogOpen(false);
-    showToast("Tous les autres appareils ont été déconnectés");
+    // Revoke session server-side and sign out
+    fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    signOut(firebaseAuth).then(() => {
+      setScreen("auth");
+      setNavActive("Accueil");
+      showToast("Toutes les sessions ont été déconnectées");
+    }).catch(() => {
+      showToast("Erreur lors de la déconnexion");
+    });
   };
 
   const openReceiptsModal = () => {
@@ -6802,7 +6797,6 @@ function App() {
               <div className="profile-avatar grad-blue small">
                 <span className="avatar-text">{(profileForm.fullName || "P").charAt(0).toUpperCase()}</span>
               </div>
-              <button className="btn-change-photo" onClick={() => showToast("Changement de photo bientôt disponible")}>Changer la photo</button>
             </div>
             <div className="edit-form">
               <div className="input-group-glass">
@@ -6887,36 +6881,6 @@ function App() {
                     <div className="card-setting-copy">Bloquez temporairement les paiements de la carte.</div>
                   </div>
                   <div className={`mini-switch ${cardLocked ? "active" : ""}`} role="switch" aria-checked={cardLocked} tabIndex={0} onClick={() => setCardLocked((current) => !current)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setCardLocked((current) => !current); } }} />
-                </div>
-
-                <div className="card-setting-row">
-                  <div>
-                    <div className="card-setting-title">Paiements en ligne</div>
-                    <div className="card-setting-copy">Autoriser les achats web et abonnements sécurisés.</div>
-                  </div>
-                  <div className={`mini-switch ${cardSettings.online ? "active" : ""}`} role="switch" aria-checked={cardSettings.online} tabIndex={0} onClick={() => setCardSettings((current) => ({ ...current, online: !current.online }))} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setCardSettings((current) => ({ ...current, online: !current.online })); } }} />
-                </div>
-
-                <div className="card-setting-row">
-                  <div>
-                    <div className="card-setting-title">International</div>
-                    <div className="card-setting-copy">Activer la carte hors Congo et pour les services mondiaux.</div>
-                  </div>
-                  <div className={`mini-switch ${cardSettings.international ? "active" : ""}`} role="switch" aria-checked={cardSettings.international} tabIndex={0} onClick={() => setCardSettings((current) => ({ ...current, international: !current.international }))} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setCardSettings((current) => ({ ...current, international: !current.international })); } }} />
-                </div>
-              </div>
-
-              <div className="pin-display" style={{ background: "linear-gradient(145deg,rgba(59,130,246,.06),rgba(10,14,23,.18))", borderColor: "rgba(59,130,246,.12)" }}>
-                <div className="pin-kicker" style={{ color: "rgba(96,165,250,.55)" }}>Statistiques</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, textAlign: "center" }}>
-                  <div>
-                    <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: ".16em", textTransform: "uppercase", color: "#64748b", marginBottom: 6 }}>Plafond journalier</div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: "#fff" }}>750 000 <span style={{ fontSize: 10, color: "#64748b" }}>FCFA</span></div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: ".16em", textTransform: "uppercase", color: "#64748b", marginBottom: 6 }}>Retrait ATM</div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: cardSettings.atm ? "#34d399" : "#f87171" }}>{cardSettings.atm ? "Actif" : "Désactivé"}</div>
-                  </div>
                 </div>
               </div>
 
@@ -7527,11 +7491,10 @@ function App() {
               <div className="card-manage-stack">
                 <div className="black-request-banner" style={{ background: "linear-gradient(145deg,rgba(212,164,55,.14),rgba(255,255,255,.03))" }}>
                   <div className="black-request-meta">
-                    <div className="black-request-title">Votre conciergerie vous contactera sous 24h</div>
-                    <div className="black-request-sub">Votre carte en métal premium est en cours de forge. Livraison prioritaire sous 3 jours ouvrés.</div>
+                    <div className="black-request-title">Demande envoyée</div>
+                    <div className="black-request-sub">Votre demande de carte Morali Black a bien été enregistrée. Vous serez contacté pour les prochaines étapes.</div>
                   </div>
                 </div>
-                <div className="card-setting-row"><div><div className="card-setting-title">Statut de fabrication</div><div className="card-setting-copy">Forge en cours → Gravure laser → Expédition VIP</div></div></div>
               </div>
               <button className="bc-btn-full" onClick={() => { setBlackCardCelebrationOpen(false); closeBlackCardModal(); openPrivilegesTab(); }}>ACCÉDER À MON ESPACE PRIVILÈGE</button>
             </div>
@@ -7969,7 +7932,7 @@ function App() {
                 <div className="security-stat">
                   <div className="security-stat-kicker">Centre de données</div>
                   <div className="security-stat-value privacy-region"><AppIcon name="shield" size={14} stroke="#60a5fa" />Région Afrique Centrale</div>
-                  <div className="security-stat-kicker" style={{ marginTop: 6, textTransform: "none", letterSpacing: ".02em" }}>Conformité CEMAC / ANSSI Congo</div>
+                  <div className="security-stat-kicker" style={{ marginTop: 6, textTransform: "none", letterSpacing: ".02em" }}>Données stockées en Afrique Centrale</div>
                 </div>
                 <div className="security-stat privacy-link-row" onClick={openAccessLog}>
                   <div className="security-stat-kicker">Journal d’accès</div>

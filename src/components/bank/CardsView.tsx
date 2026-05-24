@@ -148,7 +148,7 @@ export default function CardsView({
                   <div className="cards-duo-stat-lbl">Max / tx</div>
                 </div>
                 <div className="cards-duo-stat">
-                  <button onClick={() => { setEssentialCardRevealed((v) => !v); }} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                  <button onClick={onHistoryClick} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
                     <div className="cards-duo-stat-val val-up">Dépenses</div>
                     <div className="cards-duo-stat-lbl">Historique</div>
                   </button>

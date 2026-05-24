@@ -251,18 +251,12 @@ export default function LeaderboardView({ authUid, onBack, showToast, getAuthHea
     }
   };
 
-  const getTabIcon = () => {
-    switch (activeTab) {
-      case "epargne": return "🏦";
-      case "transactions": return "💳";
-      case "objectifs": return "🎯";
-    }
-  };
 
   return (
     <div style={{
       minHeight: "100vh", background: "#050b1a", color: "#fff",
       fontFamily: "'Inter','Segoe UI',sans-serif", padding: 16,
+      paddingBottom: 100,
     }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
@@ -284,7 +278,7 @@ export default function LeaderboardView({ authUid, onBack, showToast, getAuthHea
           background: "rgba(212,164,55,0.1)", border: "1px solid rgba(212,164,55,0.25)",
           fontSize: 11, fontWeight: 700, color: "#D4A437",
         }}>
-          {getTabIcon()} Classement
+          Classement
         </div>
       </div>
 
@@ -356,7 +350,7 @@ export default function LeaderboardView({ authUid, onBack, showToast, getAuthHea
                     {formatCurrency(userEntry.score)} pts
                   </span>
                   <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", fontWeight: 600 }}>
-                    🔥 {userEntry.streak} jours
+                    {userEntry.streak} jours
                   </span>
                 </div>
               </div>
@@ -379,7 +373,7 @@ export default function LeaderboardView({ authUid, onBack, showToast, getAuthHea
 
           {/* Leaderboard list */}
           <div style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 10 }}>
-            Top {getTabIcon()} {getTabLabel()}
+            Top {getTabLabel()}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 24 }}>
             {entries.map(entry => {
@@ -438,14 +432,6 @@ export default function LeaderboardView({ authUid, onBack, showToast, getAuthHea
                       }}>
                         {entry.name}
                       </span>
-                      {entry.streak >= 7 && (
-                        <span style={{ fontSize: 11 }}>🔥</span>
-                      )}
-                      {entry.badge && (
-                        <span style={{ fontSize: 11 }}>
-                          {entry.badge === "crown" ? "👑" : entry.badge === "star" ? "⭐" : entry.badge === "trophy" ? "🏆" : "🎁"}
-                        </span>
-                      )}
                     </div>
                     <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
                       <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", fontWeight: 600 }}>
@@ -474,7 +460,7 @@ export default function LeaderboardView({ authUid, onBack, showToast, getAuthHea
 
           {/* Achievements */}
           <div style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 12 }}>
-            🏅 Badges & Succès
+            Badges & Succès
           </div>
           <div style={{
             display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
@@ -540,7 +526,7 @@ export default function LeaderboardView({ authUid, onBack, showToast, getAuthHea
 
           {/* Challenges */}
           <div style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 12 }}>
-            🎯 Défis Actifs
+            Défis Actifs
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
             {challenges.map(ch => (

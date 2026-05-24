@@ -16,8 +16,8 @@ interface NotificationsPanelProps {
   onPin?: (id: string) => void;
 }
 
-const SWIPE_THRESHOLD = 80;
-const MAX_SWIPE = 140;
+const SWIPE_THRESHOLD = 50;
+const MAX_SWIPE = 90;
 
 export default function NotificationsPanel({
   notifications,
@@ -68,13 +68,16 @@ export default function NotificationsPanel({
     swipeState.isSwiping = false;
     const diff = swipeState.startX - swipeState.currentX;
     const el = document.getElementById(`notif-swipe-${id}`);
+    const wrap = el?.parentElement;
     if (el) {
       if (diff > SWIPE_THRESHOLD) {
         el.style.transition = 'transform .25s cubic-bezier(.4,0,.2,1)';
         el.style.transform = `translateX(-${MAX_SWIPE}px)`;
+        wrap?.classList.add('revealed');
       } else {
         el.style.transition = 'transform .25s cubic-bezier(.4,0,.2,1)';
         el.style.transform = 'translateX(0)';
+        wrap?.classList.remove('revealed');
       }
     }
   }, []);
@@ -103,9 +106,11 @@ export default function NotificationsPanel({
 
   const resetSwipe = (id: string) => {
     const el = document.getElementById(`notif-swipe-${id}`);
+    const wrap = el?.parentElement;
     if (el) {
       el.style.transition = 'transform .25s cubic-bezier(.4,0,.2,1)';
       el.style.transform = 'translateX(0)';
+      wrap?.classList.remove('revealed');
     }
   };
 

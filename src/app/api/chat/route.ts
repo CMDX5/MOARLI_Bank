@@ -14,11 +14,11 @@ import { requireAuth } from "@/lib/auth-verify";
 
 const AUTO_REPLIES: Record<string, string> = {
   "Problème de transaction":
-    "Je comprends votre frustration. Pouvez-vous me préciser le numéro de transaction ou la date ? Je vais vérifier immédiatement le statut dans notre système.",
+    "Je comprends votre frustration. Pouvez-vous me préciser le numéro de transaction ou la date ? Un conseiller Morali vous répondra sous peu pour examiner votre cas.",
   "Carte bloquée":
-    "Votre carte semble être gelée. Rendez-vous dans la section \"Cartes\" de votre espace pour la réactiver. Si le problème persiste, je peux lancer une vérification manuelle.",
+    "Votre carte semble être gelée. Rendez-vous dans la section \"Cartes\" de votre espace pour vérifier et réactiver votre carte.",
   "Question tarif":
-    "Voici nos tarifs actuels :\n• Transfert national : 0.5%\n• Retrait cash : 1%\n• Crédit téléphone : 0 FCFA\n• Change devises : Spread de 2%\n\nY a-t-il un service spécifique qui vous intéresse ?",
+    "Voici nos tarifs actuels :\n• Dépôt Mobile Money : Gratuit\n• Transfert MOARLI : Gratuit\n• Retrait Mobile Money : 2%\n• Change EUR/USD : 1.5%\n• Micro-crédit : 3% à 7.5% (selon durée)\n\nY a-t-il un service qui vous intéresse ?",
 };
 
 const SUPPORT_REPLIES = [

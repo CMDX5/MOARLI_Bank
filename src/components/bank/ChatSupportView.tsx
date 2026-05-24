@@ -16,6 +16,7 @@ interface ChatMessageItem {
   text: string;
   timestamp: unknown;
   read: boolean;
+  local?: boolean;
 }
 
 const AUTO_REPLIES: Record<string, string> = {
@@ -62,16 +63,19 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
   const [isTyping, setIsTyping] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [initialLoad, setInitialLoad] = useState(true);
+  const [firestoreReady, setFirestoreReady] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const lastAutoReplyRef = useRef<string>('');
   const unreadCountRef = useRef(0);
+  const localIdCounter = useRef(0);
 
   // Real-time chat listener
   useEffect(() => {
     if (!authUid || !firebaseDb) {
       setInitialLoad(false);
+      setFirestoreReady(false);
       return;
     }
 
@@ -98,10 +102,15 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
         }
       });
 
-      setMessages(items);
+      // Merge: keep local messages that haven't synced yet
+      setMessages((prev) => {
+        const localOnly = prev.filter((m) => m.local && !items.some((i) => i.text === m.text));
+        return [...items, ...localOnly];
+      });
       setUnreadCount(unread);
       unreadCountRef.current = unread;
       setInitialLoad(false);
+      setFirestoreReady(true);
 
       // Auto-scroll to bottom
       setTimeout(() => {
@@ -110,6 +119,10 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
     }, (err) => {
       console.error('[ChatSupport] onSnapshot error:', err);
       setInitialLoad(false);
+      // Firestore rules may block — fall back to local-only mode
+      if (String(err).includes('permission') || String(err).includes('PERMISSION_DENIED')) {
+        setFirestoreReady(false);
+      }
     });
 
     return () => unsub();
@@ -122,7 +135,7 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
       try {
         const batch = writeBatch(firebaseDb);
         messages.forEach((msg) => {
-          if (msg.sender === 'support' && !msg.read) {
+          if (msg.sender === 'support' && !msg.read && !msg.local) {
             batch.update(doc(firebaseDb, 'chats', authUid!, 'messages', msg.id), { read: true });
           }
         });
@@ -135,48 +148,79 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
     })();
   }, [authUid, messages, unreadCount]);
 
-  const sendMessage = useCallback(async (text: string) => {
-    if (!authUid || !firebaseDb || !text.trim()) return;
-    setSending(true);
-
+  const sendToFirestore = useCallback(async (msgData: { sender: string; text: string }) => {
+    if (!authUid || !firebaseDb) return false;
     try {
       await addDoc(collection(firebaseDb, 'chats', authUid, 'messages'), {
-        sender: 'user',
-        text: text.trim(),
+        sender: msgData.sender,
+        text: msgData.text,
         timestamp: serverTimestamp(),
-        read: true,
+        read: msgData.sender === 'user',
       });
-
-      setNewMessage('');
-
-      // Trigger auto-reply after delay
-      setIsTyping(true);
-
-      const replyText = AUTO_REPLIES[text.trim()] || getRandomSupportReply();
-      lastAutoReplyRef.current = replyText;
-
-      const delay = 1200 + Math.random() * 1500;
-      setTimeout(async () => {
-        if (!authUid || !firebaseDb) return;
-        try {
-          await addDoc(collection(firebaseDb, 'chats', authUid, 'messages'), {
-            sender: 'support',
-            text: replyText,
-            timestamp: serverTimestamp(),
-            read: false,
-          });
-        } catch (err) {
-          console.error('[ChatSupport] auto-reply error:', err);
-        }
-        setIsTyping(false);
-      }, delay);
+      return true;
     } catch (err) {
-      console.error('[ChatSupport] send error:', err);
-      showToast('Erreur lors de l\'envoi');
-    } finally {
-      setSending(false);
+      console.error('[ChatSupport] firestore write error:', err);
+      return false;
     }
-  }, [authUid, showToast]);
+  }, [authUid]);
+
+  const sendMessage = useCallback(async (text: string) => {
+    if (!text.trim()) return;
+    setSending(true);
+
+    const trimmed = text.trim();
+
+    // Optimistic: add user message locally immediately
+    const localId = `local-${Date.now()}-${localIdCounter.current++}`;
+    const userMsg: ChatMessageItem = {
+      id: localId,
+      sender: 'user',
+      text: trimmed,
+      timestamp: Date.now(),
+      read: true,
+      local: true,
+    };
+
+    setMessages((prev) => [...prev, userMsg]);
+    setNewMessage('');
+
+    // Try Firestore write
+    const sent = await sendToFirestore({ sender: 'user', text: trimmed });
+
+    if (!sent) {
+      // Remove local flag — message stays visible but marked as local-only
+      console.warn('[ChatSupport] Message saved locally only');
+    }
+
+    // Remove the optimistic local message once Firestore syncs (handled by onSnapshot merge)
+
+    // Auto-reply
+    setIsTyping(true);
+    const replyText = AUTO_REPLIES[trimmed] || getRandomSupportReply();
+    lastAutoReplyRef.current = replyText;
+
+    const delay = 1200 + Math.random() * 1500;
+    setTimeout(async () => {
+      setIsTyping(false);
+
+      // Add support reply locally
+      const replyId = `local-${Date.now()}-${localIdCounter.current++}`;
+      const supportMsg: ChatMessageItem = {
+        id: replyId,
+        sender: 'support',
+        text: replyText,
+        timestamp: Date.now(),
+        read: false,
+        local: true,
+      };
+      setMessages((prev) => [...prev, supportMsg]);
+
+      // Try to persist to Firestore
+      await sendToFirestore({ sender: 'support', text: replyText });
+    }, delay);
+
+    setSending(false);
+  }, [sendToFirestore]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -264,7 +308,7 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
           </div>
         </div>
 
-        {/* Unread badge (shown when navigating away) */}
+        {/* Unread badge */}
         {unreadCount > 0 && (
           <div style={{
             minWidth: 22, height: 22, borderRadius: 11, padding: '0 6px',
@@ -301,7 +345,7 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
             </div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 6 }}>Bienvenue ! 👋</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 6 }}>Bienvenue !</div>
             <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5, maxWidth: 260, marginBottom: 24 }}>
               Comment pouvons-nous vous aider aujourd&apos;hui ?
             </div>
@@ -382,7 +426,9 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
                       }}>
                         {getTimeLabel(msg.timestamp)}
                         {isUser && (
-                          <span style={{ marginLeft: 4, color: '#22c55e' }}>✓✓</span>
+                          <span style={{ marginLeft: 4, color: msg.local ? '#fbbf24' : '#22c55e' }}>
+                            {msg.local ? '••' : '✓✓'}
+                          </span>
                         )}
                       </div>
                     </div>

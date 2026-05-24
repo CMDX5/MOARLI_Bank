@@ -132,6 +132,13 @@ service cloud.firestore {
   }
 
   // ─────────────────────────────────────────────
+  //  CHAT SUPPORT — Users read/write their own chat messages
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/chats/{userId} {
+    allow read, write: if isOwner(userId);
+  }
+
+  // ─────────────────────────────────────────────
   //  ADMIN COLLECTIONS — Admin only
   // ─────────────────────────────────────────────
   match /databases/{db}/documents/adminAuditLog/{logId} {

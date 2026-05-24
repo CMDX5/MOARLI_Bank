@@ -6637,12 +6637,16 @@ function App() {
 />
 )}
 {screen === "leaderboard" && (
-<LeaderboardView
-  authUid={authUid}
-  onBack={closeHub}
-  showToast={showToast}
-  getAuthHeaders={getAuthHeaders}
-/>
+<div className={`app-screen active`}>
+  <div className="content-scrollable nav-safe">
+    <LeaderboardView
+      authUid={authUid}
+      onBack={closeHub}
+      showToast={showToast}
+      getAuthHeaders={getAuthHeaders}
+    />
+  </div>
+</div>
 )}
 {screen === "payLinks" && (
 <PayLinksView

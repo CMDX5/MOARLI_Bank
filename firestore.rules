@@ -163,6 +163,15 @@ service cloud.firestore {
   }
 
   // ─────────────────────────────────────────────
+  //  RESET TOKEN STORE — Client SDK dual-write, server-side only
+  //  Tokens are created server-side after OTP verification and consumed
+  //  by /api/auth/reset-password. No direct client access allowed.
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/resetTokenStore/{docId} {
+    allow read, write: if false;
+  }
+
+  // ─────────────────────────────────────────────
   //  KYC — Users read/write own only, via API
   // ─────────────────────────────────────────────
   match /databases/{db}/documents/kyc/{userId} {

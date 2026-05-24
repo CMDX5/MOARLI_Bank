@@ -3,10 +3,20 @@ import { randomInt } from "crypto";
 import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { setOtp } from "@/lib/otp-store";
 
-// Set to true to enable demo mode (returns OTP in response for testing without Resend API)
-const DEMO_MODE = !process.env.RESEND_API_KEY;
+// Demo mode only allowed in development when RESEND_API_KEY is absent
+const DEMO_MODE = process.env.NODE_ENV !== "production" && !process.env.RESEND_API_KEY;
 
 export async function POST(req: NextRequest) {
+  // SECURITY: In production, always require RESEND_API_KEY.
+  // If missing, fail closed rather than leaking OTP codes in the response.
+  if (process.env.NODE_ENV === "production" && !process.env.RESEND_API_KEY) {
+    console.error("[send-reset-code] RESEND_API_KEY not configured in production!");
+    return NextResponse.json(
+      { error: "Service email non configuré. Contactez le support." },
+      { status: 503 }
+    );
+  }
+
   const clientId = getClientId(req);
   const rl = rateLimitByIp(`auth:send-reset:${clientId}`, { maxRequests: 3, windowSec: 120 });
   if (!rl.allowed) {

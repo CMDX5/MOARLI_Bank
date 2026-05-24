@@ -137,11 +137,18 @@ async function firestoreVerifyOtp(phone: string, code: string): Promise<string |
 // ── Reset verification tokens ──
 // When an OTP is verified for password reset, a short-lived token is created.
 // The reset-password endpoint requires this token to proceed.
+//
+// SECURITY FIX: Tokens are now dual-stored in Firestore (Client SDK) + memory.
+// Pure in-memory storage failed on Vercel serverless: each function invocation
+// runs in a separate instance, so a token created in one instance was invisible
+// to the one handling /api/auth/reset-password — forcing users to retry.
+// Firestore is the authoritative store; memory is a same-instance fast path.
 
 const verifiedResetTokens = new Map<string, number>(); // token → expiresAt
 const RESET_TOKEN_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const RESET_TOKEN_COLLECTION = "resetTokenStore";
 
-/** Cleanup expired reset tokens every 5 minutes */
+/** Cleanup expired reset tokens from memory every 5 minutes */
 if (typeof globalThis !== "undefined") {
   setInterval(() => {
     const now = Date.now();
@@ -149,6 +156,34 @@ if (typeof globalThis !== "undefined") {
       if (expiresAt < now) verifiedResetTokens.delete(key);
     }
   }, 5 * 60 * 1000);
+}
+
+async function firestoreSetResetToken(token: string, expiresAt: number): Promise<void> {
+  try {
+    const docRef = doc(firebaseDb, RESET_TOKEN_COLLECTION, token);
+    await setDoc(docRef, { expiresAt, createdAt: Date.now() });
+  } catch (err) {
+    console.error("[otp-store] firestoreSetResetToken failed:", err);
+  }
+}
+
+async function firestoreConsumeResetToken(token: string): Promise<boolean> {
+  try {
+    const docRef = doc(firebaseDb, RESET_TOKEN_COLLECTION, token);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) return false;
+    const { expiresAt } = snap.data() as { expiresAt: number };
+    if (Date.now() > expiresAt) {
+      await deleteDoc(docRef).catch(() => {});
+      return false;
+    }
+    // One-time use — delete immediately
+    await deleteDoc(docRef).catch(() => {});
+    return true;
+  } catch (err) {
+    console.error("[otp-store] firestoreConsumeResetToken failed:", err);
+    return false;
+  }
 }
 
 // ── Public API ──
@@ -195,20 +230,39 @@ export async function verifyOtp(phone: string, code: string): Promise<string> {
  * Mark an OTP as verified for password reset purpose.
  * Returns a reset token that must be passed to /api/auth/reset-password.
  * Token expires in 5 minutes (one-time use).
+ * DUAL-WRITE: stored in Firestore + memory for cross-instance reliability.
  */
-export function createResetToken(email: string): string {
+export async function createResetToken(email: string): Promise<string> {
   const key = normalizeKey(email);
   const token = `rst_${Buffer.from(`${key}:${Date.now()}`).toString("base64url")}`;
-  verifiedResetTokens.set(token, Date.now() + RESET_TOKEN_TTL_MS);
+  const expiresAt = Date.now() + RESET_TOKEN_TTL_MS;
+
+  // Store in memory (fast path for same-instance)
+  verifiedResetTokens.set(token, expiresAt);
+
+  // Store in Firestore (authoritative for cross-instance / serverless)
+  await firestoreSetResetToken(token, expiresAt);
+
   return token;
 }
 
 /**
  * Check if a reset token is valid and consume it (one-time use).
+ * Checks Firestore first (authoritative), then memory fallback.
  * Returns true if valid, false if invalid/expired/already consumed.
  */
-export function consumeResetToken(token: string): boolean {
+export async function consumeResetToken(token: string): Promise<boolean> {
   if (!token) return false;
+
+  // 1. Try Firestore first (cross-instance authoritative)
+  const fsResult = await firestoreConsumeResetToken(token);
+  if (fsResult) {
+    // Also clean up memory
+    verifiedResetTokens.delete(token);
+    return true;
+  }
+
+  // 2. Fallback: memory (same-instance, e.g. dev environment)
   const expiresAt = verifiedResetTokens.get(token);
   if (!expiresAt) return false;
   if (Date.now() > expiresAt) {

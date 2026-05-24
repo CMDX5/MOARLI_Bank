@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     switch (result) {
       case "valid":
         // SECURITY FIX: Generate a one-time reset token for password reset
-        const resetToken = createResetToken(email);
+        const resetToken = await createResetToken(email);
         return NextResponse.json({ valid: true, resetToken });
       case "invalid":
         return NextResponse.json({ valid: false, error: "Code incorrect" });

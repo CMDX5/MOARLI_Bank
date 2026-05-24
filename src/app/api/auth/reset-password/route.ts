@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
     // SECURITY FIX: Require a valid reset token (obtained after OTP verification)
     const resetToken = rawBody.resetToken;
-    if (!resetToken || !consumeResetToken(resetToken)) {
+    if (!resetToken || !(await consumeResetToken(resetToken))) {
       return NextResponse.json(
         { error: "Jeton de réinitialisation invalide ou expiré. Veuillez vérifier votre code OTP d'abord." },
         { status: 403 }

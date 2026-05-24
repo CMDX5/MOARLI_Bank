@@ -80,7 +80,6 @@ import LeaderboardView from "@/components/bank/LeaderboardView";
 import OnboardingView from "@/components/bank/OnboardingView";
 import PayLinksView from "@/components/bank/PayLinksView";
 import BusinessDashboardView from "@/components/bank/BusinessDashboardView";
-import ThemeToggle from "@/components/bank/ThemeToggle";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useToast } from "@/hooks/useToast";
 
@@ -6572,7 +6571,6 @@ function App() {
               blackCardCcv={dashboardData.blackCardCcv}
               blackCardExp={dashboardData.blackCardExp}
               onBlackCardClick={openBlackCardModal}
-              onHistoryClick={() => setHistoryModalOpen(true)}
               cardActions={cardActions}
               onCardAction={(label) => {
                 if (label === "Geler la carte") openManageCardModal();
@@ -7905,12 +7903,20 @@ function App() {
               <div className="security-summary">
                 <div className="security-stat">
                   <div className="security-stat-kicker">Apparence</div>
-                  <ThemeToggle currentTheme={theme} onThemeChange={setTheme} />
+                  <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                    <button onClick={() => setTheme("base")} style={{ flex: 1, padding: "10px 12px", borderRadius: 14, border: theme === "base" ? "1.5px solid #3b82f6" : "1px solid rgba(255,255,255,.08)", background: theme === "base" ? "rgba(59,130,246,.12)" : "rgba(255,255,255,.03)", color: theme === "base" ? "#60a5fa" : "#94a3b8", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "all .2s" }}>
+                      <span style={{ width: 22, height: 22, borderRadius: "50%", flexShrink: 0, background: "linear-gradient(135deg, #3b82f6, #050b1a)", border: theme === "base" ? "2px solid #3b82f6" : "2px solid rgba(255,255,255,.12)" }} />
+                      Base
+                    </button>
+                    <button onClick={() => setTheme("light")} style={{ flex: 1, padding: "10px 12px", borderRadius: 14, border: theme === "light" ? "1.5px solid #2563eb" : "1px solid rgba(255,255,255,.08)", background: theme === "light" ? "rgba(59,130,246,.12)" : "rgba(255,255,255,.03)", color: theme === "light" ? "#60a5fa" : "#94a3b8", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "all .2s" }}>
+                      <span style={{ width: 22, height: 22, borderRadius: "50%", flexShrink: 0, background: "linear-gradient(135deg, #2563eb, #f8fafc)", border: theme === "light" ? "2px solid #2563eb" : "2px solid rgba(255,255,255,.12)" }} />
+                      Light
+                    </button>
+                  </div>
                 </div>
                 <div className="security-stat">
                   <div className="security-stat-kicker">Centre de données</div>
                   <div className="security-stat-value privacy-region"><AppIcon name="shield" size={14} stroke="#60a5fa" />Région Afrique Centrale</div>
-                  <div className="security-stat-kicker" style={{ marginTop: 6, textTransform: "none", letterSpacing: ".02em" }}>Données stockées en Afrique Centrale</div>
                 </div>
                 <div className="security-stat privacy-link-row" onClick={openAccessLog}>
                   <div className="security-stat-kicker">Journal d’accès</div>

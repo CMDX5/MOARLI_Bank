@@ -24,7 +24,6 @@ export interface CardsViewProps {
   blackCardCcv: string;
   blackCardExp: string;
   onBlackCardClick: () => void;
-  onHistoryClick: () => void;
   cardActions: CardAction[];
   onCardAction: (label: string) => void;
   showToast: (msg: string) => void;
@@ -43,7 +42,6 @@ export default function CardsView({
   blackCardCcv,
   blackCardExp,
   onBlackCardClick,
-  onHistoryClick,
   cardActions,
   onCardAction,
   showToast,
@@ -57,7 +55,7 @@ export default function CardsView({
         <div className="cards-screen">
           <div className="tab-title">Mes Cartes</div>
 
-          <div className="cards-duo">
+          <div className="cards-duo" style={{ gap: 14 }}>
             {/* ── CARTE STANDARD : Morali Essentielle ── */}
             <div className="cards-duo-card">
               <div className="cards-duo-tag essentielle">
@@ -138,18 +136,8 @@ export default function CardsView({
                   </div>
                 </div>
               </div>
-              <div className="cards-duo-info">
-                <div className="cards-duo-stat">
-                  <button onClick={onHistoryClick} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                    <div className="cards-duo-stat-val val-up">Dépenses</div>
-                    <div className="cards-duo-stat-lbl">Historique</div>
-                  </button>
-                </div>
-              </div>
-              <p className="cards-duo-desc">Votre carte Morali pour les paiements quotidiens, recharges et transferts.</p>
-            </div>
 
-            <div className="cards-duo-divider" />
+            </div>
 
             {/* ── CARTE BLACK : Morali Black Brazzaville ── */}
             <div className="cards-duo-card">
@@ -223,19 +211,9 @@ export default function CardsView({
                   </div>
                 </div>
               </div>
-              <div className="cards-duo-info">
-                <div className="cards-duo-stat">
-                  <button onClick={onHistoryClick} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                    <div className="cards-duo-stat-val val-gold">Dépenses</div>
-                    <div className="cards-duo-stat-lbl">Historique</div>
-                  </button>
-                </div>
-              </div>
-              <p className="cards-duo-desc">Carte premium Morali Black pour des avantages exclusifs.</p>
+
             </div>
           </div>
-
-          <div className="cards-duo-divider" />
 
           <div className="card-actions-grid">
             {cardActions.map((item) => (
@@ -254,8 +232,6 @@ export default function CardsView({
               </button>
             ))}
           </div>
-
-
         </div>
       </div>
     </div>

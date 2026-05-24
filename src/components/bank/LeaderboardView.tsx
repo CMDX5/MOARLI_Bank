@@ -41,6 +41,98 @@ interface Challenge {
 
 type TabKey = "epargne" | "transactions" | "objectifs";
 
+// ── SVG Rank Badges (pro medal-style) ──
+function MedalIcon({ rank, size = 18 }: { rank: number; size?: number }) {
+  const configs = {
+    1: { fill: "#D4A437", stroke: "#b8862d", label: "1" },
+    2: { fill: "#94a3b8", stroke: "#64748b", label: "2" },
+    3: { fill: "#cd7f32", stroke: "#a0622a", label: "3" },
+  };
+  const c = configs[rank as 1 | 2 | 3];
+  if (!c) return null;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M6 9H4a2 2 0 0 1-2-2V5h4" stroke={c.stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M18 9h2a2 2 0 0 0 2-2V5h-4" stroke={c.stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6 5h12v7a6 6 0 0 1-12 0V5Z" fill={c.fill} stroke={c.stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 16v3" stroke={c.stroke} strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M8 19h8" stroke={c.stroke} strokeWidth="1.8" strokeLinecap="round" />
+      <text x="12" y="11" textAnchor="middle" fill="#0a0e17" fontSize="7" fontWeight="900" fontFamily="Montserrat,sans-serif">{c.label}</text>
+    </svg>
+  );
+}
+
+// ── SVG Level Icons (pro, no emojis) ──
+function LevelIcon({ level, size = 16, color = "currentColor" }: { level: number; size?: number; color?: string }) {
+  const icons: Record<number, JSX.Element> = {
+    1: ( // Débutant — seedling
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 22v-8" /><path d="M7 14c0-3.5 2.5-6.5 5-8 2.5 1.5 5 4.5 5 8" /><path d="M9 10c1-2 3-3.5 3-3.5s2 1.5 3 3.5" />
+      </svg>
+    ),
+    2: ( // Novice — book
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M4 4h6a2 2 0 0 1 2 2v14a1 1 0 0 0-1-1H4V4Z" /><path d="M20 4h-6a2 2 0 0 0-2 2v14a1 1 0 0 1 1-1h7V4Z" />
+      </svg>
+    ),
+    3: ( // Apprenti — zap
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M13 2 6 13h5l-1 9 8-12h-5l0-8Z" />
+      </svg>
+    ),
+    4: ( // Intermédiaire — wrench
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z" />
+      </svg>
+    ),
+    5: ( // Avancé — rocket
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09Z" />
+        <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2Z" />
+        <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+        <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+      </svg>
+    ),
+    6: ( // Expert — diamond
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M6 3h12l4 6-10 13L2 9Z" /><path d="M11 3 8 9l4 13 4-13-3-6" /><path d="M2 9h20" />
+      </svg>
+    ),
+    7: ( // Maître — crown
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M2 18h20" /><path d="M4 18V9l4 3 4-6 4 6 4-3v9" />
+      </svg>
+    ),
+    8: ( // Champion — trophy
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M6 9H4a2 2 0 0 1-2-2V5h4" /><path d="M18 9h2a2 2 0 0 0 2-2V5h-4" /><path d="M6 5h12v7a6 6 0 0 1-12 0V5Z" /><path d="M12 16v3" /><path d="M8 19h8" />
+      </svg>
+    ),
+    9: ( // Légende — star
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26" />
+      </svg>
+    ),
+  };
+  return icons[level] || null;
+}
+
+// ── Achievement Badge Icon (pro style) ──
+function AchievementIcon({ unlocked }: { unlocked: boolean }) {
+  return unlocked ? (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D4A437" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="9" r="6" />
+      <path d="M9 15l-2 7 5-3 5 3-2-7" />
+    </svg>
+  ) : (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V8a4 4 0 1 1 8 0v3" />
+      <circle cx="12" cy="16" r="1" fill="rgba(255,255,255,0.3)" />
+    </svg>
+  );
+}
+
 // ── NO mock data — starts empty ──
 const EMPTY_ENTRIES: LeaderboardApiResponse[] = [];
 const EMPTY_ACHIEVEMENTS: UserAchievement[] = [];
@@ -79,8 +171,8 @@ function EmptyState({ tab }: { tab: TabKey }) {
           <path d="M6 9H4a2 2 0 0 1-2-2V5h4" />
           <path d="M18 9h2a2 2 0 0 0 2-2V5h-4" />
           <path d="M6 5h12v7a6 6 0 0 1-12 0V5Z" />
-          <path d="M12 18v3" />
-          <path d="M8 21h8" />
+          <path d="M12 16v3" />
+          <path d="M8 19h8" />
         </svg>
       </div>
       <div style={{
@@ -119,7 +211,6 @@ export default function LeaderboardView({ authUid, onBack, showToast, getAuthHea
       const res = await fetch(`/api/leaderboard?tab=${activeTab}`, { headers });
       const data = await res.json();
       if (data.success) {
-        // Only use real data from API — no mock fallback
         setEntries(data.entries || EMPTY_ENTRIES);
         setAchievements(data.achievements || EMPTY_ACHIEVEMENTS);
         setChallenges(data.challenges || EMPTY_CHALLENGES);
@@ -180,11 +271,13 @@ export default function LeaderboardView({ authUid, onBack, showToast, getAuthHea
           </div>
         </div>
         <div style={{
-          padding: "4px 12px", borderRadius: 8,
+          width: 36, height: 36, borderRadius: 10,
           background: "rgba(212,164,55,0.1)", border: "1px solid rgba(212,164,55,0.25)",
-          fontSize: 11, fontWeight: 700, color: "#D4A437",
+          display: "flex", alignItems: "center", justifyContent: "center",
         }}>
-          Classement
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D4A437" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 9H4a2 2 0 0 1-2-2V5h4" /><path d="M18 9h2a2 2 0 0 0 2-2V5h-4" /><path d="M6 5h12v7a6 6 0 0 1-12 0V5Z" /><path d="M12 16v3" /><path d="M8 19h8" />
+          </svg>
         </div>
       </div>
 
@@ -265,7 +358,7 @@ export default function LeaderboardView({ authUid, onBack, showToast, getAuthHea
                 border: `2px solid rgba(59,130,246,0.4)`,
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
-                <span style={{ fontSize: 14, fontWeight: 800, color: "#60a5fa" }}>{userEntry.level}</span>
+                <LevelIcon level={userEntry.level} size={22} color="#60a5fa" />
               </div>
             </div>
           )}
@@ -282,12 +375,12 @@ export default function LeaderboardView({ authUid, onBack, showToast, getAuthHea
                   {[1, 0, 2].map((podiumIdx) => {
                     const entry = entries[podiumIdx];
                     if (!entry) return null;
-                    const medals = [
-                      { emoji: "🥈", bg: "linear-gradient(180deg, rgba(192,192,192,0.15), rgba(192,192,192,0.03))", border: "rgba(192,192,192,0.3)", height: 90 },
-                      { emoji: "🥇", bg: "linear-gradient(180deg, rgba(212,164,55,0.2), rgba(212,164,55,0.03))", border: "rgba(212,164,55,0.4)", height: 120 },
-                      { emoji: "🥉", bg: "linear-gradient(180deg, rgba(205,127,50,0.15), rgba(205,127,50,0.03))", border: "rgba(205,127,50,0.3)", height: 70 },
+                    const podiumConfig = [
+                      { bg: "linear-gradient(180deg, rgba(192,192,192,0.15), rgba(192,192,192,0.03))", border: "rgba(192,192,192,0.3)", height: 90, accent: "#94a3b8" },
+                      { bg: "linear-gradient(180deg, rgba(212,164,55,0.2), rgba(212,164,55,0.03))", border: "rgba(212,164,55,0.4)", height: 120, accent: "#D4A437" },
+                      { bg: "linear-gradient(180deg, rgba(205,127,50,0.15), rgba(205,127,50,0.03))", border: "rgba(205,127,50,0.3)", height: 70, accent: "#cd7f32" },
                     ];
-                    const m = medals[podiumIdx];
+                    const p = podiumConfig[podiumIdx];
                     return (
                       <div key={entry.uid} style={{
                         display: "flex", flexDirection: "column", alignItems: "center",
@@ -299,7 +392,7 @@ export default function LeaderboardView({ authUid, onBack, showToast, getAuthHea
                           background: entry.isCurrentUser
                             ? "linear-gradient(135deg, #3b82f6, #1A3E78)"
                             : "linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03))",
-                          border: `2px solid ${m.border}`,
+                          border: `2px solid ${p.border}`,
                           display: "flex", alignItems: "center", justifyContent: "center",
                           marginBottom: 6, fontSize: podiumIdx === 1 ? 18 : 15,
                           fontWeight: 800, color: "rgba(255,255,255,0.7)",
@@ -323,14 +416,15 @@ export default function LeaderboardView({ authUid, onBack, showToast, getAuthHea
                         }}>
                           {formatCurrency(entry.score)} pts
                         </div>
+                        {/* Podium shelf — pro style */}
                         <div style={{
-                          width: "100%", height: m.height, borderRadius: "10px 10px 0 0",
-                          background: m.bg, border: `1px solid ${m.border}`,
+                          width: "100%", height: p.height, borderRadius: "10px 10px 0 0",
+                          background: p.bg, border: `1px solid ${p.border}`,
                           borderBottom: "none",
                           display: "flex", alignItems: "flex-start", justifyContent: "center",
-                          paddingTop: 10, fontSize: 22,
+                          paddingTop: 10,
                         }}>
-                          {m.emoji}
+                          <MedalIcon rank={podiumIdx + 1} size={podiumIdx === 1 ? 26 : 20} />
                         </div>
                       </div>
                     );
@@ -366,9 +460,9 @@ export default function LeaderboardView({ authUid, onBack, showToast, getAuthHea
                               ? "linear-gradient(135deg, rgba(192,192,192,0.2), rgba(192,192,192,0.05))"
                               : "linear-gradient(135deg, rgba(205,127,50,0.2), rgba(205,127,50,0.05))",
                           display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 14, flexShrink: 0,
+                          flexShrink: 0,
                         }}>
-                          {entry.rank === 1 ? "🥇" : entry.rank === 2 ? "🥈" : "🥉"}
+                          <MedalIcon rank={entry.rank} size={18} />
                         </div>
                       ) : (
                         <div style={{
@@ -453,9 +547,8 @@ export default function LeaderboardView({ authUid, onBack, showToast, getAuthHea
                           width: 32, height: 32, borderRadius: 8,
                           background: unlocked ? "rgba(212,164,55,0.12)" : "rgba(255,255,255,0.04)",
                           display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 16,
                         }}>
-                          {unlocked ? "🏅" : "🔒"}
+                          <AchievementIcon unlocked={unlocked} />
                         </div>
                         {unlocked && (
                           <div style={{
@@ -560,15 +653,15 @@ export default function LeaderboardView({ authUid, onBack, showToast, getAuthHea
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {[
-                { level: 1, title: "Débutant", min: 0, icon: "🌱" },
-                { level: 2, title: "Novice", min: 100, icon: "📚" },
-                { level: 3, title: "Apprenti", min: 300, icon: "⚡" },
-                { level: 4, title: "Intermédiaire", min: 600, icon: "🔧" },
-                { level: 5, title: "Avancé", min: 1000, icon: "🚀" },
-                { level: 6, title: "Expert", min: 1500, icon: "💎" },
-                { level: 7, title: "Maître", min: 2500, icon: "👑" },
-                { level: 8, title: "Champion", min: 4000, icon: "🏆" },
-                { level: 9, title: "Légende", min: 6000, icon: "🌟" },
+                { level: 1, title: "Débutant", min: 0 },
+                { level: 2, title: "Novice", min: 100 },
+                { level: 3, title: "Apprenti", min: 300 },
+                { level: 4, title: "Intermédiaire", min: 600 },
+                { level: 5, title: "Avancé", min: 1000 },
+                { level: 6, title: "Expert", min: 1500 },
+                { level: 7, title: "Maître", min: 2500 },
+                { level: 8, title: "Champion", min: 4000 },
+                { level: 9, title: "Légende", min: 6000 },
               ].map(lvl => {
                 const isActive = userEntry && userEntry.level === lvl.level;
                 const isPast = userEntry && userEntry.level > lvl.level;
@@ -580,7 +673,11 @@ export default function LeaderboardView({ authUid, onBack, showToast, getAuthHea
                     border: isActive ? "1px solid rgba(212,164,55,0.2)" : "1px solid transparent",
                     opacity: isPast ? 0.5 : 1,
                   }}>
-                    <span style={{ fontSize: 14 }}>{lvl.icon}</span>
+                    <div style={{
+                      width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <LevelIcon level={lvl.level} size={16} color={isActive ? "#D4A437" : "rgba(255,255,255,0.5)"} />
+                    </div>
                     <span style={{ fontSize: 11, fontWeight: 700, color: isActive ? "#D4A437" : "rgba(255,255,255,0.5)", flex: 1 }}>
                       Niv. {lvl.level} — {lvl.title}
                     </span>

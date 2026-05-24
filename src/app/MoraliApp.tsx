@@ -214,7 +214,7 @@ const myServices: SearchServiceItem[] = [
   { id: "utility-elec", name: "Électricité", category: "Quotidien", icon: "bolt" },
   { id: "utility-water", name: "Eau", category: "Quotidien", icon: "droplet" },
   { id: "budget", name: "Budget", category: "Finance", icon: "receipt" },
-  { id: "classement", name: "Classement", category: "Finance", icon: "spark" },
+  { id: "classement", name: "Classement", category: "Finance", icon: "trophy" },
   { id: "currency", name: "Change Devise", category: "Finance", icon: "swap" },
 ];
 
@@ -4708,7 +4708,7 @@ function App() {
 
                     <button className="service-tile" onClick={openLeaderboard}>
                       <div className="service-icon-box">
-                        <AppIcon name="spark" size={20} stroke="#fb7185" />
+                        <AppIcon name="trophy" size={20} stroke="#D4A437" />
                       </div>
                       <div className="service-name">Classement</div>
                       <div className="service-desc">Badges & défis</div>

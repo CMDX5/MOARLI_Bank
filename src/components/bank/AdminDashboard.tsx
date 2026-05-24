@@ -8,7 +8,6 @@ import {
   getDocs,
   addDoc,
   collection,
-  onSnapshot,
   query,
   where,
   updateDoc,
@@ -21,7 +20,6 @@ import {
 } from "firebase/firestore";
 import { signOut, signInWithEmailAndPassword } from "firebase/auth";
 import { firebaseAuth, firebaseDb } from "@/lib/firebase";
-import { encryptPinWithPassword, decryptPinWithPassword } from "@/lib/pin-utils";
 import { logAdminAction } from "@/lib/admin-logger";
 import { formatCurrency } from "@/lib/helpers";
 import jsPDF from "jspdf";
@@ -127,7 +125,7 @@ const [adminTxAmountMin, setAdminTxAmountMin] = useState("");
 const [adminTxAmountMax, setAdminTxAmountMax] = useState("");
 const [adminKycSubmissions, setAdminKycSubmissions] = useState<Array<Record<string, unknown>>>([]);
 const [adminKycLoading, setAdminKycLoading] = useState(false);
-const [adminKycNotes, setAdminKycNotes] = useState("");
+const [adminKycNotes, setAdminKycNotes] = useState<Record<string, string>>({});
 // ── New admin state: user management ──
 const [adminSelectedUserIds, setAdminSelectedUserIds] = useState<Set<string>>(new Set());
 const [adminUsersPage, setAdminUsersPage] = useState(1);
@@ -1126,17 +1124,13 @@ const adminTopUsersByVolume = useMemo(() => {
   return userVolumes.sort((a, b) => b.volume - a.volume).slice(0, 5);
 }, [adminUsers, adminTransactions]);
 
-const submitTransaction = () => {
-  openTransactionChoice();
-};
-
 // ── Real-time auto-refresh ──
 useEffect(() => {
   if (isAdminLoggedIn && screen === "admin") {
     adminRefreshRef.current = setInterval(async () => {
       await fetchAdminData();
       setAdminLastRefresh(new Date());
-    }, 8000);
+    }, 15000);
   } else {
     if (adminRefreshRef.current) {
       clearInterval(adminRefreshRef.current);
@@ -1221,6 +1215,8 @@ const selectAllUsers = () => {
 
 const handleBulkSuspend = async () => {
   if (adminSelectedUserIds.size === 0) return;
+  // Confirmation dialog
+  if (!confirm(`Suspendre ${adminSelectedUserIds.size} utilisateur(s) ? Cette action est réversible.`)) return;
   const uidsToSuspend = Array.from(adminSelectedUserIds);
   const successfulUids: string[] = [];
   try {
@@ -1453,14 +1449,17 @@ const handleAdminBackup = async () => {
     a.click();
     URL.revokeObjectURL(url);
     logAdminActivity("Sauvegarde exportée", `${users.length} utilisateurs, ${transactions.length} transactions`);
+    showToast(`Sauvegarde exportée: ${users.length} utilisateurs`);
   } catch (err) {
-    /* backup failed silently */
+    showToast("Erreur lors de la sauvegarde");
   } finally {
     setAdminBackupLoading(false);
   }
 };
 
 const handleAdminRestore = async (file: File) => {
+  // Confirmation dialog
+  if (!confirm("⚠️ La restauration écrasera les données existantes. Êtes-vous sûr ?")) return;
   setAdminBackupLoading(true);
   try {
     const text = await file.text();
@@ -1477,22 +1476,30 @@ const handleAdminRestore = async (file: File) => {
           return true;
         })
       );
-    await Promise.all(
-      data.users.map((u: Record<string, unknown>) => {
+    // Write in batches of 50 to avoid Firestore rate limits
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < data.users.length; i += BATCH_SIZE) {
+      const batch = writeBatch(firebaseDb);
+      const chunk = data.users.slice(i, i + BATCH_SIZE);
+      for (const u of chunk) {
         userCount++;
-        return setDoc(doc(firebaseDb, "moraliUsers", String(u.uid)), sanitizeForFirestore(u));
-      })
-    );
-    await Promise.all(
-      data.transactions.map((t: Record<string, unknown>) => {
+        batch.set(doc(firebaseDb, "moraliUsers", String(u.uid)), sanitizeForFirestore(u));
+      }
+      await batch.commit();
+    }
+    for (let i = 0; i < data.transactions.length; i += BATCH_SIZE) {
+      const batch = writeBatch(firebaseDb);
+      const chunk = data.transactions.slice(i, i + BATCH_SIZE);
+      for (const t of chunk) {
         txCount++;
-        return setDoc(doc(firebaseDb, "transactions", String(t.id)), sanitizeForFirestore(t));
-      })
-    );
+        batch.set(doc(firebaseDb, "transactions", String(t.id)), sanitizeForFirestore(t));
+      }
+      await batch.commit();
+    }
     logAdminActivity("Données restaurées", `${userCount} utilisateurs, ${txCount} transactions importés`);
     await fetchAdminData();
   } catch (err) {
-    /* restore failed silently */
+    showToast("Erreur lors de la restauration");
     logAdminActivity("Erreur restauration", `Échec de la restauration: ${(err as Error).message}`);
   } finally {
     setAdminBackupLoading(false);
@@ -1511,7 +1518,7 @@ const handleAdminApproveLoan = async (loan: { id: string; senderUid: string; sen
       if (!userDoc.exists()) throw new Error("USER_NOT_FOUND");
       const currentBal = userDoc.data().balance || 0;
       tx.update(userRef, { balance: currentBal + loan.amount, updatedAt: serverTimestamp() });
-      tx.update(loanTxRef, { status: "success", destination: "loan_granted", updatedAt: serverTimestamp() });
+      tx.update(loanTxRef, { status: "approved", destination: "loan_granted", updatedAt: serverTimestamp() });
     });
 
     // Create disbursement transaction record
@@ -1534,8 +1541,7 @@ const handleAdminApproveLoan = async (loan: { id: string; senderUid: string; sen
     showToast(`Prêt approuvé pour ${loan.senderName}`);
     setAdminLoans((prev) => prev.filter((l) => l.id !== loan.id));
   } catch (err) {
-    /* approve loan failed silently */
-    showToast("Erreur lors de l'approbation");
+    showToast("Erreur lors de l'approbation du prêt");
   }
 };
 
@@ -1555,8 +1561,7 @@ const handleAdminRejectLoan = async (loan: { id: string; senderUid: string; send
     showToast(`Prêt refusé pour ${loan.senderName}`);
     setAdminLoans((prev) => prev.filter((l) => l.id !== loan.id));
   } catch (err) {
-    /* reject loan failed silently */
-    showToast("Erreur lors du refus");
+    showToast("Erreur lors du refus du prêt");
   }
 };
 
@@ -2454,10 +2459,10 @@ const handleAdminRejectLoan = async (loan: { id: string; senderUid: string; send
                               </div>
                               <span style={{
                                 fontSize: 10, fontWeight: 800, padding: "3px 8px", borderRadius: 999,
-                                background: loan.status === "approved" ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)",
-                                color: loan.status === "approved" ? "#4ade80" : "#f87171",
+                                background: loan.status === "approved" || loan.status === "success" ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)",
+                                color: loan.status === "approved" || loan.status === "success" ? "#4ade80" : "#f87171",
                               }}>
-                                {loan.status === "approved" ? "Approuvé" : "Refusé"}
+                                {loan.status === "approved" || loan.status === "success" ? "Approuvé" : "Refusé"}
                               </span>
                             </div>
                           ))}
@@ -2496,7 +2501,7 @@ const handleAdminRejectLoan = async (loan: { id: string; senderUid: string; send
                         const docLabel = docType === "national_id" ? "CNI" : docType === "passport" ? "Passeport" : docType === "driver_license" ? "Permis" : docType;
 
                         const handleKycReview = async (action: "approve" | "reject") => {
-                          const notes = adminKycNotes.trim();
+                          const notes = (adminKycNotes[uid] || "").trim();
                           try {
                             const res = await fetch("/api/admin/kyc", {
                               method: "POST",
@@ -2507,7 +2512,7 @@ const handleAdminRejectLoan = async (loan: { id: string; senderUid: string; send
                             if (data.success) {
                               showToast(`KYC ${action === "approve" ? "approuvé" : "rejeté"} pour ${fullName}`);
                               setAdminKycSubmissions((prev) => prev.filter((s: Record<string, unknown>) => s.uid !== uid));
-                              setAdminKycNotes("");
+                              setAdminKycNotes((prev) => { const n = { ...prev }; delete n[uid]; return n; });
                               logAdminActivity(`KYC ${action === "approve" ? "Approuvé" : "Rejeté"}`, `${fullName} (${docLabel})`);
                             } else {
                               showToast(data.error || "Erreur");
@@ -2538,8 +2543,8 @@ const handleAdminRejectLoan = async (loan: { id: string; senderUid: string; send
                               <input
                                 type="text"
                                 placeholder="Notes (optionnel)..."
-                                value={adminKycNotes}
-                                onChange={(e) => setAdminKycNotes(e.target.value)}
+                                value={adminKycNotes[uid] || ""}
+                                onChange={(e) => setAdminKycNotes((prev) => ({ ...prev, [uid]: e.target.value }))}
                                 style={{
                                   flex: 1, padding: "8px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,.1)",
                                   background: "rgba(255,255,255,.04)", color: "#fff", fontSize: 12, outline: "none",
@@ -2932,11 +2937,11 @@ const handleAdminRejectLoan = async (loan: { id: string; senderUid: string; send
               <div className="admin-action-group">
                 <div className="admin-action-group-title">🛠️ Gestion du compte</div>
                 <div className="admin-action-row">
-                  <button className={`admin-action-btn ${adminSelectedUser.accountStatus === "suspended" ? "green" : "red"}`} onClick={() => { handleAdminSuspendUser(); showToast(adminSelectedUser.accountStatus === "suspended" ? "Compte réactivé" : "Compte suspendu"); }}>
+                  <button className={`admin-action-btn ${adminSelectedUser.accountStatus === "suspended" ? "green" : "red"}`} onClick={async () => { await handleAdminSuspendUser(); showToast(adminSelectedUser.accountStatus === "suspended" ? "Compte réactivé" : "Compte suspendu"); }}>
                     <svg viewBox="0 0 24 24">{adminSelectedUser.accountStatus === "suspended" ? <><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></> : <><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></>}</svg>
                     {adminSelectedUser.accountStatus === "suspended" ? "Réactiver" : "Suspendre"}
                   </button>
-                  <button className="admin-action-btn blue" onClick={() => { handleAdminResetPin(); showToast("PIN réinitialisé"); }}>
+                  <button className="admin-action-btn blue" onClick={async () => { await handleAdminResetPin(); showToast("PIN réinitialisé"); }}>
                     <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                     Réinitialiser PIN
                   </button>
@@ -2961,7 +2966,7 @@ const handleAdminRejectLoan = async (loan: { id: string; senderUid: string; send
                   <textarea rows={3} value={adminNotifForm.message} onChange={(e) => setAdminNotifForm({ ...adminNotifForm, message: e.target.value })} placeholder="Contenu de la notification..." />
                 </div>
                 <div className="admin-notif-form-actions">
-                  <button className="admin-inline-form-btn confirm" onClick={() => { handleAdminSendNotification(); showToast("Notification envoyée"); }} disabled={!adminNotifForm.title || !adminNotifForm.message}>Envoyer</button>
+                  <button className="admin-inline-form-btn confirm" onClick={async () => { await handleAdminSendNotification(); showToast("Notification envoyée"); }} disabled={!adminNotifForm.title || !adminNotifForm.message}>Envoyer</button>
                   <button className="admin-inline-form-btn cancel" onClick={() => setAdminNotifForm({ title: "", message: "", open: false })}>Annuler</button>
                 </div>
               </div>

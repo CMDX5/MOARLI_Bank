@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { captureError, captureSecurityEvent } from "@/lib/sentry";
+import { getAdminAuth, setAdminClaim } from "@/lib/auth-verify";
 
 /**
  * Admin Login API — SERVER-SIDE CREDENTIAL VERIFICATION
@@ -96,7 +97,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── Success ──
+    // ── Success — set Firebase Custom Claims so admin APIs (revenue, etc.) work ──
+    try {
+      const adminAuth = await getAdminAuth();
+      if (adminAuth) {
+        // Find the Firebase Auth user by email and set admin claims
+        const userRecord = await adminAuth.getUserByEmail(normalizedInput);
+        await setAdminClaim(userRecord.uid, "full");
+      }
+    } catch { /* best-effort — claims already set or user not yet in Firebase Auth */ }
+
     return NextResponse.json({
       success: true,
       message: "Identifiants valides",

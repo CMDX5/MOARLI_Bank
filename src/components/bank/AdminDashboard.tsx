@@ -375,6 +375,13 @@ const handleAdminLogin = async () => {
     // Set permission level: "full" for super-admin, "viewer" for read-only
     setAdminPermissionLevel(userData.roleLevel === "viewer" ? "viewer" : "full");
 
+    // Force refresh Firebase ID token so new admin claims are picked up by API routes
+    try {
+      if (cred.user) {
+        await cred.user.getIdToken(true); // forceRefresh = true
+      }
+    } catch { /* best-effort */ }
+
     setIsAdminLoggedIn(true);
     setAdminLoginEmail("");
     setAdminLoginPassword("");

@@ -4524,7 +4524,8 @@ function App() {
           )}
 
           <div className={`app-screen ${screen === "services" ? "active" : ""}`}>
-            <div className="content-scrollable nav-safe" style={{ paddingBottom: 200 }}>
+            {/* nav-safe already provides 140px bottom padding — no inline override needed */}
+            <div className="content-scrollable nav-safe services-scroll">
               <div className="services-screen">
                 <div className="services-header">
                   <div className="services-topbar">

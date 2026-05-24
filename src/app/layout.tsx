@@ -6,8 +6,10 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  // NOTE: maximumScale and userScalable intentionally omitted.
+  // Blocking zoom violates WCAG 1.4.4 (Resize Text) and prevents
+  // visually impaired users from enlarging content. The app layout
+  // handles its own overflow/scroll — user zoom is safe to allow.
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
 };

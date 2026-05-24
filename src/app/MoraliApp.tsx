@@ -4676,6 +4676,22 @@ function App() {
                       <div className="finance-card-title">Tontine</div>
                       <div className="finance-card-sub rose">Collectif sécurisé</div>
                     </button>
+
+                    <button className="finance-card blue" onClick={openBudget}>
+                      <div className="finance-card-icon blue">
+                        <AppIcon name="chart-bar" size={22} stroke="#60a5fa" />
+                      </div>
+                      <div className="finance-card-title">Budget</div>
+                      <div className="finance-card-sub blue">Suivi mensuel</div>
+                    </button>
+
+                    <button className="finance-card rose" onClick={openLeaderboard}>
+                      <div className="finance-card-icon rose">
+                        <AppIcon name="trophy" size={22} stroke="#fb7185" />
+                      </div>
+                      <div className="finance-card-title">Classement</div>
+                      <div className="finance-card-sub rose">Badges & défis</div>
+                    </button>
                   </div>
                 </section>
               </div>

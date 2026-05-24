@@ -186,7 +186,7 @@ const profileGroups = [
     items: [
       { icon: "user" as IconName, label: "Informations Personnelles" },
       { icon: "shield" as IconName, label: "Sécurité & Biométrie", badge: "Activé" },
-      { icon: "lock" as IconName, label: "Confidentialité" },
+      { icon: "eye-off" as IconName, label: "Confidentialité" },
       { icon: "receipt" as IconName, label: "Historique des Reçus" },
       { icon: "headset" as IconName, label: "Support Client", sub: "Réponse en 5min" },
     ],
@@ -195,7 +195,7 @@ const profileGroups = [
     title: "Légal",
     items: [
       { icon: "document" as IconName, label: "Conditions d'utilisation" },
-      { icon: "eye-off" as IconName, label: "Politique de confidentialité" },
+      { icon: "document" as IconName, label: "Politique de confidentialité" },
     ],
   },
 ];
@@ -6515,17 +6515,6 @@ function App() {
                   </div>
 
                   <div className="priv-divider" />
-
-                  {/* EXCLUSIVE BANNER */}
-                  <div className="priv-exclusive-banner">
-                    <div className="priv-exclusive-icon">
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                    </div>
-                    <div className="priv-exclusive-title">Sur invitation uniquement</div>
-                    <div className="priv-exclusive-desc">
-                      La Carte Morali Black est réservée à nos clients les plus exclusifs. Un programme sur sélection pour une expérience bancaire d&apos;exception.
-                    </div>
-                  </div>
 
                   {/* CTA */}
                   <button className="priv-cta-btn" onClick={openBlackCardModal}>

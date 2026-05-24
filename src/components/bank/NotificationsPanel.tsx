@@ -16,9 +16,10 @@ interface NotificationsPanelProps {
   onPin?: (id: string) => void;
 }
 
-const SWIPE_THRESHOLD = 25;
-const MAX_SWIPE = 88;
-const VELOCITY_THRESHOLD = 0.35; // px/ms — fast flick triggers reveal
+// ── Swipe physics ──
+const MAX_SWIPE = 80;
+const SNAP_THRESHOLD = 28;
+const RUBBER_BAND_LIMIT = 20; // extra px past MAX for rubber-band
 
 export default function NotificationsPanel({
   notifications,
@@ -40,6 +41,9 @@ export default function NotificationsPanel({
     startTime: number;
     isSwiping: boolean;
     direction: 'none' | 'horizontal' | 'vertical';
+    lastX: number;
+    lastTime: number;
+    velocity: number;
   }>>(new Map());
 
   const handleTouchStart = useCallback((id: string, e: React.TouchEvent) => {
@@ -49,8 +53,11 @@ export default function NotificationsPanel({
       startY: touch.clientY,
       currentX: touch.clientX,
       startTime: Date.now(),
+      lastX: touch.clientX,
+      lastTime: Date.now(),
       isSwiping: true,
       direction: 'none',
+      velocity: 0,
     });
   }, []);
 
@@ -62,31 +69,47 @@ export default function NotificationsPanel({
     const dx = swipeState.startX - touch.clientX;
     const dy = Math.abs(touch.clientY - swipeState.startY);
 
-    // Lock direction after 8px of movement
+    // Lock direction after 6px
     if (swipeState.direction === 'none') {
-      if (Math.abs(dx) > 8 || dy > 8) {
+      if (Math.abs(dx) > 6 || dy > 6) {
         swipeState.direction = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
       }
       return;
     }
 
-    // Only handle horizontal swipes (left direction only)
     if (swipeState.direction === 'vertical') return;
-    if (dx < 0) return; // only left swipe
+    if (dx < 0) return;
 
+    // Track velocity (smoothed)
+    const now = Date.now();
+    const dt = now - swipeState.lastTime;
+    if (dt > 0) {
+      const instantV = (touch.clientX - swipeState.lastX) / dt;
+      swipeState.velocity = swipeState.velocity * 0.6 + instantV * 0.4;
+    }
+    swipeState.lastX = touch.clientX;
+    swipeState.lastTime = now;
     swipeState.currentX = touch.clientX;
-    const clamped = Math.min(dx, MAX_SWIPE);
+
+    // Rubber-band: slow down past MAX_SWIPE
+    let clamped = dx;
+    if (clamped > MAX_SWIPE) {
+      const overshoot = clamped - MAX_SWIPE;
+      clamped = MAX_SWIPE + overshoot * 0.25; // dampen
+      clamped = Math.min(clamped, MAX_SWIPE + RUBBER_BAND_LIMIT);
+    }
 
     const el = document.getElementById(`notif-swipe-${id}`);
     const wrap = el?.parentElement;
     if (el) {
       el.style.transform = `translateX(-${clamped}px)`;
       el.style.transition = 'none';
-      // Progressive action reveal: actions opacity follows swipe progress
-      const progress = clamped / MAX_SWIPE;
+      // Progressive action reveal
+      const progress = Math.min(clamped / MAX_SWIPE, 1);
       const actions = wrap?.querySelector('.notif-swipe-actions') as HTMLElement;
       if (actions) {
-        actions.style.opacity = String(Math.min(progress * 2, 1));
+        actions.style.opacity = String(progress * 1.2);
+        actions.style.transition = 'none';
       }
     }
   }, []);
@@ -97,26 +120,33 @@ export default function NotificationsPanel({
     swipeState.isSwiping = false;
 
     const diff = swipeState.startX - swipeState.currentX;
-    const elapsed = Date.now() - swipeState.startTime;
-    const velocity = diff / (elapsed || 1); // px/ms
-
-    const shouldReveal = diff > SWIPE_THRESHOLD || (diff > 10 && velocity > VELOCITY_THRESHOLD);
+    // Use velocity for flick detection
+    const flickVelocity = -swipeState.velocity; // positive = left swipe
+    const shouldReveal = diff > SNAP_THRESHOLD || (diff > 8 && flickVelocity > 0.3);
 
     const el = document.getElementById(`notif-swipe-${id}`);
     const wrap = el?.parentElement;
     if (el) {
       if (shouldReveal) {
-        el.style.transition = 'transform .28s cubic-bezier(.32,.72,.27,1.01)';
+        // Snap to revealed with spring physics
+        el.style.transition = 'transform .32s cubic-bezier(.22,1,.36,1)';
         el.style.transform = `translateX(-${MAX_SWIPE}px)`;
         wrap?.classList.add('revealed');
         const actions = wrap?.querySelector('.notif-swipe-actions') as HTMLElement;
-        if (actions) actions.style.opacity = '1';
+        if (actions) {
+          actions.style.transition = 'opacity .25s ease';
+          actions.style.opacity = '1';
+        }
       } else {
-        el.style.transition = 'transform .3s cubic-bezier(.32,.72,.27,1)';
+        // Bounce back with overshoot
+        el.style.transition = 'transform .4s cubic-bezier(.32,1.4,.56,1)';
         el.style.transform = 'translateX(0)';
         wrap?.classList.remove('revealed');
         const actions = wrap?.querySelector('.notif-swipe-actions') as HTMLElement;
-        if (actions) actions.style.opacity = '0';
+        if (actions) {
+          actions.style.transition = 'opacity .3s ease';
+          actions.style.opacity = '0';
+        }
       }
     }
   }, []);
@@ -147,11 +177,14 @@ export default function NotificationsPanel({
     const el = document.getElementById(`notif-swipe-${id}`);
     const wrap = el?.parentElement;
     if (el) {
-      el.style.transition = 'transform .3s cubic-bezier(.32,.72,.27,1)';
+      el.style.transition = 'transform .4s cubic-bezier(.32,1.4,.56,1)';
       el.style.transform = 'translateX(0)';
       wrap?.classList.remove('revealed');
       const actions = wrap?.querySelector('.notif-swipe-actions') as HTMLElement;
-      if (actions) actions.style.opacity = '0';
+      if (actions) {
+        actions.style.transition = 'opacity .3s ease';
+        actions.style.opacity = '0';
+      }
     }
   };
 
@@ -178,7 +211,7 @@ export default function NotificationsPanel({
         onClick={(e) => { e.stopPropagation(); handlePin(id); }}
         aria-label="Épingler"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 17v5" /><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1Z" />
         </svg>
       </button>
@@ -187,7 +220,7 @@ export default function NotificationsPanel({
         onClick={(e) => { e.stopPropagation(); handleDelete(id); }}
         aria-label="Supprimer"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><path d="M10 11v6" /><path d="M14 11v6" />
         </svg>
       </button>

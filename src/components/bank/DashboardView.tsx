@@ -249,11 +249,11 @@ export default function DashboardView({
           <div className="bc-stats">
             <div className="bc-stat">
               <div className="bc-stat-l">Revenus</div>
-              <div className="bc-stat-v up">{formatStat(weeklyStats.income, "credit")}</div>
+              <div className="bc-stat-v up">{weeklyStats.income > 0 ? formatStat(weeklyStats.income, "credit") : "—"}</div>
             </div>
             <div className="bc-stat">
               <div className="bc-stat-l">Dépenses</div>
-              <div className="bc-stat-v dn">{formatStat(weeklyStats.expenses, "debit")}</div>
+              <div className="bc-stat-v dn">{weeklyStats.expenses > 0 ? formatStat(weeklyStats.expenses, "debit") : "—"}</div>
             </div>
             <div className="bc-stat">
               <div className="bc-stat-l">Épargne</div>

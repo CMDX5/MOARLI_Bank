@@ -4,10 +4,13 @@ import { getAdminFirestore } from "@/lib/admin-firestore";
 
 /**
  * POST /api/admin/reset-all
- * 
+ *
  * DANGER: Resets ALL application data to zero.
- * SECURITY: Protected by Firebase Custom Claims (claims.admin === true)
- * 
+ * SECURITY:
+ *  - Protected by Firebase Custom Claims (claims.admin === true)
+ *  - Requires re-authentication within the last 5 minutes (auth_time check)
+ *  - Requires exact confirmation string "RESET_ALL_DATA"
+ *
  * Requires: Admin Custom Claims + confirmReset: "RESET_ALL_DATA"
  */
 export async function POST(req: NextRequest) {
@@ -15,6 +18,27 @@ export async function POST(req: NextRequest) {
   const auth = await requireAdmin(req);
   if (auth.error) return auth.error;
   if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+  // SECURITY: Require recent authentication (within 5 minutes).
+  // Prevents stale-token abuse on this destructive operation.
+  const authTime = auth.claims?.auth_time;
+  if (typeof authTime !== "number") {
+    return NextResponse.json(
+      { error: "Impossible de vérifier l'heure d'authentification. Reconnectez-vous." },
+      { status: 401 },
+    );
+  }
+  const tokenAgeSeconds = Math.floor(Date.now() / 1000) - authTime;
+  if (tokenAgeSeconds > 300) {
+    return NextResponse.json(
+      {
+        error: "Session trop ancienne. Reconnectez-vous pour effectuer cette action critique.",
+        tokenAgeSec: tokenAgeSeconds,
+        maxAllowedSec: 300,
+      },
+      { status: 401 },
+    );
+  }
 
   const adminDb = await getAdminFirestore();
   if (!adminDb) return NextResponse.json({ error: "Service indisponible" }, { status: 503 });

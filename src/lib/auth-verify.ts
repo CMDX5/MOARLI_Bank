@@ -100,6 +100,11 @@ function verifyTokenLocal(token: string): string | null {
   // SECURITY: Local JWT verification (no signature check) is ONLY allowed
   // when explicitly enabled via ALLOW_INSECURE_AUTH env var.
   // In production, this fallback is ALWAYS disabled.
+
+  // SECURITY: Hard block in production regardless of env var value.
+  // Prevents accidental flag leakage to production environment.
+  if (process.env.NODE_ENV === "production") return null;
+
   if (process.env.ALLOW_INSECURE_AUTH !== "true") return null;
 
   const parts = token.split(".");
@@ -230,7 +235,10 @@ export async function requireAuth(req: NextRequest): Promise<AuthResult> {
  * - Cannot be forged by client-side Firestore writes
  * - Embedded in every ID token after next refresh
  *
- * Fallback: In development only, checks Firestore role field as secondary.
+ * NOTE: The Firestore role-field fallback has been removed.
+ * Relying on a Firestore field for admin authorization is unsafe because
+ * a compromised Admin SDK write could elevate a user to admin without
+ * going through the proper setCustomUserClaims flow. Custom Claims only.
  */
 export async function requireAdmin(req: NextRequest): Promise<AuthResult> {
   const result = await verifyRequestAuthFull(req);
@@ -243,25 +251,9 @@ export async function requireAdmin(req: NextRequest): Promise<AuthResult> {
 
   const { uid, claims } = result;
 
-  // ── Primary: Firebase Custom Claims (production authoritative) ──
+  // ── Firebase Custom Claims (production authoritative — only accepted source) ──
   if (claims.admin === true || claims.role === "admin") {
     return { uid, claims };
-  }
-
-  // ── Fallback: Firestore role field (works in all environments) ──
-  {
-    try {
-      const { getAdminFirestore } = await import("@/lib/admin-firestore");
-      const adminDb = await getAdminFirestore();
-      if (adminDb) {
-        const userDoc = await adminDb.collection("moraliUsers").doc(uid).get();
-        if (userDoc.exists && userDoc.data()?.role === "admin") {
-          return { uid, claims };
-        }
-      }
-    } catch {
-      // Fall through to 403
-    }
   }
 
   return {

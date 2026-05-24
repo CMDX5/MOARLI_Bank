@@ -16,6 +16,7 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // All routes — global security headers
         source: "/(.*)",
         headers: [
           // NOTE: Content-Security-Policy is handled by middleware (per-request nonce)
@@ -23,8 +24,23 @@ const nextConfig: NextConfig = {
           // See src/middleware.ts for the full CSP configuration.
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+          // SECURITY: Prevent clickjacking — deny all iframe embedding.
+          { key: "X-Frame-Options", value: "DENY" },
+        ],
+      },
+      {
+        // QR scanner page — camera access is required here only
+        source: "/scan",
+        headers: [
+          { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=()" },
+        ],
+      },
+      {
+        // All other pages — camera disabled (principle of least privilege)
+        source: "/((?!scan).*)",
+        headers: [
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
         ],
       },
     ];

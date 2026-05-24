@@ -4646,49 +4646,31 @@ function App() {
 
                   <div className="finance-grid">
                     <button className="finance-card emerald" onClick={openSavings}>
-                      <div className="finance-card-icon emerald">
-                        <AppIcon name="piggy" size={22} stroke="#34d399" />
-                      </div>
                       <div className="finance-card-title">Épargne</div>
                       <div className="finance-card-sub emerald">Taux annuel +4.5%</div>
                     </button>
 
                     <button className="finance-card amber" onClick={() => { setScreen("loans"); setNavActive("Accueil"); }}>
-                      <div className="finance-card-icon amber">
-                        <AppIcon name="bank" size={22} stroke="#fbbf24" />
-                      </div>
                       <div className="finance-card-title">Prêt</div>
                       <div className="finance-card-sub amber">Personnel & rapide</div>
                     </button>
 
                     <button className="finance-card blue" onClick={openWallet}>
-                      <div className="finance-card-icon blue">
-                        <AppIcon name="wallet" size={22} stroke="#60a5fa" />
-                      </div>
                       <div className="finance-card-title">Portefeuilles</div>
                       <div className="finance-card-sub blue">EUR / USD</div>
                     </button>
 
                     <button className="finance-card rose" onClick={openTontine}>
-                      <div className="finance-card-icon rose">
-                        <AppIcon name="users" size={22} stroke="#fb7185" />
-                      </div>
                       <div className="finance-card-title">Tontine</div>
                       <div className="finance-card-sub rose">Collectif sécurisé</div>
                     </button>
 
                     <button className="finance-card blue" onClick={openBudget}>
-                      <div className="finance-card-icon blue">
-                        <AppIcon name="chart" size={22} stroke="#60a5fa" />
-                      </div>
                       <div className="finance-card-title">Budget</div>
                       <div className="finance-card-sub blue">Suivi mensuel</div>
                     </button>
 
                     <button className="finance-card rose" onClick={openLeaderboard}>
-                      <div className="finance-card-icon rose">
-                        <AppIcon name="trophy" size={22} stroke="#fb7185" />
-                      </div>
                       <div className="finance-card-title">Classement</div>
                       <div className="finance-card-sub rose">Badges & défis</div>
                     </button>

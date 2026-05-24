@@ -256,7 +256,7 @@ export default function LeaderboardView({ authUid, onBack, showToast, getAuthHea
     <div style={{
       minHeight: "100vh", background: "#050b1a", color: "#fff",
       fontFamily: "'Inter','Segoe UI',sans-serif", padding: 16,
-      paddingBottom: 100,
+      paddingBottom: 180,
     }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>

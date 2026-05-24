@@ -16,8 +16,8 @@ interface NotificationsPanelProps {
   onPin?: (id: string) => void;
 }
 
-const SWIPE_THRESHOLD = 50;
-const MAX_SWIPE = 90;
+const SWIPE_THRESHOLD = 40;
+const MAX_SWIPE = 88;
 
 export default function NotificationsPanel({
   notifications,
@@ -137,14 +137,18 @@ export default function NotificationsPanel({
         onClick={(e) => { e.stopPropagation(); handlePin(id); }}
         aria-label="Épingler"
       >
-        <AppIcon name={pinnedIds.has(id) ? "pin" : "pin"} size={18} stroke="#3b82f6" />
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 17v5" /><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1Z" />
+        </svg>
       </button>
       <button
         className="notif-swipe-btn notif-swipe-delete"
         onClick={(e) => { e.stopPropagation(); handleDelete(id); }}
         aria-label="Supprimer"
       >
-        <AppIcon name="shield" size={18} stroke="#ef4444" />
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><path d="M10 11v6" /><path d="M14 11v6" />
+        </svg>
       </button>
     </div>
   );

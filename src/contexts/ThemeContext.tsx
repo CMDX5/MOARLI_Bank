@@ -143,11 +143,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<ThemeMode>(() => {
     const stored = readStoredTheme();
     if (stored) return stored;
-    // Auto-detect system preference (dark→base, light→light)
-    if (typeof window !== 'undefined') {
-      const mq = window.matchMedia('(prefers-color-scheme: light)');
-      return mq.matches ? 'light' : 'base';
-    }
+    // Always default to dark 'base' theme for MOARLI Bank
     return 'base';
   });
 

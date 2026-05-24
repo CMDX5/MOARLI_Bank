@@ -271,12 +271,7 @@ export default function CardsView({
             ))}
           </div>
 
-          <div className="tip-box">
-            <div className="tab-card-icon" style={{ background: "rgba(251,191,36,.1)", color: "#fbbf24", flexShrink: 0 }}>
-              <AppIcon name="spark" size={18} stroke="#fbbf24" />
-            </div>
-            <p className="tip-text">Astuce : Utilisez votre carte Essentielle pour le quotidien et votre carte Black pour les transactions premium.</p>
-          </div>
+
         </div>
       </div>
     </div>

@@ -18,7 +18,8 @@ interface NotificationsPanelProps {
 
 // ── Swipe physics ──
 const MAX_SWIPE = 80;
-const SNAP_THRESHOLD = 28;
+const SNAP_THRESHOLD = 40;
+const FLICK_VELOCITY_THRESHOLD = 0.5;
 const RUBBER_BAND_LIMIT = 20; // extra px past MAX for rubber-band
 
 export default function NotificationsPanel({
@@ -59,6 +60,9 @@ export default function NotificationsPanel({
       direction: 'none',
       velocity: 0,
     });
+    // Kill any CSS transition immediately for smooth first frame
+    const el = document.getElementById(`notif-swipe-${id}`);
+    if (el) el.style.transition = 'none';
   }, []);
 
   const handleTouchMove = useCallback((id: string, e: React.TouchEvent) => {
@@ -122,7 +126,7 @@ export default function NotificationsPanel({
     const diff = swipeState.startX - swipeState.currentX;
     // Use velocity for flick detection
     const flickVelocity = -swipeState.velocity; // positive = left swipe
-    const shouldReveal = diff > SNAP_THRESHOLD || (diff > 8 && flickVelocity > 0.3);
+    const shouldReveal = diff > SNAP_THRESHOLD || (diff > 15 && flickVelocity > FLICK_VELOCITY_THRESHOLD);
 
     const el = document.getElementById(`notif-swipe-${id}`);
     const wrap = el?.parentElement;
@@ -228,7 +232,11 @@ export default function NotificationsPanel({
   );
 
   return (
-    <div className={`notif-overlay ${open ? "open" : ""}`} onClick={onClose}>
+    <div className={`notif-overlay ${open ? "open" : ""}`} onClick={() => {
+      // Reset all swipes on overlay close
+      swipeRefs.current.forEach((_, id) => resetSwipe(id));
+      onClose();
+    }}>
       <div className="notif-panel" onClick={(event) => event.stopPropagation()}>
         <div className="notif-panel-head">
           <h3 className="notif-panel-title">Notifications</h3>

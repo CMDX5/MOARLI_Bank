@@ -78,7 +78,7 @@ export default function ProfileView({
                         item.icon === "lock" ? "rgba(212,164,55,.12)" :
                         item.icon === "receipt" ? "rgba(34,197,94,.12)" :
                         item.icon === "headset" ? "rgba(168,85,247,.12)" :
-                        item.icon === "eye-off" ? "rgba(148,163,184,.12)" :
+                        item.icon === "eye-off" ? "rgba(129,140,248,.12)" :
                         "rgba(255,255,255,.05)",
                       borderColor: item.icon === "shield" ? "rgba(96,165,250,.2)" :
                         item.icon === "user" ? "rgba(59,130,246,.2)" :
@@ -86,7 +86,7 @@ export default function ProfileView({
                         item.icon === "receipt" ? "rgba(34,197,94,.2)" :
                         item.icon === "headset" ? "rgba(168,85,247,.2)" :
                         item.icon === "document" ? "rgba(251,191,36,.2)" :
-                        item.icon === "eye-off" ? "rgba(148,163,184,.2)" :
+                        item.icon === "eye-off" ? "rgba(129,140,248,.2)" :
                         "rgba(255,255,255,.06)",
                     }}>
                       <AppIcon name={item.icon} size={20} stroke={
@@ -96,7 +96,7 @@ export default function ProfileView({
                         item.icon === "receipt" ? "#22c55e" :
                         item.icon === "headset" ? "#a855f7" :
                         item.icon === "document" ? "#fbbf24" :
-                        item.icon === "eye-off" ? "#94a3b8" :
+                        item.icon === "eye-off" ? "#818cf8" :
                         "#cbd5e1"
                       } />
                     </div>

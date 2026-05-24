@@ -1692,7 +1692,7 @@ function App() {
     let savingsRate: string;
     if (!hasRealData) {
       // No transactions at all
-      savingsRate = "—";
+      savingsRate = "0%";
     } else if (totalIncome === 0 && totalExpenses > 0) {
       // Expenses but no income
       savingsRate = "0%";

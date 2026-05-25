@@ -6444,7 +6444,7 @@ function App() {
           </div>
 
           <div className={`app-screen ${screen === "privileges" ? "active" : ""}`}>
-            <div className="content-scrollable priv-safe">
+            <div className="content-scrollable nav-safe">
               <div className="privileges-screen">
 
                 {/* ── HERO IMAGE SECTION ── */}

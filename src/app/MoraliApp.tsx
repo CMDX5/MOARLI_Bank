@@ -1628,7 +1628,7 @@ function App() {
   // Dynamic chart days based on selected period
   const dynamicChartDays = useMemo(() => {
     const monthNames = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
-    const days = [];
+    const days: { label: string; day: number; month: number; year: number; dateStr: string }[] = [];
     const daysBack = chartPeriod === "7j" ? 6 : chartPeriod === "30j" ? 29 : 180;
     const step = chartPeriod === "6m" ? 3 : 1;
     for (let d = daysBack; d >= 0; d -= step) {

@@ -4649,52 +4649,52 @@ function App() {
                   </div>
 
                   <div className="services-grid">
-                    <button className="service-tile" onClick={openSavings}>
-                      <div className="service-icon-box">
+                    <button className="service-tile" style={{ borderColor: "rgba(16,185,129,.25)", background: "rgba(16,185,129,.06)" }} onClick={openSavings}>
+                      <div className="service-icon-box" style={{ background: "rgba(16,185,129,.15)" }}>
                         <AppIcon name="piggy" size={20} stroke="#34d399" />
                       </div>
                       <div className="service-name">Épargne</div>
-                      <div className="service-desc">Épargnez vos fonds</div>
+                      <div className="service-desc" style={{ color: "rgba(52,211,153,.7)" }}>Épargnez vos fonds</div>
                     </button>
 
-                    <button className="service-tile" onClick={() => { setScreen("loans"); setNavActive("Accueil"); }}>
-                      <div className="service-icon-box">
+                    <button className="service-tile" style={{ borderColor: "rgba(245,158,11,.25)", background: "rgba(245,158,11,.06)" }} onClick={() => { setScreen("loans"); setNavActive("Accueil"); }}>
+                      <div className="service-icon-box" style={{ background: "rgba(245,158,11,.15)" }}>
                         <AppIcon name="bank" size={20} stroke="#fbbf24" />
                       </div>
                       <div className="service-name">Prêt</div>
-                      <div className="service-desc">Sur demande</div>
+                      <div className="service-desc" style={{ color: "rgba(251,191,36,.7)" }}>Sur demande</div>
                     </button>
 
-                    <button className="service-tile" onClick={openWallet}>
-                      <div className="service-icon-box">
+                    <button className="service-tile" style={{ borderColor: "rgba(59,130,246,.25)", background: "rgba(59,130,246,.06)" }} onClick={openWallet}>
+                      <div className="service-icon-box" style={{ background: "rgba(59,130,246,.15)" }}>
                         <AppIcon name="wallet" size={20} stroke="#60a5fa" />
                       </div>
                       <div className="service-name">Portefeuilles</div>
-                      <div className="service-desc">EUR / USD</div>
+                      <div className="service-desc" style={{ color: "rgba(96,165,250,.7)" }}>EUR / USD</div>
                     </button>
 
-                    <button className="service-tile" onClick={openTontine}>
-                      <div className="service-icon-box">
+                    <button className="service-tile" style={{ borderColor: "rgba(244,63,94,.25)", background: "rgba(244,63,94,.06)" }} onClick={openTontine}>
+                      <div className="service-icon-box" style={{ background: "rgba(244,63,94,.15)" }}>
                         <AppIcon name="users" size={20} stroke="#fb7185" />
                       </div>
                       <div className="service-name">Tontine</div>
-                      <div className="service-desc">Épargne collective</div>
+                      <div className="service-desc" style={{ color: "rgba(251,113,133,.7)" }}>Épargne collective</div>
                     </button>
 
-                    <button className="service-tile" onClick={openBudget}>
-                      <div className="service-icon-box">
-                        <AppIcon name="receipt" size={20} stroke="#60a5fa" />
+                    <button className="service-tile" style={{ borderColor: "rgba(139,92,246,.25)", background: "rgba(139,92,246,.06)" }} onClick={openBudget}>
+                      <div className="service-icon-box" style={{ background: "rgba(139,92,246,.15)" }}>
+                        <AppIcon name="receipt" size={20} stroke="#a78bfa" />
                       </div>
                       <div className="service-name">Budget</div>
-                      <div className="service-desc">Suivi mensuel</div>
+                      <div className="service-desc" style={{ color: "rgba(167,139,250,.7)" }}>Suivi mensuel</div>
                     </button>
 
-                    <button className="service-tile" onClick={openLeaderboard}>
-                      <div className="service-icon-box">
+                    <button className="service-tile" style={{ borderColor: "rgba(212,164,55,.25)", background: "rgba(212,164,55,.06)" }} onClick={openLeaderboard}>
+                      <div className="service-icon-box" style={{ background: "rgba(212,164,55,.15)" }}>
                         <AppIcon name="trophy" size={20} stroke="#D4A437" />
                       </div>
                       <div className="service-name">Classement</div>
-                      <div className="service-desc">Badges & défis</div>
+                      <div className="service-desc" style={{ color: "rgba(212,164,55,.7)" }}>Badges & défis</div>
                     </button>
                   </div>
                 </section>

@@ -5,7 +5,6 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: false,
   },
   reactStrictMode: true,
-  output: "standalone",
 
   // Prevent firebase-admin from being bundled into client code
   serverExternalPackages: ["firebase-admin"],

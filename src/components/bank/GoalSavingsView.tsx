@@ -20,12 +20,12 @@ interface GoalSavingsViewProps {
    Goal Templates
    ───────────────────────────────────────────── */
 const GOAL_TEMPLATES = [
-  { name: "Vacances", icon: "sun" as IconName, color: "#f59e0b", defaultTarget: 300000, emoji: "✈️" },
-  { name: "Éducation", icon: "chart" as IconName, color: "#3b82f6", defaultTarget: 500000, emoji: "📚" },
-  { name: "Voiture", icon: "flash" as IconName, color: "#8b5cf6", defaultTarget: 2000000, emoji: "🚗" },
-  { name: "Urgence", icon: "shield" as IconName, color: "#ef4444", defaultTarget: 200000, emoji: "🛡️" },
-  { name: "Mariage", icon: "gift" as IconName, color: "#ec4899", defaultTarget: 1500000, emoji: "💍" },
-  { name: "Custom", icon: "spark" as IconName, color: "#22c55e", defaultTarget: 100000, emoji: "✨" },
+  { name: "Vacances", icon: "sun" as IconName, color: "#f59e0b", defaultTarget: 300000, emoji: "" },
+  { name: "Éducation", icon: "chart" as IconName, color: "#3b82f6", defaultTarget: 500000, emoji: "" },
+  { name: "Voiture", icon: "flash" as IconName, color: "#8b5cf6", defaultTarget: 2000000, emoji: "" },
+  { name: "Urgence", icon: "shield" as IconName, color: "#ef4444", defaultTarget: 200000, emoji: "" },
+  { name: "Mariage", icon: "gift" as IconName, color: "#ec4899", defaultTarget: 1500000, emoji: "" },
+  { name: "Custom", icon: "spark" as IconName, color: "#22c55e", defaultTarget: 100000, emoji: "" },
 ];
 
 type ModalType = "create" | "addMoney" | "withdraw" | "deleteConfirm" | null;
@@ -493,7 +493,6 @@ export default function GoalSavingsView({
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: 44,
               }}>
-                🎯
               </div>
               <div>
                 <div style={{

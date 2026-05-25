@@ -342,7 +342,6 @@ export default function BusinessDashboardView({ authUid, firestoreBalance, onBac
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 22,
               }}>
-                👥
               </div>
               <div>
                 <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>

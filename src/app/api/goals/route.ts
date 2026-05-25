@@ -132,7 +132,7 @@ export async function PATCH(req: NextRequest) {
         success: true,
         currentAmount: newAmount,
         message: amount > 0 && newAmount >= targetAmount
-          ? "🎉 Félicitations ! Objectif atteint !"
+          ? "Félicitations ! Objectif atteint !"
           : `+${formatFCFA(amount)} ajouté à l'objectif`,
       });
     } else {

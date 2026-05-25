@@ -70,7 +70,6 @@ import QrScanner from "@/components/bank/QrScanner";
 import CardsView from "@/components/bank/CardsView";
 import TransactionsView from "@/components/bank/TransactionsView";
 import TransferView from "@/components/bank/TransferView";
-import RequestMoneyView from "@/components/bank/RequestMoneyView";
 import LegalTerms from "@/components/bank/LegalTerms";
 import PrivacyPolicy from "@/components/bank/PrivacyPolicy";
 import AdminDashboard, { type AdminDashboardHandle, type AdminDashboardProps } from "@/components/bank/AdminDashboard";
@@ -174,7 +173,7 @@ const serviceTiles: Array<{ icon: IconName; name: string; desc: string; accent: 
 
 const initialPaymentContacts: PaymentContact[] = [];
 const cardActions = [
-  { icon: "snowflake" as IconName, label: "Geler la carte", sub: "Sécurité instantanée" },
+  { icon: "snowflake" as IconName, label: "Geler la carte", sub: "Geler / Dégeler" },
   { icon: "pin" as IconName, label: "Code PIN", sub: "Carte confidentielle" },
   { icon: "service" as IconName, label: "Limites", sub: "Gérer les plafonds" },
   { icon: "request" as IconName, label: "Nouvelle", sub: "Carte virtuelle" },
@@ -188,7 +187,7 @@ const profileGroups = [
       { icon: "shield" as IconName, label: "Sécurité & Face ID" },
       { icon: "eye-off" as IconName, label: "Confidentialité" },
       { icon: "receipt" as IconName, label: "Historique des Reçus" },
-      { icon: "headset" as IconName, label: "Support Client", sub: "Assistance instantanée" },
+      { icon: "headset" as IconName, label: "Support Client" },
     ],
   },
   {
@@ -540,7 +539,6 @@ function App() {
   const [verifiedMoraliUser, setVerifiedMoraliUser] = useState<MoraliUser | null>(null);
   const [paymentContacts, setPaymentContacts] = useState<PaymentContact[]>(initialPaymentContacts);
   const [requestQrOpen, setRequestQrOpen] = useState(false);
-  const [requestMoneyOpen, setRequestMoneyOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const transferInitialQueryRef = useRef<string | undefined>(undefined);
 
@@ -748,8 +746,6 @@ function App() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [liveTransactions, setLiveTransactions] = useState<Transaction[]>([]);
   const [firestoreBalance, setFirestoreBalance] = useState<number | null>(null);
-  const [pendingMoneyRequests, setPendingMoneyRequests] = useState<{ id: string; senderName: string; senderMoraliId: string; amount: number; message?: string; createdAt?: unknown; isIncoming?: boolean }[]>([]);
-  const [payingRequestId, setPayingRequestId] = useState<string | null>(null);
 
   // Tick every 30s to refresh relative timestamps
   useEffect(() => {
@@ -852,14 +848,13 @@ function App() {
         if (cardPinOpen) { closePinModal(); return; }
         if (infoDrawerOpen) { setInfoDrawerOpen(false); return; }
         if (transferOpen) { setTransferOpen(false); return; }
-        if (requestMoneyOpen) { setRequestMoneyOpen(false); return; }
         const serviceScreens: Screen[] = ["credit", "internet", "canalplus", "electricity", "water", "crypto", "tontine", "merchant", "microcredit", "personalloan", "loans", "currency", "savings", "wallet"];
         if (serviceScreens.includes(screen)) { setScreen("dashboard"); return; }
       }
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [blackCardOpen, cameraScannerOpen, securityModalOpen, privacyModalOpen, contactModalOpen, historyModalOpen, receiptsOpen, supportOpen, termsOpen, virtualCardOpen, cardLimitsOpen, cardManageOpen, cardPinOpen, infoDrawerOpen, transferOpen, requestMoneyOpen, screen]);
+  }, [blackCardOpen, cameraScannerOpen, securityModalOpen, privacyModalOpen, contactModalOpen, historyModalOpen, receiptsOpen, supportOpen, termsOpen, virtualCardOpen, cardLimitsOpen, cardManageOpen, cardPinOpen, infoDrawerOpen, transferOpen, screen]);
 
   useEffect(() => {
     getRedirectResult(firebaseAuth).catch((err: unknown) => {
@@ -1151,72 +1146,6 @@ function App() {
       unsubSupport();
     };
   }, [authUid]);
-
-  // Fetch pending money requests for current user
-  useEffect(() => {
-    if (!authUid) return;
-    const fetchPendingRequests = async () => {
-      try {
-        const res = await fetch(`/api/money-request?uid=${authUid}`, {
-          headers: await getAuthHeaders(),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && (data.incoming || data.outgoing)) {
-            const incoming = (data.incoming || []).filter((r: { status: string }) => r.status === "pending").map((r: Record<string, unknown>) => ({ ...r, isIncoming: true }));
-            const outgoing = (data.outgoing || []).filter((r: { status: string }) => r.status === "pending").map((r: Record<string, unknown>) => ({ ...r, isIncoming: false }));
-            setPendingMoneyRequests([...incoming, ...outgoing]);
-          }
-        }
-      } catch {
-        // silent
-      }
-    };
-    fetchPendingRequests();
-    const interval = setInterval(fetchPendingRequests, 15000);
-    return () => clearInterval(interval);
-  }, [authUid]);
-
-  const payMoneyRequest = async (requestId: string) => {
-    setPayingRequestId(requestId);
-    try {
-      const res = await fetch("/api/money-request", {
-        method: "POST",
-        headers: await getAuthHeaders(),
-        body: JSON.stringify({ action: "pay", requestId, senderUid: authUid }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (data.success) {
-        showToast("Paiement envoyé avec succès");
-        setPendingMoneyRequests((prev) => prev.filter((r) => r.id !== requestId));
-      } else {
-        showToast(data.error || "Erreur lors du paiement");
-      }
-    } catch {
-      showToast("Erreur de connexion");
-    } finally {
-      setPayingRequestId(null);
-    }
-  };
-
-  const cancelMoneyRequest = async (requestId: string) => {
-    try {
-      const res = await fetch("/api/money-request", {
-        method: "POST",
-        headers: await getAuthHeaders(),
-        body: JSON.stringify({ action: "cancel", requestId, senderUid: authUid }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (data.success) {
-        showToast("Demande annulée");
-        setPendingMoneyRequests((prev) => prev.filter((r) => r.id !== requestId));
-      } else {
-        showToast(data.error || "Erreur");
-      }
-    } catch {
-      showToast("Erreur de connexion");
-    }
-  };
 
   // Process pending transfer credits — polls every 3 seconds while logged in
   useEffect(() => {
@@ -2110,10 +2039,6 @@ function App() {
   };
 
   // ── openTransferModal: simplified — TransferView handles internal reset ──
-  const openRequestMoney = () => {
-    setRequestMoneyOpen(true);
-  };
-
   const openTransferModal = () => {
     transferInitialQueryRef.current = undefined;
     setTransferOpen(true);
@@ -3013,7 +2938,7 @@ function App() {
           tier: "black",
           eligible: true,
           status: "none",
-          provider: "Visa Infinite",
+          provider: "Visa",
           spendingLimit: 1500000,
           monthlyLimit: 10000000,
           concierge: true,
@@ -3041,7 +2966,7 @@ function App() {
       tier: "black",
       eligible: true,
       status: "requested",
-      provider: "Visa Infinite",
+      provider: "Visa",
       spendingLimit: 1500000,
       monthlyLimit: 10000000,
       concierge: true,
@@ -4729,7 +4654,7 @@ function App() {
                         <AppIcon name="piggy" size={20} stroke="#34d399" />
                       </div>
                       <div className="service-name">Épargne</div>
-                      <div className="service-desc">Taux annuel +4.5%</div>
+                      <div className="service-desc">Épargnez vos fonds</div>
                     </button>
 
                     <button className="service-tile" onClick={() => { setScreen("loans"); setNavActive("Accueil"); }}>
@@ -4737,7 +4662,7 @@ function App() {
                         <AppIcon name="bank" size={20} stroke="#fbbf24" />
                       </div>
                       <div className="service-name">Prêt</div>
-                      <div className="service-desc">Personnel & rapide</div>
+                      <div className="service-desc">Sur demande</div>
                     </button>
 
                     <button className="service-tile" onClick={openWallet}>
@@ -4753,7 +4678,7 @@ function App() {
                         <AppIcon name="users" size={20} stroke="#fb7185" />
                       </div>
                       <div className="service-name">Tontine</div>
-                      <div className="service-desc">Collectif sécurisé</div>
+                      <div className="service-desc">Épargne collective</div>
                     </button>
 
                     <button className="service-tile" onClick={openBudget}>
@@ -4973,7 +4898,7 @@ function App() {
                       </div>
                       <div className="loans-option-divider" />
                       <div className="loans-option-metric">
-                        <div className="loans-option-metric-val gold">TAEG 12%</div>
+                        <div className="loans-option-metric-val gold">TAEG variable</div>
                         <div className="loans-option-metric-lbl">fixe</div>
                       </div>
                     </div>
@@ -5226,7 +5151,7 @@ function App() {
                         </div>
                         <div className="loan-recap-item">
                           <div className="loan-recap-label">TAEG</div>
-                          <div className="loan-recap-value" style={{ color: "#fbbf24" }}>12.00%</div>
+                          <div className="loan-recap-value" style={{ color: "#fbbf24" }}>Variable</div>
                         </div>
                         <div className="loan-recap-item">
                           <div className="loan-recap-label">Mensualité estimée</div>
@@ -5256,7 +5181,7 @@ function App() {
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
                           <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
                         </svg>
-                        Le taux annuel effectif global (TAEG) est de 12%. Les mensualités seront prélevées automatiquement.
+                        Le taux annuel effectif global (TAEG) est variable selon votre profil et la durée. Les conditions exactes vous seront communiquées lors de l'étude de votre dossier.
                       </div>
 
                       <div className="loan-btn-group">
@@ -5340,7 +5265,7 @@ function App() {
                       </div>
                       <div className="loan-summary-row">
                         <span>Taux (TAEG)</span>
-                        <span>12.00%</span>
+                        <span>Variable</span>
                       </div>
                       <div className="loan-summary-row">
                         <span>Durée</span>
@@ -6455,20 +6380,6 @@ function App() {
                   initialRecipientQuery={transferInitialQueryRef.current}
                 />
 
-                {/* ── Request Money modal ── */}
-                <RequestMoneyView
-                  open={requestMoneyOpen}
-                  onClose={() => setRequestMoneyOpen(false)}
-                  authUid={authUid || ""}
-                  dashboardName={dashboardName}
-                  bankingIdentity={bankingIdentity}
-                  balance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
-                  showToast={showToast}
-                  getAuthHeaders={getAuthHeaders}
-                  findMoraliUser={findMoraliUser}
-                  createRealtimeNotification={createRealtimeNotification}
-                />
-
                 <div className="tab-grid-two">
                   <button className="service-card virement" onClick={openTransferModal}>
                     <div className="service-icon-box">
@@ -6479,105 +6390,18 @@ function App() {
                       <p className="tab-card-sub">Vers banque ou mobile</p>
                     </div>
                   </button>
-                  <button className="service-card demander" onClick={openRequestMoney}>
+                  <button className="service-card demander" onClick={openRequestQr}>
                     <div className="service-icon-box">
                       <AppIcon name="request" size={18} stroke="#4ade80" />
                     </div>
                     <div>
                       <p className="tab-card-title">Demander</p>
-                      <p className="tab-card-sub">Demander de l'argent</p>
+                      <p className="tab-card-sub">Lien de paiement QR</p>
                     </div>
                   </button>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  {/* ── Pending Money Requests ── */}
-                  {pendingMoneyRequests.length > 0 && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 2px" }}>
-                        <p className="tab-kicker" style={{ color: "#fbbf24" }}>💸 Demandes d'argent</p>
-                        <span style={{ fontSize: 10, color: "#fbbf24", fontWeight: 800 }}>{pendingMoneyRequests.length} en attente</span>
-                      </div>
-                      {pendingMoneyRequests.map((req) => (
-                        <div key={req.id} style={{
-                          padding: "14px 16px", borderRadius: 18,
-                          background: req.isIncoming
-                            ? "linear-gradient(135deg, rgba(251,191,36,0.08), rgba(212,164,55,0.04))"
-                            : "linear-gradient(135deg, rgba(59,130,246,0.06), rgba(59,130,246,0.02))",
-                          border: req.isIncoming
-                            ? "1px solid rgba(251,191,36,0.2)"
-                            : "1px solid rgba(59,130,246,0.15)",
-                        }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                            <div>
-                              <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", marginBottom: 2 }}>
-                                {req.isIncoming ? req.senderName : "Envoyée"}
-                              </div>
-                              <div style={{ fontSize: 11, color: "var(--dim)" }}>
-                                {req.isIncoming ? "vous demande" : "votre demande en attente"}
-                              </div>
-                            </div>
-                            <div style={{ fontSize: 18, fontWeight: 900, color: req.isIncoming ? "#fbbf24" : "#60a5fa", fontFamily: "'Montserrat',sans-serif" }}>
-                              {formatCurrency(req.amount)} <span style={{ fontSize: 11, fontWeight: 600 }}>FCFA</span>
-                            </div>
-                          </div>
-                          {req.message && (
-                            <div style={{ fontSize: 11, color: "var(--muted)", fontStyle: "italic", marginBottom: 10, lineHeight: 1.4 }}>
-                              &ldquo;{req.message}&rdquo;
-                            </div>
-                          )}
-                          {req.isIncoming ? (
-                            <div style={{ display: "flex", gap: 8 }}>
-                              <button
-                                disabled={payingRequestId === req.id}
-                                onClick={() => payMoneyRequest(req.id)}
-                                style={{
-                                  flex: 1, height: 40, borderRadius: 12, border: "none",
-                                  background: payingRequestId === req.id ? "rgba(255,255,255,0.1)" : "linear-gradient(135deg, #22c55e, #16a34a)",
-                                  color: "#fff", fontSize: 13, fontWeight: 800,
-                                  fontFamily: "'Montserrat',sans-serif", cursor: payingRequestId === req.id ? "not-allowed" : "pointer",
-                                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                                  opacity: payingRequestId === req.id ? 0.6 : 1,
-                                }}
-                              >
-                                {payingRequestId === req.id ? (
-                                  <><span className="transfer-search-spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> Paiement...</>
-                                ) : (
-                                  <><AppIcon name="send" size={14} stroke="#fff" /> Payer</>
-                                )}
-                              </button>
-                              <button
-                                onClick={() => cancelMoneyRequest(req.id)}
-                                style={{
-                                  width: 40, height: 40, borderRadius: 12,
-                                  border: "1px solid rgba(255,255,255,0.1)",
-                                  background: "rgba(255,255,255,0.04)",
-                                  color: "var(--dim)", fontSize: 16, cursor: "pointer",
-                                  display: "flex", alignItems: "center", justifyContent: "center",
-                                }}
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => cancelMoneyRequest(req.id)}
-                              style={{
-                                height: 36, borderRadius: 10, border: "1px solid rgba(239,68,68,0.25)",
-                                background: "rgba(239,68,68,0.06)",
-                                color: "#f87171", fontSize: 12, fontWeight: 700,
-                                fontFamily: "'Montserrat',sans-serif", cursor: "pointer",
-                                display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
-                              }}
-                            >
-                              Annuler la demande
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 2px" }}>
                     <p className="tab-kicker" style={{ color: "var(--gold)" }}>Activité récente</p>
                     <span style={{ fontSize: 10, color: "#3b82f6", fontWeight: 800, cursor: "pointer" }} onClick={() => { setScreen("dashboard"); setNavActive("Accueil"); setNotificationsOpen(true); }}>Voir tout →</span>
@@ -6639,7 +6463,7 @@ function App() {
                     <h1 className="priv-hero-title">
                       La Carte <span>Black</span><br />d&apos;exception
                     </h1>
-                    <p className="priv-hero-sub">Votre passeport vers un monde de privilèges exclusifs. Puissance, prestige et performances bancaires réunis.</p>
+                    <p className="priv-hero-sub">Un programme premium pour une expérience bancaire supérieure.</p>
                   </div>
                 </div>
 
@@ -6679,29 +6503,29 @@ function App() {
                       <div className="priv-benefit-icon sapphire">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                       </div>
-                      <div className="priv-benefit-name">Cashback Renforcé</div>
-                      <div className="priv-benefit-desc">Jusqu&apos;à 3.5% de remise sur tous vos achats premium.</div>
+                      <div className="priv-benefit-name">Cashback</div>
+                      <div className="priv-benefit-desc">Remise sur vos achats selon le programme en vigueur.</div>
                     </div>
                     <div className="priv-benefit-card">
                       <div className="priv-benefit-icon emerald">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
                       </div>
-                      <div className="priv-benefit-name">Conciergerie 24/7</div>
-                      <div className="priv-benefit-desc">Assistance personnelle pour voyages, réservations et demandes.</div>
+                      <div className="priv-benefit-name">Assistance Prioritaire</div>
+                      <div className="priv-benefit-desc">Support dédié pour toutes vos demandes.</div>
                     </div>
                     <div className="priv-benefit-card">
                       <div className="priv-benefit-icon rose">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
                       </div>
-                      <div className="priv-benefit-name">Assurance Voyage</div>
-                      <div className="priv-benefit-desc">Couverture internationale complète sur vos déplacements.</div>
+                      <div className="priv-benefit-name">Protection</div>
+                      <div className="priv-benefit-desc">Sécurité renforcée sur vos transactions et comptes.</div>
                     </div>
                     <div className="priv-benefit-card">
                       <div className="priv-benefit-icon amber">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
                       </div>
-                      <div className="priv-benefit-name">Accès Lounges</div>
-                      <div className="priv-benefit-desc">Salons VIP dans plus de 1 300 aéroports dans le monde.</div>
+                      <div className="priv-benefit-name">Flexibilité</div>
+                      <div className="priv-benefit-desc">Gérez vos plafonds et limites selon vos besoins.</div>
                     </div>
                     <div className="priv-benefit-card">
                       <div className="priv-benefit-icon violet">
@@ -6799,27 +6623,21 @@ function App() {
 />
 )}
 {screen === "budget" && (
-<div className="app-screen active">
-  <div className="content-scrollable nav-safe">
-    <BudgetView
-      authUid={authUid}
-      firestoreBalance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
-      onBack={closeHub}
-      showToast={showToast}
-      getAuthHeaders={getAuthHeaders}
-    />
-  </div>
-</div>
+<BudgetView
+  authUid={authUid}
+  firestoreBalance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
+  onBack={closeHub}
+  showToast={showToast}
+  getAuthHeaders={getAuthHeaders}
+/>
 )}
 {screen === "chat" && (
-<div className="app-screen active">
-  <ChatSupportView
-    authUid={authUid}
-    onBack={openDashboard}
-    showToast={showToast}
-    getAuthHeaders={getAuthHeaders}
-  />
-</div>
+<ChatSupportView
+  authUid={authUid}
+  onBack={openDashboard}
+  showToast={showToast}
+  getAuthHeaders={getAuthHeaders}
+/>
 )}
 {screen === "leaderboard" && (
 <div className={`app-screen active`}>
@@ -6834,25 +6652,21 @@ function App() {
 </div>
 )}
 {screen === "payLinks" && (
-<div className="app-screen active">
-  <PayLinksView
-    authUid={authUid}
-    onBack={openDashboard}
-    showToast={showToast}
-    getAuthHeaders={getAuthHeaders}
-  />
-</div>
+<PayLinksView
+  authUid={authUid}
+  onBack={openDashboard}
+  showToast={showToast}
+  getAuthHeaders={getAuthHeaders}
+/>
 )}
 {screen === "business" && (
-<div className="app-screen active">
-  <BusinessDashboardView
-    authUid={authUid}
-    firestoreBalance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
-    onBack={openDashboard}
-    showToast={showToast}
-    getAuthHeaders={getAuthHeaders}
-  />
-</div>
+<BusinessDashboardView
+  authUid={authUid}
+  firestoreBalance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
+  onBack={openDashboard}
+  showToast={showToast}
+  getAuthHeaders={getAuthHeaders}
+/>
 )}
 
           {(screen === "dashboard" || historyModalOpen) && (
@@ -7494,7 +7308,7 @@ function App() {
                     <div className="bc-card-preview-overlay">
                       <div className="bc-card-preview-badge">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" /></svg>
-                        <span>Visa Infinite</span>
+                        <span>Visa</span>
                       </div>
                     </div>
                   </div>
@@ -7505,8 +7319,8 @@ function App() {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                       </div>
                       <div>
-                        <div className="bc-feature-text">5M+ FCFA</div>
-                        <div className="bc-feature-label">Plafond mensuel</div>
+                        <div className="bc-feature-text">Premium</div>
+                        <div className="bc-feature-label">Plafonds rehaussés</div>
                       </div>
                     </div>
                     <div className="bc-feature">
@@ -7514,8 +7328,8 @@ function App() {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
                       </div>
                       <div>
-                        <div className="bc-feature-text">3.5%</div>
-                        <div className="bc-feature-label">Cashback premium</div>
+                        <div className="bc-feature-text">Cashback</div>
+                        <div className="bc-feature-label">Remise sur achats</div>
                       </div>
                     </div>
                     <div className="bc-feature">
@@ -7523,8 +7337,8 @@ function App() {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
                       </div>
                       <div>
-                        <div className="bc-feature-text">24/7</div>
-                        <div className="bc-feature-label">Conciergerie</div>
+                        <div className="bc-feature-text">Support</div>
+                        <div className="bc-feature-label">Assistance dédiée</div>
                       </div>
                     </div>
                     <div className="bc-feature">
@@ -7532,15 +7346,15 @@ function App() {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
                       </div>
                       <div>
-                        <div className="bc-feature-text">1 300+</div>
-                        <div className="bc-feature-label">Lounges VIP</div>
+                        <div className="bc-feature-text">Sécurité</div>
+                        <div className="bc-feature-label">Protection avancée</div>
                       </div>
                     </div>
                   </div>
 
                   <div className="bc-notice">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    <div className="bc-notice-text">La Carte Black est réservée aux clients sélectionnés. Votre demande sera étudiée sous 24h.</div>
+                    <div className="bc-notice-text">La Carte Black est un programme premium. Votre demande sera examinée selon les critères d'éligibilité.</div>
                   </div>
 
                   <button className="bc-btn-full" onClick={() => setBlackCardStep("material")}>
@@ -7628,18 +7442,18 @@ function App() {
                       <span>{blackCardAddress || "—"}</span>
                     </div>
                     <div className="bc-confirm-row">
-                      <span>Plafond</span>
-                      <span style={{ color: "#D4A437" }}>5M+ FCFA</span>
+                      <span>Programme</span>
+                      <span style={{ color: "#D4A437" }}>Black</span>
                     </div>
                     <div className="bc-confirm-row">
                       <span>Frais</span>
-                      <span style={{ color: "#4ade80" }}>Gratuit</span>
+                      <span style={{ color: "#4ade80" }}>Selon offre</span>
                     </div>
                   </div>
 
                   <div className="bc-notice">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                    <div className="bc-notice-text">En soumettant, vous acceptez les conditions du Programme Black Morali. Votre conciergerie vous contactera sous 24h.</div>
+                    <div className="bc-notice-text">En soumettant, vous acceptez les conditions du Programme Black Morali. Votre demande sera examinée.</div>
                   </div>
 
                   <div className="bc-actions">

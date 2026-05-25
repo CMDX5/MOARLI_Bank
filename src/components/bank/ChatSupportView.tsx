@@ -1,5 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { firebaseDb } from '@/lib/firebase';
 
 interface ChatSupportViewProps {
   authUid: string | null;
@@ -14,40 +16,39 @@ interface ChatMessageItem {
   text: string;
   timestamp: unknown;
   read: boolean;
-  synced?: boolean;
+  local?: boolean;
 }
 
-const QUICK_REPLY_OPTIONS = [
-  'Problème de transaction',
-  'Carte bloquée',
-  'Question tarif',
+const AUTO_REPLIES: Record<string, string> = {
+  'Problème de transaction': 'Je comprends votre frustration. Pouvez-vous me préciser le numéro de transaction ou la date ? Je vais vérifier immédiatement le statut dans notre système.',
+  'Carte bloquée': 'Votre carte semble être gelée. Rendez-vous dans la section "Cartes" de votre espace pour la réactiver. Si le problème persiste, je peux lancer une vérification manuelle.',
+  'Question tarif': 'Voici nos tarifs actuels :\n• Transfert national : 0.5%\n• Retrait cash : 1%\n• Crédit téléphone : 0 FCFA\n• Change devises : Spread de 2%\n\nY a-t-il un service spécifique qui vous intéresse ?',
+};
+
+const SUPPORT_REPLIES = [
+  'Merci pour votre message. Un de nos conseillers va vous répondre sous peu. En attendant, n\'hésitez pas à consulter notre FAQ dans les paramètres.',
+  'Votre demande a bien été prise en compte. Notre équipe technique examine votre cas et reviendra vers vous rapidement.',
+  'Je note votre préoccupation. Pour un traitement plus rapide, vous pouvez également nous contacter par email à support@morali-pay.com.',
+  'Bien reçu ! Je transmets votre demande au service compétent. Le délai de réponse est généralement de 5 à 10 minutes.',
 ];
+
+function getRandomSupportReply(): string {
+  return SUPPORT_REPLIES[Math.floor(Math.random() * SUPPORT_REPLIES.length)];
+}
 
 function getTimeLabel(timestamp: unknown): string {
   if (!timestamp) return '';
-  let ms: number;
-  if (typeof timestamp === 'object' && timestamp !== null && 'seconds' in (timestamp as object)) {
-    ms = (timestamp as { seconds: number }).seconds * 1000;
-  } else if (typeof timestamp === 'string') {
-    ms = new Date(timestamp).getTime();
-  } else {
-    ms = timestamp as number;
-  }
-  if (isNaN(ms)) return '';
+  const ms = typeof timestamp === 'object' && 'seconds' in (timestamp as object)
+    ? (timestamp as { seconds: number }).seconds * 1000
+    : timestamp as number;
   return new Date(ms).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 
 function getDateSeparator(timestamp: unknown): string | null {
   if (!timestamp) return null;
-  let ms: number;
-  if (typeof timestamp === 'object' && timestamp !== null && 'seconds' in (timestamp as object)) {
-    ms = (timestamp as { seconds: number }).seconds * 1000;
-  } else if (typeof timestamp === 'string') {
-    ms = new Date(timestamp).getTime();
-  } else {
-    ms = timestamp as number;
-  }
-  if (isNaN(ms)) return null;
+  const ms = typeof timestamp === 'object' && 'seconds' in (timestamp as object)
+    ? (timestamp as { seconds: number }).seconds * 1000
+    : timestamp as number;
   const d = new Date(ms);
   const today = new Date();
   if (d.toDateString() === today.toDateString()) return null;
@@ -55,195 +56,201 @@ function getDateSeparator(timestamp: unknown): string | null {
   return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
-function getDateKey(timestamp: unknown): string {
-  if (!timestamp) return 'unknown';
-  let ms: number;
-  if (typeof timestamp === 'object' && timestamp !== null && 'seconds' in (timestamp as object)) {
-    ms = (timestamp as { seconds: number }).seconds * 1000;
-  } else if (typeof timestamp === 'string') {
-    ms = new Date(timestamp).getTime();
-  } else {
-    ms = timestamp as number;
-  }
-  if (isNaN(ms)) return 'unknown';
-  return new Date(ms).toDateString();
-}
-
 export default function ChatSupportView({ authUid, onBack, showToast, getAuthHeaders }: ChatSupportViewProps) {
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [initialLoad, setInitialLoad] = useState(true);
-  const [lastFetchId, setLastFetchId] = useState<string | null>(null);
+  const [firestoreReady, setFirestoreReady] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const isMountedRef = useRef(true);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const lastAutoReplyRef = useRef<string>('');
+  const unreadCountRef = useRef(0);
+  const localIdCounter = useRef(0);
 
-  // Keep mounted ref in sync
+  // Real-time chat listener
   useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
-  }, []);
-
-  // Scroll to bottom
-  const scrollToBottom = useCallback(() => {
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  }, []);
-
-  // Fetch messages from API
-  const fetchMessages = useCallback(async (showLoading = false) => {
-    if (!authUid) return;
-    try {
-      const headers = await getAuthHeaders();
-      const res = await fetch('/api/chat', { headers });
-      if (!res.ok) {
-        if (res.status === 401) {
-          showToast('Session expirée — reconnectez-vous');
-          return;
-        }
-        throw new Error(`HTTP ${res.status}`);
-      }
-      const data = await res.json();
-      if (!isMountedRef.current) return;
-
-      const items: ChatMessageItem[] = (data.messages || []).map((m: Record<string, unknown>) => ({
-        id: m.id as string,
-        sender: (m.sender as 'user' | 'support') || 'user',
-        text: (m.text as string) || '',
-        timestamp: m.timestamp || Date.now(),
-        read: m.read !== false,
-        synced: true,
-      }));
-
-      setMessages(items);
-      if (items.length > 0) {
-        setLastFetchId(items[items.length - 1].id);
-      }
+    if (!authUid || !firebaseDb) {
       setInitialLoad(false);
-      scrollToBottom();
-    } catch (err) {
-      console.error('[ChatSupport] fetch error:', err);
-      if (showLoading && isMountedRef.current) {
-        setInitialLoad(false);
-      }
-    }
-  }, [authUid, getAuthHeaders, showToast, scrollToBottom]);
-
-  // Poll for new messages every 4 seconds
-  useEffect(() => {
-    if (!authUid) {
-      setInitialLoad(false);
+      setFirestoreReady(false);
       return;
     }
 
-    // Initial load
-    fetchMessages(true);
+    const q = query(
+      collection(firebaseDb, 'chats', authUid, 'messages'),
+      orderBy('timestamp', 'asc')
+    );
 
-    // Start polling
-    pollingRef.current = setInterval(() => {
-      fetchMessages(false);
-    }, 4000);
+    const unsub = onSnapshot(q, (snap) => {
+      const items: ChatMessageItem[] = [];
+      let unread = 0;
 
-    return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
+      snap.forEach((d) => {
+        const data = d.data();
+        items.push({
+          id: d.id,
+          sender: data.sender || 'user',
+          text: data.text || '',
+          timestamp: data.timestamp,
+          read: data.read !== false,
+        });
+        if (data.sender === 'support' && !data.read) {
+          unread++;
+        }
+      });
+
+      // Merge: keep local messages that haven't synced yet
+      setMessages((prev) => {
+        const localOnly = prev.filter((m) => m.local && !items.some((i) => i.text === m.text));
+        return [...items, ...localOnly];
+      });
+      setUnreadCount(unread);
+      unreadCountRef.current = unread;
+      setInitialLoad(false);
+      setFirestoreReady(true);
+
+      // Auto-scroll to bottom
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }, (err) => {
+      console.error('[ChatSupport] onSnapshot error:', err);
+      setInitialLoad(false);
+      // Firestore rules may block — fall back to local-only mode
+      if (String(err).includes('permission') || String(err).includes('PERMISSION_DENIED')) {
+        setFirestoreReady(false);
       }
-    };
-  }, [authUid, fetchMessages]);
+    });
 
-  // Send message via API
+    return () => unsub();
+  }, [authUid]);
+
+  // Mark messages as read when chat is visible
+  useEffect(() => {
+    if (!authUid || !firebaseDb || unreadCount === 0) return;
+    (async () => {
+      try {
+        const batch = writeBatch(firebaseDb);
+        messages.forEach((msg) => {
+          if (msg.sender === 'support' && !msg.read && !msg.local) {
+            batch.update(doc(firebaseDb, 'chats', authUid!, 'messages', msg.id), { read: true });
+          }
+        });
+        await batch.commit();
+        setUnreadCount(0);
+        unreadCountRef.current = 0;
+      } catch (err) {
+        console.error('[ChatSupport] markAsRead error:', err);
+      }
+    })();
+  }, [authUid, messages, unreadCount]);
+
+  const sendToFirestore = useCallback(async (msgData: { sender: string; text: string }) => {
+    if (!authUid || !firebaseDb) return false;
+    try {
+      await addDoc(collection(firebaseDb, 'chats', authUid, 'messages'), {
+        sender: msgData.sender,
+        text: msgData.text,
+        timestamp: serverTimestamp(),
+        read: msgData.sender === 'user',
+      });
+      return true;
+    } catch (err) {
+      console.error('[ChatSupport] firestore write error:', err);
+      return false;
+    }
+  }, [authUid]);
+
   const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim() || !authUid || sending) return;
+    if (!text.trim()) return;
+    setSending(true);
 
     const trimmed = text.trim();
-    setSending(true);
-    setNewMessage('');
 
-    // Optimistic: add user message locally
-    const tempId = `temp-${Date.now()}`;
+    // Optimistic: add user message locally immediately
+    const localId = `local-${Date.now()}-${localIdCounter.current++}`;
     const userMsg: ChatMessageItem = {
-      id: tempId,
+      id: localId,
       sender: 'user',
       text: trimmed,
       timestamp: Date.now(),
       read: true,
-      synced: false,
+      local: true,
     };
+
     setMessages((prev) => [...prev, userMsg]);
-    scrollToBottom();
+    setNewMessage('');
 
-    try {
-      const headers = await getAuthHeaders();
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: trimmed }),
-      });
+    // Try Firestore write
+    const sent = await sendToFirestore({ sender: 'user', text: trimmed });
 
-      if (!res.ok) {
-        if (res.status === 401) {
-          showToast('Session expirée — reconnectez-vous');
-        } else if (res.status === 429) {
-          showToast('Trop de messages — attendez un instant');
-        } else {
-          showToast('Envoi échoué — réessayez');
-        }
-        // Remove optimistic message on failure
-        setMessages((prev) => prev.filter((m) => m.id !== tempId));
-        setSending(false);
-        return;
-      }
-
-      // Message sent successfully — API schedules auto-reply
-      // Mark as synced (will be replaced by fetched data on next poll)
-      setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, synced: true } : m))
-      );
-
-      // Show typing indicator for auto-reply
-      setIsTyping(true);
-
-      // Poll after delay to get the auto-reply
-      setTimeout(() => {
-        fetchMessages(false);
-        setIsTyping(false);
-      }, 2000 + Math.random() * 1000);
-    } catch (err) {
-      console.error('[ChatSupport] send error:', err);
-      showToast('Erreur réseau — vérifiez votre connexion');
-      // Remove optimistic message on failure
-      setMessages((prev) => prev.filter((m) => m.id !== tempId));
-    } finally {
-      setSending(false);
+    if (!sent) {
+      // Remove local flag — message stays visible but marked as local-only
+      console.warn('[ChatSupport] Message saved locally only');
     }
-  }, [authUid, sending, getAuthHeaders, showToast, scrollToBottom, fetchMessages]);
+
+    // Remove the optimistic local message once Firestore syncs (handled by onSnapshot merge)
+
+    // Auto-reply
+    setIsTyping(true);
+    const replyText = AUTO_REPLIES[trimmed] || getRandomSupportReply();
+    lastAutoReplyRef.current = replyText;
+
+    const delay = 1200 + Math.random() * 1500;
+    setTimeout(async () => {
+      setIsTyping(false);
+
+      // Add support reply locally
+      const replyId = `local-${Date.now()}-${localIdCounter.current++}`;
+      const supportMsg: ChatMessageItem = {
+        id: replyId,
+        sender: 'support',
+        text: replyText,
+        timestamp: Date.now(),
+        read: false,
+        local: true,
+      };
+      setMessages((prev) => [...prev, supportMsg]);
+
+      // Try to persist to Firestore
+      await sendToFirestore({ sender: 'support', text: replyText });
+    }, delay);
+
+    setSending(false);
+  }, [sendToFirestore]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    if (!sending) {
-      sendMessage(newMessage);
-    }
-  }, [newMessage, sendMessage, sending]);
+    sendMessage(newMessage);
+  }, [newMessage, sendMessage]);
 
   const handleQuickReply = useCallback((text: string) => {
     sendMessage(text);
   }, [sendMessage]);
 
+  const handleFocusInput = useCallback(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
+
   // Group messages by date
   const groupedMessages: { dateLabel: string | null; messages: ChatMessageItem[] }[] = [];
   let lastDate: string | null = null;
   messages.forEach((msg) => {
-    const dateKey = getDateKey(msg.timestamp);
+    const dateLabel = getDateSeparator(msg.timestamp);
+    const dateKey = msg.timestamp
+      ? new Date(
+          typeof msg.timestamp === 'object' && 'seconds' in (msg.timestamp as object)
+            ? (msg.timestamp as { seconds: number }).seconds * 1000
+            : msg.timestamp as number
+        ).toDateString()
+      : 'unknown';
+
     if (dateKey !== lastDate) {
-      const dateLabel = getDateSeparator(msg.timestamp);
       groupedMessages.push({ dateLabel, messages: [msg] });
       lastDate = dateKey;
     } else {
@@ -296,14 +303,26 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
 
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>Support MORALI</div>
-          <div style={{ fontSize: 11, color: isTyping ? '#60a5fa' : '#22c55e', fontWeight: 600 }}>
+          <div style={{ fontSize: 11, color: '#22c55e', fontWeight: 600 }}>
             {isTyping ? 'En train d\'écrire...' : 'En ligne'}
           </div>
         </div>
+
+        {/* Unread badge */}
+        {unreadCount > 0 && (
+          <div style={{
+            minWidth: 22, height: 22, borderRadius: 11, padding: '0 6px',
+            background: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 10, fontWeight: 800, color: '#fff',
+          }}>
+            {unreadCount}
+          </div>
+        )}
       </div>
 
       {/* Chat Messages */}
       <div
+        ref={chatContainerRef}
         style={{
           flex: 1, overflowY: 'auto', padding: '16px 16px 8px',
           display: 'flex', flexDirection: 'column', gap: 4,
@@ -333,17 +352,15 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
 
             {/* Quick replies for empty state */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
-              {QUICK_REPLY_OPTIONS.map((label) => (
+              {Object.keys(AUTO_REPLIES).map((label) => (
                 <button
                   key={label}
                   onClick={() => handleQuickReply(label)}
-                  disabled={sending}
                   style={{
                     width: '100%', padding: '12px 16px', borderRadius: 14,
                     border: '1px solid rgba(59,130,246,0.18)',
                     background: 'rgba(59,130,246,0.06)', color: '#60a5fa',
-                    fontSize: 13, fontWeight: 600, cursor: sending ? 'not-allowed' : 'pointer', textAlign: 'left',
-                    opacity: sending ? 0.5 : 1,
+                    fontSize: 13, fontWeight: 600, cursor: 'pointer', textAlign: 'left',
                   }}
                 >
                   {label}
@@ -409,8 +426,8 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
                       }}>
                         {getTimeLabel(msg.timestamp)}
                         {isUser && (
-                          <span style={{ marginLeft: 4, color: msg.synced ? '#22c55e' : '#fbbf24' }}>
-                            {msg.synced ? '✓✓' : '••'}
+                          <span style={{ marginLeft: 4, color: msg.local ? '#fbbf24' : '#22c55e' }}>
+                            {msg.local ? '••' : '✓✓'}
                           </span>
                         )}
                       </div>
@@ -463,23 +480,21 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick Replies (shown when there are messages) */}
+      {/* Quick Replies */}
       {messages.length > 0 && (
         <div style={{
           display: 'flex', gap: 8, padding: '8px 16px',
           overflowX: 'auto', flexShrink: 0, WebkitOverflowScrolling: 'touch',
         }}>
-          {QUICK_REPLY_OPTIONS.map((label) => (
+          {Object.keys(AUTO_REPLIES).map((label) => (
             <button
               key={label}
               onClick={() => handleQuickReply(label)}
-              disabled={sending}
               style={{
                 padding: '8px 14px', borderRadius: 20, whiteSpace: 'nowrap', flexShrink: 0,
                 border: '1px solid rgba(59,130,246,0.18)',
                 background: 'rgba(59,130,246,0.06)', color: '#60a5fa',
-                fontSize: 11, fontWeight: 600, cursor: sending ? 'not-allowed' : 'pointer',
-                opacity: sending ? 0.5 : 1,
+                fontSize: 11, fontWeight: 600, cursor: 'pointer',
               }}
             >
               {label}

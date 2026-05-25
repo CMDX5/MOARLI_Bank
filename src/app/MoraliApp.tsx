@@ -6623,13 +6623,17 @@ function App() {
 />
 )}
 {screen === "budget" && (
-<BudgetView
-  authUid={authUid}
-  firestoreBalance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
-  onBack={closeHub}
-  showToast={showToast}
-  getAuthHeaders={getAuthHeaders}
-/>
+<div className={`app-screen active`}>
+  <div className="content-scrollable services-scroll">
+    <BudgetView
+      authUid={authUid}
+      firestoreBalance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
+      onBack={closeHub}
+      showToast={showToast}
+      getAuthHeaders={getAuthHeaders}
+    />
+  </div>
+</div>
 )}
 {screen === "chat" && (
 <ChatSupportView
@@ -6641,7 +6645,7 @@ function App() {
 )}
 {screen === "leaderboard" && (
 <div className={`app-screen active`}>
-  <div className="content-scrollable nav-safe">
+  <div className="content-scrollable services-scroll">
     <LeaderboardView
       authUid={authUid}
       onBack={closeHub}

@@ -67,11 +67,12 @@ body.lock-scroll{overflow:hidden;position:fixed}
 }
 
 .app-screen{display:none;flex:1;flex-direction:column;overflow:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
-.app-screen.active{display:flex;overflow:hidden}
+.app-screen.active{display:flex;overflow:hidden;min-height:0}
 .app-screen:not(:first-child){padding-bottom:0;box-sizing:border-box}
 
 .content-scrollable{
   flex:1;
+  min-height:0;
   overflow-y:auto;
   overflow-x:hidden;
   -webkit-overflow-scrolling:touch;

@@ -67,7 +67,7 @@ body.lock-scroll{overflow:hidden;position:fixed}
 
 .app-screen{display:none;flex:1;flex-direction:column;overflow:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
 .app-screen.active{display:flex}
-.app-screen:not(:first-child){padding-bottom:80px;box-sizing:border-box}
+.app-screen:not(:first-child){padding-bottom:100px;box-sizing:border-box}
 
 .content-scrollable{
   flex:1;
@@ -83,7 +83,7 @@ body.lock-scroll{overflow:hidden;position:fixed}
 .content-scrollable::-webkit-scrollbar{display:none}
 .auth-scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:12px 22px 10px;overscroll-behavior:none}
 .auth-scroll::-webkit-scrollbar{display:none}
-.content-scrollable.dashboard-mode{padding-bottom:100px}
+.content-scrollable.dashboard-mode{padding-bottom:120px}
 .content-scrollable.nav-safe{padding-bottom:140px}
 .content-scrollable.transaction-safe{padding-bottom:140px}
 

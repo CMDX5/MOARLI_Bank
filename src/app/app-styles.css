@@ -67,7 +67,7 @@ body.lock-scroll{overflow:hidden;position:fixed}
 
 .app-screen{display:none;flex:1;flex-direction:column;overflow:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:none}
 .app-screen.active{display:flex}
-.app-screen:not(:first-child){padding-bottom:0;box-sizing:border-box}
+.app-screen:not(:first-child){padding-bottom:100px;box-sizing:border-box}
 
 .content-scrollable{
   flex:1;

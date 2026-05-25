@@ -261,7 +261,7 @@ export default function LeaderboardView({ authUid, onBack, showToast, getAuthHea
 
   return (
     <div style={{
-      minHeight: "100vh", background: "#050b1a", color: "#fff",
+      background: "#050b1a", color: "#fff",
       fontFamily: "'Inter','Segoe UI',sans-serif", padding: 16,
     }}>
       {/* Header */}

@@ -6614,7 +6614,8 @@ function App() {
   createRealtimeTransaction={createRealtimeTransaction}
 />
 )}
-{screen === "budget" && (
+<div className={`app-screen ${screen === "budget" ? "active" : ""}`}>
+<div className="content-scrollable nav-safe">
 <BudgetView
   authUid={authUid}
   firestoreBalance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
@@ -6622,7 +6623,8 @@ function App() {
   showToast={showToast}
   getAuthHeaders={getAuthHeaders}
 />
-)}
+</div>
+</div>
 {screen === "chat" && (
 <ChatSupportView
   authUid={authUid}
@@ -6631,14 +6633,16 @@ function App() {
   getAuthHeaders={getAuthHeaders}
 />
 )}
-{screen === "leaderboard" && (
+<div className={`app-screen ${screen === "leaderboard" ? "active" : ""}`}>
+<div className="content-scrollable nav-safe">
 <LeaderboardView
   authUid={authUid}
   onBack={openDashboard}
   showToast={showToast}
   getAuthHeaders={getAuthHeaders}
 />
-)}
+</div>
+</div>
 {screen === "payLinks" && (
 <PayLinksView
   authUid={authUid}

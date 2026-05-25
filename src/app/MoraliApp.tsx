@@ -6799,21 +6799,27 @@ function App() {
 />
 )}
 {screen === "budget" && (
-<BudgetView
-  authUid={authUid}
-  firestoreBalance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
-  onBack={closeHub}
-  showToast={showToast}
-  getAuthHeaders={getAuthHeaders}
-/>
+<div className="app-screen active">
+  <div className="content-scrollable nav-safe">
+    <BudgetView
+      authUid={authUid}
+      firestoreBalance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
+      onBack={closeHub}
+      showToast={showToast}
+      getAuthHeaders={getAuthHeaders}
+    />
+  </div>
+</div>
 )}
 {screen === "chat" && (
-<ChatSupportView
-  authUid={authUid}
-  onBack={openDashboard}
-  showToast={showToast}
-  getAuthHeaders={getAuthHeaders}
-/>
+<div className="app-screen active">
+  <ChatSupportView
+    authUid={authUid}
+    onBack={openDashboard}
+    showToast={showToast}
+    getAuthHeaders={getAuthHeaders}
+  />
+</div>
 )}
 {screen === "leaderboard" && (
 <div className={`app-screen active`}>
@@ -6828,21 +6834,25 @@ function App() {
 </div>
 )}
 {screen === "payLinks" && (
-<PayLinksView
-  authUid={authUid}
-  onBack={openDashboard}
-  showToast={showToast}
-  getAuthHeaders={getAuthHeaders}
-/>
+<div className="app-screen active">
+  <PayLinksView
+    authUid={authUid}
+    onBack={openDashboard}
+    showToast={showToast}
+    getAuthHeaders={getAuthHeaders}
+  />
+</div>
 )}
 {screen === "business" && (
-<BusinessDashboardView
-  authUid={authUid}
-  firestoreBalance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
-  onBack={openDashboard}
-  showToast={showToast}
-  getAuthHeaders={getAuthHeaders}
-/>
+<div className="app-screen active">
+  <BusinessDashboardView
+    authUid={authUid}
+    firestoreBalance={firestoreBalance !== null ? firestoreBalance : dashboardData.balance}
+    onBack={openDashboard}
+    showToast={showToast}
+    getAuthHeaders={getAuthHeaders}
+  />
+</div>
 )}
 
           {(screen === "dashboard" || historyModalOpen) && (

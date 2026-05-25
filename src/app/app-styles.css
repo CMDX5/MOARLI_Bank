@@ -76,16 +76,16 @@ body.lock-scroll{overflow:hidden;position:fixed}
   -webkit-overflow-scrolling:touch;
   position:relative;
   z-index:5;
-  padding-bottom:90px;
+  padding-bottom:100px;
   scrollbar-width:none;
   overscroll-behavior:none;
 }
 .content-scrollable::-webkit-scrollbar{display:none}
 .auth-scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:12px 22px 10px;overscroll-behavior:none}
 .auth-scroll::-webkit-scrollbar{display:none}
-.content-scrollable.dashboard-mode{padding-bottom:90px}
-.content-scrollable.nav-safe{padding-bottom:90px}
-.content-scrollable.transaction-safe{padding-bottom:90px}
+.content-scrollable.dashboard-mode{padding-bottom:100px}
+.content-scrollable.nav-safe{padding-bottom:100px}
+.content-scrollable.transaction-safe{padding-bottom:100px}
 
 .auth-hero{display:flex;flex-direction:column;align-items:center;padding:calc(env(safe-area-inset-top, 0px) + 24px) 20px 2px;position:relative;z-index:2}
 .auth-shield-wrap{
@@ -185,7 +185,7 @@ body.lock-scroll{overflow:hidden;position:fixed}
 .reg-pin-input::placeholder{color:rgba(148,163,184,.3);letter-spacing:.3em}
 
 /* ── Loan Screens (Microcrédit & Prêt Personnel) ── */
-.loan-screen{min-height:100%;background:#0a0e17;color:#fff;padding:24px 18px 100px;display:flex;flex-direction:column;gap:18px}
+.loan-screen{min-height:100%;background:#0a0e17;color:#fff;padding:24px 18px;display:flex;flex-direction:column;gap:18px}
 .loan-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .loan-header-left{display:flex;align-items:center;gap:12px;flex:1}
 .loan-header-title{font-size:22px;font-weight:800;letter-spacing:-.3px;font-family:'Montserrat',sans-serif}
@@ -261,7 +261,7 @@ body.lock-scroll{overflow:hidden;position:fixed}
 .loan-btn-confirm{height:52px;font-size:15px}
 
 /* ── Loans Landing Screen ── */
-.loans-landing{min-height:100%;background:#0a0e17;color:#fff;padding:24px 18px 100px;display:flex;flex-direction:column;gap:20px;animation:loanFadeIn .3s ease both}
+.loans-landing{min-height:100%;background:#0a0e17;color:#fff;padding:24px 18px;display:flex;flex-direction:column;gap:20px;animation:loanFadeIn .3s ease both}
 .loans-landing-header{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
 .loans-landing-title{font-size:26px;font-weight:800;letter-spacing:-.4px;font-family:'Montserrat',sans-serif}
 .loans-landing-sub{font-size:13px;color:#64748b;margin-top:4px}
@@ -295,7 +295,7 @@ body.lock-scroll{overflow:hidden;position:fixed}
 .loans-info-banner svg{flex-shrink:0;color:#64748b;margin-top:2px}
 
 /* ── Wallet Screen ── */
-.wallet-screen{min-height:100%;background:#0a0e17;color:#fff;padding:24px 18px 100px;display:flex;flex-direction:column;gap:18px}
+.wallet-screen{min-height:100%;background:#0a0e17;color:#fff;padding:24px 18px;display:flex;flex-direction:column;gap:18px}
 .wallet-header{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
 .wallet-header-title{font-size:26px;font-weight:800;letter-spacing:-.4px;font-family:'Montserrat',sans-serif}
 .wallet-header-sub{font-size:13px;color:#64748b;margin-top:4px}
@@ -349,7 +349,7 @@ body.lock-scroll{overflow:hidden;position:fixed}
 .fx-wc-equiv{font-size:10px;color:#64748b;font-weight:600}
 
 /* ── Wallet Detail Screens (EUR / USD) ── */
-.wallet-detail-screen{min-height:100%;background:#0a0e17;color:#fff;padding:24px 18px 100px;display:flex;flex-direction:column;gap:18px}
+.wallet-detail-screen{min-height:100%;background:#0a0e17;color:#fff;padding:24px 18px;display:flex;flex-direction:column;gap:18px}
 .wallet-detail-header{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
 .wallet-detail-title{font-size:24px;font-weight:800;letter-spacing:-.3px;font-family:'Montserrat',sans-serif;display:flex;align-items:center}
 .wallet-detail-sub{font-size:13px;color:#64748b;margin-top:4px}
@@ -380,7 +380,7 @@ body.lock-scroll{overflow:hidden;position:fixed}
 .wallet-detail-notice{display:flex;align-items:flex-start;gap:10px;padding:14px 16px;border-radius:14px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);font-size:11px;color:#64748b;line-height:1.5}
 
 /* ── Improved Currency Exchange ── */
-.fx-screen{min-height:100%;background:#0a0e17;color:#fff;padding:24px 18px 100px;display:flex;flex-direction:column;gap:18px}
+.fx-screen{min-height:100%;background:#0a0e17;color:#fff;padding:24px 18px;display:flex;flex-direction:column;gap:18px}
 .fx-header{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
 .fx-header-title{font-size:22px;font-weight:800;letter-spacing:-.3px;font-family:'Montserrat',sans-serif}
 .fx-direction-toggle{display:flex;align-items:center;gap:0;padding:4px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)}

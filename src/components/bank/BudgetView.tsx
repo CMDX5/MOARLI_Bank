@@ -280,7 +280,7 @@ export default function BudgetView({ authUid, firestoreBalance, onBack, showToas
   if (showSetBudget) {
     return (
       <div style={{
-        minHeight: "100vh", background: "#050b1a", color: "#fff",
+        background: "#050b1a", color: "#fff",
         fontFamily: "'Inter','Segoe UI',sans-serif", padding: 16,
       }}>
         {/* Header */}
@@ -433,8 +433,8 @@ export default function BudgetView({ authUid, firestoreBalance, onBack, showToas
   // ── Main Budget View ──
   return (
     <div style={{
-      minHeight: "100vh", background: "#050b1a", color: "#fff",
-      fontFamily: "'Inter','Segoe UI',sans-serif", padding: 16, paddingBottom: 90,
+      background: "#050b1a", color: "#fff",
+      fontFamily: "'Inter','Segoe UI',sans-serif", padding: 16,
     }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>

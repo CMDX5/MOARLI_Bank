@@ -435,6 +435,7 @@ export default function BudgetView({ authUid, firestoreBalance, onBack, showToas
     <div style={{
       minHeight: "100vh", background: "#050b1a", color: "#fff",
       fontFamily: "'Inter','Segoe UI',sans-serif", padding: 16,
+      paddingBottom: 230,
     }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>

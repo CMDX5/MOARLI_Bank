@@ -1,0 +1,420 @@
+"use client";
+
+import React from "react";
+
+interface PrivacyPolicyProps {
+  onAccept?: () => void;
+  onClose?: () => void;
+  mode?: "modal" | "scroll";
+}
+
+const PRIVACY_SECTIONS = [
+  {
+    title: "Article 1 — Responsable du traitement",
+    content: `Le responsable du traitement des données personnelles est Morali Pay, établissement de services financiers numériques immatriculé en République du Congo, dont le siège social est situé à Brazzaville.\n\nPour toute question relative à la présente Politique de Confidentialité, l'Utilisateur peut contacter le Délégué à la Protection des Données (DPO) via l'application Morali Pay ou à l'adresse de contact figurant dans la section Support.`,
+  },
+  {
+    title: "Article 2 — Données personnelles collectées",
+    content: `Morali Pay collecte les catégories de données suivantes :\n\n2.1 Données d'identification :\n— Nom, prénom(s), date de naissance\n— Numéro de téléphone (incluant le préfixe international +242)\n— Adresse email\n— Adresse de résidence\n— Pièce d'identité nationale ou passeport (dans le cadre du KYC)\n— Photographie (selfie biométrique)\n\n2.2 Données financières :\n— Solde du compte et historique des transactions\n— Données de carte bancaire (numéro masqué, date d'expiration)\n— Relevés d'épargne et opérations de crédit\n\n2.3 Données techniques et de connexion :\n— Adresse IP\n— Identifiants de session et tokens d'authentification\n— Type et modèle de l'appareil\n— Système d'exploitation et version de l'application\n— Localisation géographique approximative\n\n2.4 Données biométriques :\n— Empreinte digitale (si activée par l'Utilisateur)\n— Reconnaissance faciale (si activée par l'Utilisateur)\n\nLes données biométriques sont stockées exclusivement sur l'appareil de l'Utilisateur et ne sont jamais transmises aux serveurs de Morali Pay.`,
+  },
+  {
+    title: "Article 3 — Finalités du traitement",
+    content: `Les données personnelles sont traitées pour les finalités suivantes :\n\n3.1 Obligations légales et réglementaires :\n— Vérification d'identité (KYC/AML) conformément aux directives COBAC et GABAC\n— Lutte contre le blanchiment d'argent et le financement du terrorisme\n— Déclaration aux autorités de supervision (BEAC, COBAC, ANR Congo)\n\n3.2 Exécution du contrat :\n— Gestion et fonctionnement du Compte Morali\n— Traitement des transactions et virements\n— Émission et gestion des cartes de paiement\n— Gestion du service d'épargne\n— Support client et traitement des réclamations\n\n3.3 Intérêts légitimes de Morali Pay :\n— Sécurisation des transactions et prévention de la fraude\n— Amélioration et personnalisation des services\n— Analyse statistique anonymisée\n— Communication relative aux opérations sur le compte\n\n3.4 Consentement de l'Utilisateur :\n— Communications marketing (optionnel, désactivable)\n— Analyses d'usage anonymisées (optionnel, désactivable)`,
+  },
+  {
+    title: "Article 4 — Base légale du traitement",
+    content: `Le traitement des données repose sur les bases légales suivantes, conformément à la Loi n° 34-2018 relative à la protection des données personnelles en République du Congo :\n\n— Exécution du contrat de services financiers (art. 5)\n— Obligation légale (KYC/AML, déclarations réglementaires) (art. 6)\n— Consentement explicite de l'Utilisateur pour les traitements optionnels (art. 7)\n— Intérêt légitime de Morali Pay, sous réserve de ne pas porter atteinte aux droits de l'Utilisateur (art. 8)\n\nPour les traitements reposant sur le consentement, l'Utilisateur peut retirer son consentement à tout moment via les paramètres de confidentialité de l'application.`,
+  },
+  {
+    title: "Article 5 — Durée de conservation",
+    content: `Les données personnelles sont conservées selon les durées suivantes :\n\n5.1 Données d'identification : pendant toute la durée de la relation contractuelle, puis 10 ans après la clôture du compte (conformément aux obligations réglementaires COBAC).\n\n5.2 Données financières (historique des transactions) : 10 ans à compter de la réalisation de chaque opération (obligation de conservation documentaire).\n\n5.3 Données KYC (pièces d'identité, selfie) : 5 ans après la clôture du compte.\n\n5.4 Données de connexion et techniques : 24 mois maximum.\n\n5.5 Données biométriques : supprimées dès la désactivation de la biométrie sur l'appareil.\n\n5.6 Données de marketing : jusqu'au retrait du consentement.\n\nÀ l'issue de la période de conservation, les données sont supprimées ou anonymisées de manière irréversible.`,
+  },
+  {
+    title: "Article 6 — Sécurité des données",
+    content: `Morali Pay met en œuvre des mesures de sécurité techniques et organisationnelles appropriées pour protéger les données personnelles contre la destruction accidentelle ou illicite, la perte, l'altération, la divulgation ou l'accès non autorisé :\n\n6.1 Mesures techniques :\n— Chiffrement AES-256 au repos et TLS 1.3 en transit\n— Tokenisation des données de paiement\n— Authentification multi-facteurs (MFA)\n— Isolation des bases de données par environnement\n— Monitoring continu des accès et alertes en temps réel\n— Tests de pénétration réguliers par des tiers certifiés\n\n6.2 Mesures organisationnelles :\n— Formation obligatoire du personnel à la protection des données\n— Contrôle d'accès basé sur le principe du moindre privilège\n— Procédure de gestion des incidents de sécurité\n— Plan de continuité d'activité\n\n6.3 Hébergement :\nLes données sont hébergées sur des serveurs situés en Afrique Centrale, dans le respect de la souveraineté numérique de la République du Congo et des recommandations de l'ANSSI Congo.`,
+  },
+  {
+    title: "Article 7 — Partage et transfert des données",
+    content: `7.1 Morali Pay ne vend ni ne loue les données personnelles de l'Utilisateur à des tiers.\n\n7.2 Les données peuvent être partagées avec :\n— Réseau VISA (international) : données de transaction nécessaires à l'exécution des paiements\n— Opérateurs de télécommunications (MTN Congo, Airtel Congo) : pour le traitement des recharges\n— Autorités de supervision (BEAC, COBAC, GABAC, ANR Congo) : dans le cadre des obligations légales\n— Prestataires de services techniques (hébergement, sécurité) : sous accord de confidentialité\n\n7.3 Transfert international :\nEn cas de transfert hors de la République du Congo, Morali Pay s'assure que le destinataire offre un niveau de protection adéquat, conformément aux standards CEMAC. Le réseau VISA dispose de certifications PCI-DSS garantissant la sécurité des données de paiement.\n\n7.4 L'Utilisateur est informé que les données de paiement transitant par le réseau VISA peuvent être traitées dans des juridictions internationales conformément aux règles du réseau.`,
+  },
+  {
+    title: "Article 8 — Droits de l'Utilisateur",
+    content: `Conformément à la Loi n° 34-2018, l'Utilisateur dispose des droits suivants :\n\n8.1 Droit d'accès : obtenir la confirmation du traitement et une copie de ses données personnelles.\n\n8.2 Droit de rectification : demander la correction des données inexactes ou incomplètes.\n\n8.3 Droit à l'effacement : demander la suppression de ses données dans les conditions prévues par la loi (sauf obligation légale de conservation).\n\n8.4 Droit à la limitation : demander la limitation du traitement en cas de contestation de l'exactitude des données.\n\n8.5 Droit à la portabilité : recevoir ses données dans un format structuré et courant, ou demander leur transfert à un tiers.\n\n8.6 Droit d'opposition : s'opposer au traitement pour des raisons légitimes, y compris la prospection commerciale.\n\n8.7 Droit de retirer le consentement : à tout moment, sans que cela ne compromette la licéité du traitement antérieur.\n\n8.8 Exercice des droits :\nL'Utilisateur peut exercer ses droits via :\n— Les paramètres de confidentialité dans l'application\n— Le service client Morali Pay\n— Le Délégué à la Protection des Données (DPO)\nMorali Pay s'engage à répondre dans un délai de 30 jours calendaires.`,
+  },
+  {
+    title: "Article 9 — Cookies et technologies de suivi",
+    content: `9.1 Morali Pay n'utilise pas de cookies publicitaires.\n\n9.2 Les seuls cookies et technologies de suivi utilisés sont :\n— Cookies de session : nécessaires au fonctionnement de l'application\n— Tokens d'authentification : sécurisation de la connexion\n— Analyse anonymisée : agrégation statistique sans identification individuelle (optionnel)\n\n9.3 L'Utilisateur peut gérer ses préférences d'analyse dans les paramètres de confidentialité.`,
+  },
+  {
+    title: "Article 10 — Protection des mineurs",
+    content: `10.1 Morali Pay est exclusivement réservé aux personnes physiques majeures âgées de 18 ans et plus, résidant en République du Congo ou dans un État membre de la CEMAC.\n\n10.2 L'inscription sur l'application implique une déclaration de majorité de l'Utilisateur. Morali Pay se réserve le droit de demander la vérification de l'âge à tout moment, notamment lors de la procédure KYC.\n\n10.3 Morali Pay ne collecte pas sciemment de données personnelles de mineurs. En cas de découverte de données relatives à un mineur :\n— Les données concernées sont supprimées dans les plus brefs délais, au plus tard sous 72 heures\n— Aucune donnée n'est transmise à des tiers\n— Un signalement interne est effectué pour prévenir toute récurrence\n\n10.4 Si un représentant légal constate que des données d'un mineur ont été collectées, il peut contacter le DPO via le formulaire Support pour demander la suppression immédiate.\n\n10.5 Morali Pay met en place des mesures techniques de vérification lors de l'inscription pour limiter les risques d'accès par des mineurs.`,
+  },
+  {
+    title: "Article 11 — Notification en cas de violation de données",
+    content: `11.1 En cas de violation de données à caractère personnel susceptible d'engendrer un risque pour les droits et libertés de l'Utilisateur, Morali Pay s'engage à :\n\n— Notifier l'ANSSI Congo dans les 72 heures suivant la constatation de la violation\n— Informer l'Utilisateur sans retard injustifié par notification push dans l'application et/ou par email\n— Documenter les circonstances, la nature des données concernées, les effets prévisibles et les mesures correctives prises\n\n11.2 L'évaluation de la gravité de la violation est réalisée conformément aux recommandations de l'ANSSI Congo et prend en compte :\n— Le nombre et la catégorie des personnes concernées\n— La nature et la sensibilité des données compromises\n— La probabilité et la gravité des conséquences pour les personnes concernées\n\n11.3 La notification à l'Utilisateur inclut obligatoirement :\n— La description claire de la nature de la violation\n— Le nom et les coordonnées du DPO\n— Les conséquences probables de la violation\n— Les mesures prises ou proposées pour remédier à la violation\n\n11.4 Morali Pay conserve un registre des violations de données, indiquant les faits, les effets et les mesures correctives, conformément aux obligations de la Loi n° 34-2018.`,
+  },
+  {
+    title: "Article 12 — Modifications de la politique",
+    content: `12.1 Morali Pay se réserve le droit de modifier la présente Politique de Confidentialité pour tenir compte de l'évolution réglementaire, technologique ou opérationnelle.\n\n12.2 Toute modification substantielle sera notifiée à l'Utilisateur par :\n— Notification dans l'application (au minimum 30 jours calendaires avant l'entrée en vigueur)\n— Email à l'adresse de contact enregistrée\n— Mise à jour de la version et de la date de dernière modification dans le présent document\n\n12.3 L'utilisation continue de l'application après la date d'entrée en vigueur des modifications vaut acceptation tacite de la nouvelle politique.\n\n12.4 L'Utilisateur est invité à consulter régulièrement la présente politique via l'application. En cas de non-acceptation des modifications, l'Utilisateur peut résilier son compte dans les conditions prévues aux CGU.`,
+  },
+  {
+    title: "Article 13 — Contact",
+    content: `13.1 Pour toute question relative à la protection des données personnelles ou pour exercer vos droits, l'Utilisateur peut contacter :\n\n— Le formulaire Support intégré dans l'application Morali Pay\n— Le Délégué à la Protection des Données (DPO) via le menu Confidentialité\n\n13.2 Autorités de contrôle compétentes :\n— ANSSI Congo — Agence Nationale de Sécurité des Systèmes d'Information\n— Commission Nationale de l'Informatique et des Libertés\n\n13.3 Morali Pay s'engage à répondre à toute demande dans un délai de 30 jours calendaires conformément à la Loi n° 34-2018.\n\nDernière mise à jour : Janvier 2025\nVersion : 2.0 — Conforme Loi n° 34-2018 (Congo) et standards CEMAC`,
+  },
+];
+
+export default function PrivacyPolicy({ onAccept, onClose, mode = "modal" }: PrivacyPolicyProps) {
+  const [expanded, setExpanded] = React.useState<number | null>(null);
+
+  const toggleSection = (idx: number) => {
+    setExpanded((prev) => (prev === idx ? null : idx));
+  };
+
+  return (
+    <div className="legal-doc">
+      <div className="legal-doc-header">
+        <div className="legal-doc-badge privacy-badge">PROTECTION DES DONNÉES</div>
+        <h2 className="legal-doc-title">Politique de Confidentialité</h2>
+        <p className="legal-doc-subtitle">
+          Morali Pay — Gestion des données personnelles
+          <br />
+          Conforme Loi n° 34-2018 • ANSSI Congo • Recommandations CEMAC
+        </p>
+        <div className="legal-doc-line" />
+      </div>
+
+      <div className="legal-doc-preamble privacy-preamble">
+        <p>
+          <strong>ENGAGEMENT DE MORALI PAY</strong>
+        </p>
+        <p>
+          Morali Pay s'engage à protéger la vie privée de ses utilisateurs et à traiter
+          les données personnelles de manière transparente, licite et sécurisée. La présente
+          politique décrit en détail les données collectées, les finalités du traitement,
+          les droits des utilisateurs et les mesures de sécurité mises en œuvre.
+        </p>
+      </div>
+
+      <div className="legal-doc-sections">
+        {PRIVACY_SECTIONS.map((section, idx) => (
+          <div key={idx} className="legal-section">
+            <button
+              className={`legal-section-header ${expanded === idx ? "expanded" : ""}`}
+              onClick={() => toggleSection(idx)}
+            >
+              <span className="legal-section-title">{section.title}</span>
+              <span className={`legal-section-arrow ${expanded === idx ? "rotated" : ""}`}>▾</span>
+            </button>
+            {expanded === idx && (
+              <div className="legal-section-content">
+                {section.content.split("\n\n").map((paragraph, pIdx) => (
+                  <p key={pIdx}>
+                    {paragraph.split("\n").map((line, lIdx) => (
+                      <React.Fragment key={lIdx}>
+                        {lIdx > 0 && <br />}
+                        {line}
+                      </React.Fragment>
+                    ))}
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="legal-doc-footer">
+        <div className="legal-doc-line" />
+        <p className="legal-doc-gov">
+          Morali Pay — Protection des Données Personnelles
+          <br />
+          Loi n° 34-2018 • ANSSI Congo • Standards CEMAC
+          <br />
+          <span style={{ opacity: 0.5, fontSize: "10px" }}>
+            République du Congo — Hébergement : Afrique Centrale — Chiffrement AES-256
+          </span>
+        </p>
+        {mode === "modal" && onAccept && (
+          <button
+            className="legal-doc-accept privacy-accept"
+            onClick={onAccept}
+          >
+            J'accepte la Politique de Confidentialité
+          </button>
+        )}
+      </div>
+
+      <style>{`
+        /* ── Base Legal Document CSS (self-contained) ── */
+        .legal-doc {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          width: 100%;
+          box-sizing: border-box;
+          gap: 0;
+          animation: legalDocFadeIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        @keyframes legalDocFadeIn {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .legal-doc-header {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 8px;
+          margin-bottom: 16px;
+          width: 100%;
+        }
+        .legal-doc-badge {
+          font-size: 9px;
+          font-weight: 800;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          color: #D4A437;
+          background: rgba(212, 164, 55, 0.1);
+          border: 1px solid rgba(212, 164, 55, 0.2);
+          border-radius: 8px;
+          padding: 6px 12px;
+          display: inline-block;
+          align-self: flex-start;
+          box-shadow: 0 0 12px rgba(212, 164, 55, 0.06);
+        }
+        .legal-doc-title {
+          font-size: 20px;
+          font-weight: 900;
+          color: #fff;
+          font-family: 'Inter', 'Montserrat', -apple-system, sans-serif;
+          letter-spacing: -0.02em;
+          margin: 0;
+        }
+        .legal-doc-subtitle {
+          font-size: 12px;
+          color: #94a3b8;
+          line-height: 1.5;
+          margin: 0;
+          font-family: 'Inter', -apple-system, sans-serif;
+        }
+        .legal-doc-line {
+          height: 1px;
+          background: linear-gradient(90deg, rgba(212, 164, 55, 0.3), rgba(212, 164, 55, 0.05), transparent);
+          margin: 12px 0;
+          width: 100%;
+        }
+        .legal-doc-preamble {
+          background: rgba(212, 164, 55, 0.04);
+          border: 1px solid rgba(212, 164, 55, 0.1);
+          border-radius: 16px;
+          padding: 16px;
+          margin-bottom: 16px;
+          width: 100%;
+          box-sizing: border-box;
+          box-shadow: 0 0 20px rgba(212, 164, 55, 0.03);
+        }
+        .legal-doc-preamble p {
+          font-size: 12px;
+          color: #94a3b8;
+          line-height: 1.6;
+          margin: 0 0 8px 0;
+          text-align: left;
+          font-family: 'Inter', -apple-system, sans-serif;
+        }
+        .legal-doc-preamble p:last-child {
+          margin-bottom: 0;
+        }
+        .legal-doc-preamble strong {
+          color: #D4A437;
+          font-size: 10px;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+
+        /* ── Sections container — forces left alignment, no cascade indent ── */
+        .legal-doc-sections {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 8px;
+          margin-bottom: 16px;
+          margin-left: 0 !important;
+          padding-left: 0;
+          width: 100%;
+          box-sizing: border-box;
+        }
+        .legal-section {
+          border-radius: 14px;
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          overflow: hidden;
+          transition: all 0.3s ease;
+          margin-left: 0 !important;
+          width: 100%;
+          box-sizing: border-box;
+        }
+        .legal-section:has(.expanded) {
+          border-color: rgba(212, 164, 55, 0.15);
+          background: rgba(212, 164, 55, 0.02);
+          box-shadow: 0 0 15px rgba(212, 164, 55, 0.06);
+        }
+        .legal-section-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 14px 16px;
+          border: none;
+          background: transparent;
+          color: #fff;
+          cursor: pointer;
+          width: 100%;
+          text-align: left;
+          font-family: 'Inter', 'Montserrat', -apple-system, sans-serif;
+          transition: background 0.2s ease;
+          box-sizing: border-box;
+        }
+        .legal-section-header:hover {
+          background: rgba(255, 255, 255, 0.02);
+        }
+        .legal-section-title {
+          font-size: 12px;
+          font-weight: 700;
+          color: #e2e8f0;
+          line-height: 1.4;
+          font-family: 'Inter', 'Montserrat', -apple-system, sans-serif;
+        }
+        .legal-section-arrow {
+          font-size: 14px;
+          color: #64748b;
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+          flex-shrink: 0;
+        }
+        .legal-section-arrow.rotated {
+          transform: rotate(180deg);
+          color: #D4A437;
+        }
+        .legal-section-content {
+          padding: 0 16px 14px 16px;
+          animation: legalFadeIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+          width: 100%;
+          box-sizing: border-box;
+          margin-left: 0;
+        }
+        @keyframes legalFadeIn {
+          from { opacity: 0; transform: translateY(-6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .legal-section-content p {
+          font-size: 11px;
+          color: #94a3b8;
+          line-height: 1.65;
+          margin: 0 0 10px 0;
+          text-align: left;
+          font-family: 'Inter', -apple-system, sans-serif;
+        }
+        .legal-section-content p:last-child {
+          margin-bottom: 0;
+        }
+
+        /* ── Footer ── */
+        .legal-doc-footer {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          align-items: center;
+          padding-top: 8px;
+          width: 100%;
+        }
+        .legal-doc-gov {
+          font-size: 10px;
+          color: #64748b;
+          text-align: center;
+          line-height: 1.6;
+          margin: 0;
+          font-family: 'Inter', -apple-system, sans-serif;
+        }
+        .legal-doc-accept {
+          width: 100%;
+          height: 52px;
+          border-radius: 16px;
+          font-size: 14px;
+          font-weight: 800;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          background: linear-gradient(135deg, rgba(212, 164, 55, 0.2), rgba(212, 164, 55, 0.08));
+          color: #D4A437;
+          border: 1px solid rgba(212, 164, 55, 0.25);
+          box-shadow: 0 0 20px rgba(212, 164, 55, 0.08);
+          transition: all 0.3s ease;
+          font-family: 'Inter', 'Montserrat', -apple-system, sans-serif;
+          margin-top: 8px;
+          position: relative;
+          overflow: hidden;
+        }
+        .legal-doc-accept:hover {
+          box-shadow: 0 0 30px rgba(212, 164, 55, 0.15);
+          border-color: rgba(212, 164, 55, 0.4);
+        }
+        .legal-doc-accept:active {
+          transform: scale(0.97);
+        }
+        .legal-doc-accept::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(212, 164, 55, 0.1), transparent);
+          transition: left 0.5s ease;
+        }
+        .legal-doc-accept:hover::before {
+          left: 100%;
+        }
+
+        /* ── Privacy-specific overrides ── */
+        .privacy-badge {
+          background: rgba(212, 164, 55, 0.1) !important;
+          border-color: rgba(212, 164, 55, 0.2) !important;
+          color: #D4A437 !important;
+        }
+        .privacy-preamble {
+          background: rgba(212, 164, 55, 0.04) !important;
+          border-color: rgba(212, 164, 55, 0.1) !important;
+        }
+        .privacy-accept {
+          background: linear-gradient(135deg, rgba(212, 164, 55, 0.2), rgba(212, 164, 55, 0.08)) !important;
+          color: #D4A437 !important;
+          border-color: rgba(212, 164, 55, 0.25) !important;
+        }
+
+        /* ── Custom gold scrollbar for legal modals ── */
+        .bc-modal::-webkit-scrollbar,
+        .legal-modal::-webkit-scrollbar {
+          width: 4px;
+        }
+        .bc-modal::-webkit-scrollbar-track,
+        .legal-modal::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .bc-modal::-webkit-scrollbar-thumb,
+        .legal-modal::-webkit-scrollbar-thumb {
+          background: rgba(212, 164, 55, 0.3);
+          border-radius: 10px;
+        }
+        .bc-modal::-webkit-scrollbar-thumb:hover,
+        .legal-modal::-webkit-scrollbar-thumb:hover {
+          background: rgba(212, 164, 55, 0.5);
+        }
+        .bc-modal,
+        .legal-modal {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(212, 164, 55, 0.3) transparent;
+        }
+      `}</style>
+    </div>
+  );
+}

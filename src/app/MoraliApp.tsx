@@ -6816,7 +6816,7 @@ function App() {
 />
 )}
 {screen === "leaderboard" && (
-<div className={`app-screen active`} style={{ paddingBottom: 0 }}>
+<div className={`app-screen active`}>
   <div className="content-scrollable nav-safe">
     <LeaderboardView
       authUid={authUid}

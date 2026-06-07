@@ -35,7 +35,7 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
-import { firebaseAuth, firebaseDb } from "@/lib/firebase";
+import { firebaseAuth, firebaseDb, isFirebaseConfigured } from "@/lib/firebase";
 import { encryptPinWithPassword, decryptPinWithPassword } from "@/lib/pin-utils";
 import { logAdminAction } from "@/lib/admin-logger";
 import jsPDF from "jspdf";
@@ -426,7 +426,7 @@ function App() {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   // Helper: get Firebase auth headers for API requests
   const getAuthHeaders = async (): Promise<Record<string, string>> => {
-    const user = firebaseAuth.currentUser;
+    const user = firebaseAuth?.currentUser;
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (user) {
       try {
@@ -646,6 +646,7 @@ function App() {
   }, []);
 
   const trackLoginDevice = useCallback(async () => {
+    if (!firebaseDb) return;
     try {
       const ua = typeof navigator !== "undefined" ? navigator.userAgent : "Unknown";
       const isMobile = /Android|iPhone|iPad/i.test(ua);
@@ -756,7 +757,7 @@ function App() {
 
   // Real-time listener on moraliUsers/{authUid} for balance
   useEffect(() => {
-    if (!authUid) return;
+    if (!authUid || !firebaseDb) return;
     const userRef = doc(firebaseDb, "moraliUsers", authUid);
     const unsub = onSnapshot(userRef, (snap) => {
       if (snap.exists()) {
@@ -858,6 +859,16 @@ function App() {
   }, [blackCardOpen, cameraScannerOpen, securityModalOpen, privacyModalOpen, contactModalOpen, historyModalOpen, receiptsOpen, supportOpen, termsOpen, virtualCardOpen, cardLimitsOpen, cardManageOpen, cardPinOpen, infoDrawerOpen, transferOpen, screen]);
 
   useEffect(() => {
+    // If Firebase is not configured, skip auth setup and go straight to dashboard (demo mode)
+    if (!isFirebaseConfigured || !firebaseAuth) {
+      setAuthUid("demo-user");
+      setAuthChecked(true);
+      setDashboardName("Morali Test");
+      window.localStorage.setItem("morali_profile_full_name", "Morali Test");
+      setScreen("dashboard");
+      return;
+    }
+
     getRedirectResult(firebaseAuth).catch((err: unknown) => {
       // On mobile/iOS, the auth state listener below will pick up the session.
       console.error("Erreur redirect auth:", err);
@@ -983,7 +994,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!authUid) return;
+    if (!authUid || !firebaseDb) return;
 
     // Queries with ONLY where+limit (no orderBy) — no composite index needed
     const txSentQuery = query(collection(firebaseDb, "transactions"), where("senderUid", "==", authUid), limit(50));
@@ -1150,7 +1161,7 @@ function App() {
 
   // Process pending transfer credits — polls every 3 seconds while logged in
   useEffect(() => {
-    if (!authUid) return;
+    if (!authUid || !firebaseDb) return;
     // Initial check after 2s to let auth settle
     const initialTimer = setTimeout(() => {
       processPendingCredits(authUid, true); // silent on first load
@@ -1365,7 +1376,7 @@ function App() {
 
   // Load card & security settings from Firestore on auth
   useEffect(() => {
-    if (!authUid) return;
+    if (!authUid || !firebaseDb) return;
     const loadSettings = async () => {
       // ── PIN check: localStorage first (instant), API as secondary verification ──
       // Skip if already known from localStorage (set in initial useEffect)
@@ -2643,7 +2654,7 @@ function App() {
 
   // ── Device fingerprint check on login ──
   const checkNewDevice = useCallback(async () => {
-    if (!authUid) return;
+    if (!authUid || !firebaseDb) return;
     try {
       const ua = navigator.userAgent;
       const fingerprint = btoa(ua.slice(0, 120) + "|" + window.screen.width + "x" + window.screen.height + "|" + navigator.language);
@@ -2690,7 +2701,7 @@ function App() {
   };
 
   const handleChangePassword = async () => {
-    const user = firebaseAuth.currentUser;
+    const user = firebaseAuth?.currentUser;
     if (!user || !user.email) {
       showToast("Aucun compte connecté");
       return;
@@ -3156,7 +3167,7 @@ function App() {
       showToast("Les codes PIN ne correspondent pas");
       return;
     }
-    const user = firebaseAuth.currentUser;
+    const user = firebaseAuth?.currentUser;
     const pinToSave = cardPinDraft;
     // Send plaintext PIN to server; server hashes with bcrypt
     try {
@@ -3203,7 +3214,7 @@ function App() {
       showToast(`Trop de tentatives. Réessayez dans ${waitSec}s`);
       return;
     }
-    const user = firebaseAuth.currentUser;
+    const user = firebaseAuth?.currentUser;
     if (!user || !user.email) {
       showToast("Aucun compte connecté");
       return;
@@ -3333,7 +3344,7 @@ function App() {
       showToast("Entrez un code PIN à 4 chiffres");
       return;
     }
-    const user = firebaseAuth.currentUser;
+    const user = firebaseAuth?.currentUser;
     if (!user) return;
     setRevealPinVerifying(true);
     try {
@@ -3451,7 +3462,7 @@ function App() {
 
   // ── PIN Reset via Email OTP ──
   const sendPinResetOtp = async () => {
-    const user = firebaseAuth.currentUser;
+    const user = firebaseAuth?.currentUser;
     if (!user?.email) {
       showToast("Aucun email associé à ce compte");
       return;
@@ -3483,7 +3494,7 @@ function App() {
   };
 
   const verifyPinResetOtp = async () => {
-    const user = firebaseAuth.currentUser;
+    const user = firebaseAuth?.currentUser;
     if (!user?.email) return;
     if (pinResetOtpCode.length !== 6) {
       showToast("Entrez le code à 6 chiffres");
@@ -3820,6 +3831,20 @@ function App() {
       return;
     }
     setLoginLoading(true);
+
+    // Demo mode: when Firebase is not configured, allow login with any valid-looking credentials
+    if (!isFirebaseConfigured || !firebaseAuth) {
+      console.warn("[Demo] Firebase not configured — allowing local login");
+      const emailName = loginEmail.split("@")[0] || "";
+      const name = emailName.charAt(0).toUpperCase() + emailName.slice(1) || "Utilisateur";
+      setAuthUid("demo-user");
+      window.localStorage.setItem("morali_profile_full_name", name);
+      setDashboardName(name);
+      enterDashboard(name);
+      setLoginLoading(false);
+      return;
+    }
+
     try {
       const cred = await signInWithEmailAndPassword(firebaseAuth, loginEmail.trim(), loginPassword);
       // Charger le profil depuis Firestore pour récupérer le vrai nom/prénom

@@ -6954,7 +6954,7 @@ function App() {
           )}
         </div>
 
-        {screen !== "auth" && screen !== "admin" && (
+        {screen !== "auth" && screen !== "admin" && screen !== "transaction" && (
           <nav className="bottom-nav" role="tablist" aria-label="Navigation principale">
             {navItems.map((item) => {
               const active = navActive === item;

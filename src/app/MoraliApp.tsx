@@ -4334,13 +4334,6 @@ function App() {
       if (authUid) {
         const userRef = doc(firebaseDb, "moraliUsers", authUid);
 
-        // Pre-flight: minimum amount check (1000 FCFA)
-        if (transactionNumericAmount < 1000) {
-          showToast("Montant minimum : 1 000 FCFA");
-          setTransactionProcessing(false);
-          return;
-        }
-
         // Pre-flight: check suspension
         const userSnap = await getDoc(userRef);
         if (userSnap.exists() && userSnap.data().accountStatus === "suspended") {

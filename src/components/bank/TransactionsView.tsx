@@ -842,7 +842,7 @@ export default function TransactionsView({
           <div className="transaction-footer">
             <div className="transaction-recap">
               <div>
-                <strong>{formatCurrency(total)} XAF <small style={{ fontSize: 10, fontWeight: 600, color: type === 'depot' ? '#22c55e' : 'var(--dim)', marginLeft: 6 }}>({type === 'depot' ? 'Frais: 0 XAF' : `Frais: ${formatCurrency(fees)} XAF`})</small></strong>
+                <strong>{formatCurrency(total)} XAF <small style={{ fontSize: 10, fontWeight: 600, color: type === 'depot' ? '#22c55e' : 'var(--dim)', marginLeft: 6 }}>({type === 'depot' ? 'Frais: 0 XAF' : `Frais: 2% — ${formatCurrency(fees)} XAF`})</small></strong>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <span>Estimation</span>

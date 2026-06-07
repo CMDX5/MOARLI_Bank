@@ -227,7 +227,7 @@ export default function SwipeableTransactionItem({ tx, onDelete, onPin }: Swipea
           <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 2 }}>{tx.dateTimestamp ? timeAgo(tx.dateTimestamp) : tx.date}</div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: tx.type === "credit" ? "#22c55e" : "var(--text)" }}>{tx.type === "credit" ? "+" : "-"}{tx.amount}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: tx.type === "credit" ? "#22c55e" : "#ef4444" }}>{tx.type === "credit" ? "+" : "-"}{tx.amount}</div>
           <div style={{ fontSize: 10, color: "var(--dim)", marginTop: 2 }}>{tx.category}</div>
         </div>
       </div>

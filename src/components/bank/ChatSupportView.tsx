@@ -19,21 +19,14 @@ interface ChatMessageItem {
   local?: boolean;
 }
 
-const AUTO_REPLIES: Record<string, string> = {
-  'Problème de transaction': 'Je comprends votre frustration. Pouvez-vous me préciser le numéro de transaction ou la date ? Je vais vérifier immédiatement le statut dans notre système.',
-  'Carte bloquée': 'Votre carte semble être gelée. Rendez-vous dans la section "Cartes" de votre espace pour la réactiver. Si le problème persiste, je peux lancer une vérification manuelle.',
-  'Question tarif': 'Voici nos tarifs actuels :\n• Transfert national : 0.5%\n• Retrait cash : 1%\n• Crédit téléphone : 0 FCFA\n• Change devises : Spread de 2%\n\nY a-t-il un service spécifique qui vous intéresse ?',
-};
-
-const SUPPORT_REPLIES = [
-  'Merci pour votre message. Un de nos conseillers va vous répondre sous peu. En attendant, n\'hésitez pas à consulter notre FAQ dans les paramètres.',
-  'Votre demande a bien été prise en compte. Notre équipe technique examine votre cas et reviendra vers vous rapidement.',
-  'Je note votre préoccupation. Pour un traitement plus rapide, vous pouvez également nous contacter par email à support@morali-pay.com.',
-  'Bien reçu ! Je transmets votre demande au service compétent. Le délai de réponse est généralement de 5 à 10 minutes.',
+// Fallback reply if API fails
+const FALLBACK_REPLIES = [
+  'Je suis momentanément indisponible. Veuillez réessayer dans un instant. Notre équipe technique travaille à rétablir le service.',
+  'Une interruption technique est survenue. Je reste à votre disposition pour toute question sur vos services MOARLI.',
 ];
 
-function getRandomSupportReply(): string {
-  return SUPPORT_REPLIES[Math.floor(Math.random() * SUPPORT_REPLIES.length)];
+function getRandomFallback(): string {
+  return FALLBACK_REPLIES[Math.floor(Math.random() * FALLBACK_REPLIES.length)];
 }
 
 function getTimeLabel(timestamp: unknown): string {
@@ -111,6 +104,7 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
       unreadCountRef.current = unread;
       setInitialLoad(false);
       setFirestoreReady(true);
+      setIsTyping(false);
 
       // Auto-scroll to bottom
       setTimeout(() => {
@@ -194,30 +188,36 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
 
     // Remove the optimistic local message once Firestore syncs (handled by onSnapshot merge)
 
-    // Auto-reply
+    // LLM-powered reply via API
     setIsTyping(true);
-    const replyText = AUTO_REPLIES[trimmed] || getRandomSupportReply();
-    lastAutoReplyRef.current = replyText;
 
-    const delay = 1200 + Math.random() * 1500;
-    setTimeout(async () => {
-      setIsTyping(false);
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: trimmed }),
+      });
 
-      // Add support reply locally
+      // API handles Firestore persistence — just wait for it
+      // The onSnapshot listener will pick up the reply
+    } catch (err) {
+      console.error('[ChatSupport] API error, using fallback:', err);
+      // Fallback: add local reply
+      const fallbackText = getRandomFallback();
       const replyId = `local-${Date.now()}-${localIdCounter.current++}`;
       const supportMsg: ChatMessageItem = {
         id: replyId,
         sender: 'support',
-        text: replyText,
+        text: fallbackText,
         timestamp: Date.now(),
         read: false,
         local: true,
       };
       setMessages((prev) => [...prev, supportMsg]);
-
-      // Try to persist to Firestore
-      await sendToFirestore({ sender: 'support', text: replyText });
-    }, delay);
+      await sendToFirestore({ sender: 'support', text: fallbackText });
+      setIsTyping(false);
+      return;
+    }
 
     setSending(false);
   }, [sendToFirestore]);

@@ -2,34 +2,78 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/admin-firestore";
 import { rateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
+import ZAI from "z-ai-web-dev-sdk";
 
 /**
- * Chat Support API — IDOR-PROTECTED
+ * Chat Support API — IDOR-PROTECTED with LLM-powered responses
  *
  * - GET: Load chat history (paginated, latest 50)
- * - POST: Send message + trigger auto-reply after 1-2s delay
+ * - POST: Send message + LLM auto-reply
  *
  * Firestore path: chats/{uid}/messages
  */
 
-const AUTO_REPLIES: Record<string, string> = {
-  "Problème de transaction":
-    "Je comprends votre frustration. Pouvez-vous me préciser le numéro de transaction ou la date ? Je vais vérifier immédiatement le statut dans notre système.",
-  "Carte bloquée":
-    "Votre carte semble être gelée. Rendez-vous dans la section \"Cartes\" de votre espace pour la réactiver. Si le problème persiste, je peux lancer une vérification manuelle.",
-  "Question tarif":
-    "Voici nos tarifs actuels :\n• Transfert national : 0.5%\n• Retrait cash : 1%\n• Crédit téléphone : 0 FCFA\n• Change devises : Spread de 2%\n\nY a-t-il un service spécifique qui vous intéresse ?",
-};
+const SYSTEM_PROMPT = `Tu es le conseiller virtuel de MOARLI Bank, une application bancaire mobile. Tu es professionnel, courtois, et tu dialogues naturellement en français.
 
-const SUPPORT_REPLIES = [
-  "Merci pour votre message. Un de nos conseillers va vous répondre sous peu. En attendant, n'hésitez pas à consulter notre FAQ dans les paramètres.",
-  "Votre demande a bien été prise en compte. Notre équipe technique examine votre cas et reviendra vers vous rapidement.",
-  "Je note votre préoccupation. Pour un traitement plus rapide, vous pouvez également nous contacter par email à support@morali-pay.com.",
-  "Bien reçu ! Je transmets votre demande au service compétent. Le délai de réponse est généralement de 5 à 10 minutes.",
-];
+Règles strictes :
+1. Réponds TOUJOURS en français
+2. Tu ne parles QUE de MOARLI Bank et de ses services bancaires : virements, retraits, dépôts, change de devises, épargne, prêts, cartes bancaires, crédits téléphone/internet, tontines, crypto, portefeuilles multi-devises
+3. Si l'utilisateur parle de sujets hors bancaire, redirige poliment vers les services MOARLI
+4. Tu dialogues librement et naturellement : salutations, politesses, empathie, tout en restant professionnel
+5. Réponds de façon concise (max 2-3 phrases) sauf si l'utilisateur pose une question détaillée
+6. Utilise un ton chaleureux mais professionnel, comme un bon banquier
+7. Pour les salutations (bonjour, bonsoir, salut, coucou, bienvenue), réponds naturellement par la même salutation suivie d'une proposition d'aide
+8. Si on te demande comment tu vas, réponds brièvement et propose ton aide
+9. Ne donne JAMAIS d'informations personnelles, ne simule JAMAIS des opérations bancaires réelles
+10. Pour toute demande technique (problème de transaction, carte bloquée), oriente l'utilisateur vers la section appropriée de l'app`;
 
-function getRandomReply(): string {
-  return SUPPORT_REPLIES[Math.floor(Math.random() * SUPPORT_REPLIES.length)];
+// In-memory conversation history per user (last 10 messages for context)
+const userConversations = new Map<string, { role: string; content: string }[]>();
+
+function getConversationHistory(uid: string): { role: string; content: string }[] {
+  if (!userConversations.has(uid)) {
+    userConversations.set(uid, []);
+  }
+  return userConversations.get(uid)!;
+}
+
+function addToHistory(uid: string, role: string, content: string) {
+  const history = getConversationHistory(uid);
+  history.push({ role, content });
+  // Keep last 10 messages only (5 user + 5 assistant)
+  if (history.length > 10) {
+    history.splice(0, history.length - 10);
+  }
+}
+
+async function getLLMResponse(uid: string, userMessage: string): Promise<string> {
+  const history = getConversationHistory(uid);
+
+  try {
+    const zai = await ZAI.create();
+
+    const messages = [
+      { role: "assistant", content: SYSTEM_PROMPT },
+      ...history,
+      { role: "user", content: userMessage },
+    ];
+
+    const completion = await zai.chat.completions.create({
+      messages,
+      thinking: { type: "disabled" },
+    });
+
+    const response = completion.choices[0]?.message?.content;
+
+    if (!response || response.trim().length === 0) {
+      return "Je vous remercie pour votre message. Comment puis-je vous aider avec vos services bancaires MOARLI ?";
+    }
+
+    return response.trim().slice(0, 500);
+  } catch (err) {
+    console.error("[chat] LLM error:", err);
+    return "Une interruption technique est survenue. Je suis toujours là pour vous aider avec vos services MOARLI. Que puis-je faire pour vous ?";
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -112,11 +156,17 @@ export async function POST(req: NextRequest) {
       read: true,
     });
 
-    // Determine auto-reply
-    const replyText = AUTO_REPLIES[sanitized] || getRandomReply();
+    // Add to conversation history for LLM context
+    addToHistory(auth.uid, "user", sanitized);
 
-    // Schedule auto-reply (fire-and-forget with 1-2s delay)
-    const delay = 1000 + Math.random() * 1000;
+    // Get LLM reply
+    const replyText = await getLLMResponse(auth.uid, sanitized);
+
+    // Add reply to conversation history
+    addToHistory(auth.uid, "assistant", replyText);
+
+    // Save support reply with a small delay for natural feel
+    const delay = 800 + Math.random() * 700;
     const uid = auth.uid;
     setTimeout(async () => {
       try {
@@ -127,7 +177,7 @@ export async function POST(req: NextRequest) {
           read: false,
         });
       } catch (err) {
-        console.error("[chat] auto-reply error:", err);
+        console.error("[chat] LLM reply save error:", err);
       }
     }, delay).unref();
 

@@ -616,6 +616,23 @@ export default function TransactionsView({
   /* ── Derived states ── */
   const parsedAmount = Number(amount) || 0;
 
+  // Minimum amount for depot & retrait: 1000 FCFA
+  const MIN_AMOUNT = 1000;
+  const amountBelowMin = parsedAmount > 0 && parsedAmount < MIN_AMOUNT;
+
+  // Phone operator auto-detection: 06 → MTN, 05/04 → Airtel
+  React.useEffect(() => {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length >= 2) {
+      const prefix = digits.substring(0, 2);
+      if (prefix === '06' && method !== 'mtn') {
+        onMethodChange('mtn');
+      } else if ((prefix === '05' || prefix === '04') && method !== 'airtel') {
+        onMethodChange('airtel');
+      }
+    }
+  }, [phone]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const phoneValid = useMemo(() => {
     // Phone is valid if it has at least 9 digits
     const digits = phone.replace(/\D/g, '');
@@ -636,8 +653,12 @@ export default function TransactionsView({
 
   /* ── Handlers ── */
   const handleSubmit = () => {
+    if (amountBelowMin) return;
     setConfirming(true);
   };
+
+  // Can submit: amount >= min, phone valid, no balance exceeded
+  const canSubmit = parsedAmount >= MIN_AMOUNT && phoneValid && !balanceExceeded;
 
   const handleConfirm = () => {
     setConfirming(false);
@@ -705,6 +726,29 @@ export default function TransactionsView({
                 />
                 <span>XAF</span>
               </div>
+              {/* Amount below minimum warning */}
+              {amountBelowMin && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    marginTop: 8,
+                    padding: '8px 12px',
+                    borderRadius: 12,
+                    background: 'rgba(245,158,11,0.08)',
+                    border: '1px solid rgba(245,158,11,0.2)',
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <circle cx="7" cy="7" r="6" stroke="#f59e0b" strokeWidth="1.5" opacity="0.5" />
+                    <text x="7" y="10" textAnchor="middle" fill="#f59e0b" fontSize="8" fontWeight="800">!</text>
+                  </svg>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24', lineHeight: 1.4 }}>
+                    Montant minimum : 1 000 FCFA
+                  </span>
+                </div>
+              )}
               {/* Balance exceeded warning (retrait) */}
               {balanceExceeded && (
                 <div
@@ -862,14 +906,28 @@ export default function TransactionsView({
                 <p>Instantané</p>
               </div>
             </div>
+            <button
+              className="transaction-confirm"
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+              style={!canSubmit ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
+            >
+              {parsedAmount === 0
+                ? `Minimum 1 000 FCFA`
+                : type === 'depot' ? 'Confirmer le dépôt' : 'Valider le retrait'}
+            </button>
           </div>
 
           {/* Fixed Confirm Button - sits above the bottom nav bar */}
           <button
             className="transaction-confirm"
             onClick={handleSubmit}
+            disabled={!canSubmit}
+            style={!canSubmit ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
           >
-            {type === 'depot' ? 'Confirmer le dépôt' : 'Valider le retrait'}
+            {parsedAmount === 0
+              ? `Minimum 1 000 FCFA`
+              : type === 'depot' ? 'Confirmer le dépôt' : 'Valider le retrait'}
           </button>
 
           {/* ── Confirmation modal ── */}

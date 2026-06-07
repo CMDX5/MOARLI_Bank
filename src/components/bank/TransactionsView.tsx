@@ -855,17 +855,32 @@ export default function TransactionsView({
           <div className="transaction-footer">
             <div className="transaction-recap">
               <div>
-                <strong>{formatCurrency(total)} XAF <small style={{ fontSize: 10, fontWeight: 600, color: type === 'depot' ? '#22c55e' : 'var(--dim)', marginLeft: 6 }}>({type === 'depot' ? 'Frais: 0 XAF' : `Frais: 2% — ${formatCurrency(fees)} XAF`})</small></strong>
+                <strong>{formatCurrency(total)} XAF <small style={{ fontSize: 10, fontWeight: 600, color: type === 'depot' ? '#22c55e' : 'var(--dim)', marginLeft: 6 }}>({type === 'depot' ? 'Gratuit' : `${formatCurrency(fees)} XAF`})</small></strong>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <span>Estimation</span>
                 <p>Instantané</p>
               </div>
             </div>
-            <button className="transaction-confirm" onClick={handleSubmit}>
-              {type === 'depot' ? 'Confirmer le dépôt' : 'Valider le retrait'}
-            </button>
           </div>
+
+          {/* Fixed Confirm Button - Positioned just above the nav bar */}
+          <button 
+            className="transaction-confirm" 
+            onClick={handleSubmit}
+            style={{
+              position: 'fixed',
+              bottom: 60,
+              left: 0,
+              right: 0,
+              margin: '0 auto',
+              maxWidth: '360px',
+              width: 'calc(100% - 32px)',
+              zIndex: 1000
+            }}
+          >
+            {type === 'depot' ? 'Confirmer le dépôt' : 'Valider le retrait'}
+          </button>
 
           {/* ── Confirmation modal ── */}
           {confirming && (
@@ -880,6 +895,19 @@ export default function TransactionsView({
               onCancel={handleCancelConfirm}
             />
           )}
+
+          <style>{`
+            @media (max-width: 600px) {
+              .transaction-confirm {
+                position: fixed !important;
+                bottom: 60px !important;
+                left: 16px !important;
+                right: 16px !important;
+                width: calc(100% - 32px) !important;
+                margin: 0 !important;
+              }
+            }
+          `}</style>
         </div>
       </div>
     </div>

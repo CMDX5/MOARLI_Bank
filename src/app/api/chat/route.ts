@@ -38,16 +38,17 @@ Règles :
 6. Si tu ne peux pas identifier clairement l'image, demande des précisions`;
 
 // In-memory conversation history per user (last 10 messages for context)
-const userConversations = new Map<string, { role: string; content: string }[]>();
+type MsgRole = "user" | "assistant";
+const userConversations = new Map<string, { role: MsgRole; content: string }[]>();
 
-function getConversationHistory(uid: string): { role: string; content: string }[] {
+function getConversationHistory(uid: string): { role: MsgRole; content: string }[] {
   if (!userConversations.has(uid)) {
     userConversations.set(uid, []);
   }
   return userConversations.get(uid)!;
 }
 
-function addToHistory(uid: string, role: string, content: string) {
+function addToHistory(uid: string, role: MsgRole, content: string) {
   const history = getConversationHistory(uid);
   history.push({ role, content });
   // Keep last 10 messages only (5 user + 5 assistant)
@@ -69,7 +70,7 @@ async function getLLMResponse(uid: string, userMessage: string): Promise<string>
     ];
 
     const completion = await zai.chat.completions.create({
-      messages,
+      messages: messages as any,
       thinking: { type: "disabled" },
     });
 
@@ -95,6 +96,7 @@ async function getVLMResponse(uid: string, userMessage: string, imageUrl: string
       : "Analysez cette image envoyée dans le chat de support MOARLI Bank et aidez l'utilisateur.";
 
     const response = await zai.chat.completions.createVision({
+      model: "glm-4.6v",
       messages: [
         {
           role: "user",
@@ -109,7 +111,7 @@ async function getVLMResponse(uid: string, userMessage: string, imageUrl: string
         },
       ],
       thinking: { type: "disabled" },
-    });
+    } as any);
 
     const reply = response.choices[0]?.message?.content;
 
@@ -223,7 +225,7 @@ export async function POST(req: NextRequest) {
     await adminDb.collection("chats").doc(auth.uid).collection("messages").add(userMsgData);
 
     // Add to conversation history for LLM context (text only, no base64)
-    addToHistory(auth.uid, "user", msgText);
+    addToHistory(auth.uid, "user" as MsgRole, msgText);
 
     // Get LLM or VLM reply
     const replyText = safeImageUrl
@@ -231,7 +233,7 @@ export async function POST(req: NextRequest) {
       : await getLLMResponse(auth.uid, msgText);
 
     // Add reply to conversation history
-    addToHistory(auth.uid, "assistant", replyText);
+    addToHistory(auth.uid, "assistant" as MsgRole, replyText);
 
     // Save support reply with a small delay for natural feel
     const delay = 800 + Math.random() * 700;

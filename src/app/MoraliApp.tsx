@@ -6637,12 +6637,16 @@ function App() {
 </div>
 )}
 {screen === "chat" && (
-<ChatSupportView
-  authUid={authUid}
-  onBack={openDashboard}
-  showToast={showToast}
-  getAuthHeaders={getAuthHeaders}
-/>
+<div className={`app-screen active`}>
+  <div className="content-scrollable" style={{ padding: 0, overflow: 'hidden' }}>
+    <ChatSupportView
+      authUid={authUid}
+      onBack={openDashboard}
+      showToast={showToast}
+      getAuthHeaders={getAuthHeaders}
+    />
+  </div>
+</div>
 )}
 {screen === "leaderboard" && (
 <div className={`app-screen active`}>

@@ -31,16 +31,16 @@ const BASE_COLORS: ThemeColors = {
 };
 
 const LIGHT_COLORS: ThemeColors = {
-  '--bg-primary': '#f8fafc',
-  '--bg-secondary': '#ffffff',
+  '--bg-primary': '#f4f2ee',
+  '--bg-secondary': '#faf9f6',
   '--bg-card': '#ffffff',
-  '--text-primary': '#0f172a',
-  '--text-secondary': '#475569',
-  '--accent': '#2563eb',
-  '--accent-secondary': '#3b82f6',
-  '--border': 'rgba(0,0,0,0.08)',
-  '--gradient-start': '#2563eb',
-  '--gradient-end': '#1d4ed8',
+  '--text-primary': '#1e293b',
+  '--text-secondary': '#64748b',
+  '--accent': '#3b72d4',
+  '--accent-secondary': '#5b8def',
+  '--border': 'rgba(0,0,0,0.06)',
+  '--gradient-start': '#3b72d4',
+  '--gradient-end': '#2a5ab8',
 };
 
 const THEME_COLORS: Record<ThemeMode, ThemeColors> = {
@@ -52,7 +52,7 @@ const THEME_COLORS: Record<ThemeMode, ThemeColors> = {
 
 export const THEME_META: Record<ThemeMode, { label: string; accentColor: string; accentSecondary: string }> = {
   base: { label: 'Base', accentColor: '#3b82f6', accentSecondary: '#60a5fa' },
-  light: { label: 'MOARLI Light', accentColor: '#2563eb', accentSecondary: '#3b82f6' },
+  light: { label: 'MOARLI Light', accentColor: '#3b72d4', accentSecondary: '#5b8def' },
 };
 
 // ── Context shape ──
@@ -103,19 +103,23 @@ function applyThemeToDOM(mode: ThemeMode) {
   if (mode === 'light') {
     root.style.setProperty('--bg', colors['--bg-primary']);
     root.style.setProperty('--surface', colors['--bg-secondary']);
-    root.style.setProperty('--surface2', '#f1f5f9');
-    root.style.setProperty('--blue', '#2563eb');
-    root.style.setProperty('--blue2', '#1d4ed8');
-    root.style.setProperty('--blue3', '#3b82f6');
+    root.style.setProperty('--surface2', '#eeece8');
+    root.style.setProperty('--blue', '#3b72d4');
+    root.style.setProperty('--blue2', '#2a5ab8');
+    root.style.setProperty('--blue3', '#5b8def');
     root.style.setProperty('--border', colors['--border']);
     root.style.setProperty('--text', colors['--text-primary']);
     root.style.setProperty('--muted', colors['--text-secondary']);
-    root.style.setProperty('--dim', '#64748b');
-    root.style.setProperty('--w05', 'rgba(0,0,0,0.04)');
+    root.style.setProperty('--dim', '#94a3b8');
+    root.style.setProperty('--w05', 'rgba(0,0,0,0.03)');
+    root.style.setProperty('--royal', '#2a5ab8');
+    root.style.setProperty('--gold', '#b8942e');
+    root.style.setProperty('--gold2', '#d4b95a');
+    root.style.setProperty('--success', '#1a9a4a');
+    root.style.setProperty('--danger', '#d64545');
     root.style.setProperty('color-scheme', 'light');
-    // Set body background for light theme
-    document.body.style.background = '#f8fafc';
-    document.body.style.color = '#0f172a';
+    document.body.style.background = '#f4f2ee';
+    document.body.style.color = '#1e293b';
   } else {
     // base
     root.style.setProperty('--bg', colors['--bg-primary']);

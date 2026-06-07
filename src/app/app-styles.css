@@ -1365,5 +1365,723 @@ html[style*="color-scheme: light"] .privileges-screen {
 
 /* Toast */
 html[style*="color-scheme: light"] .toast {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  background: linear-gradient(135deg, #3b72d4, #2a5ab8);
+}
+
+/* ══════════════════════════════════════════════════════════
+   LIGHT THEME — SOFT & WARM (complete override)
+   Palette: #f4f2ee bg, #faf9f6 cards, #1e293b text
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Global backgrounds ── */
+html[style*="color-scheme: light"] .stage {
+  background: #f4f2ee;
+}
+html[style*="color-scheme: light"] .app-viewport {
+  background: #f4f2ee;
+}
+html[style*="color-scheme: light"] html,
+html[style*="color-scheme: light"] body {
+  background: #f4f2ee !important;
+  color: #1e293b;
+}
+
+/* ── Top header ── */
+html[style*="color-scheme: light"] .top-header {
+  background: #f4f2ee;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+html[style*="color-scheme: light"] .brand-name {
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .brand-sub-lbl {
+  color: #b8942e;
+}
+
+/* ── Bottom nav ── */
+html[style*="color-scheme: light"] .bottom-nav {
+  background: rgba(250,249,246,0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
+html[style*="color-scheme: light"] .nav-item {
+  color: #94a3b8;
+}
+html[style*="color-scheme: light"] .nav-item.active {
+  color: #3b72d4;
+}
+html[style*="color-scheme: light"] .nav-item.active .nav-icon-dot {
+  background: #3b72d4;
+  box-shadow: 0 0 8px rgba(59,114,212,0.4);
+}
+
+/* ── Icon pills / bell ── */
+html[style*="color-scheme: light"] .icon-pill {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.06);
+}
+html[style*="color-scheme: light"] .services-bell {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.06);
+}
+
+/* ── Service tiles ── */
+html[style*="color-scheme: light"] .service-tile {
+  background: #faf9f6;
+  border-color: rgba(0,0,0,0.06);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+html[style*="color-scheme: light"] .service-tile:hover,
+html[style*="color-scheme: light"] .service-tile:active {
+  background: #f5f3ef;
+}
+html[style*="color-scheme: light"] .service-icon-box {
+  background: rgba(59,114,212,0.08);
+}
+
+/* ── Service wide cards ── */
+html[style*="color-scheme: light"] .service-wide {
+  background: #faf9f6;
+  border-color: rgba(0,0,0,0.06);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+html[style*="color-scheme: light"] .service-wide.emerald {
+  background: rgba(16,185,129,0.04);
+  border-color: rgba(16,185,129,0.15);
+}
+
+/* ── Hub screen ── */
+html[style*="color-scheme: light"] .hub-screen {
+  background: #f4f2ee;
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .hub-card {
+  background: #faf9f6;
+  border-color: rgba(0,0,0,0.06);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+}
+html[style*="color-scheme: light"] .hub-metric {
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.05);
+}
+
+/* ── Savings screen ── */
+html[style*="color-scheme: light"] .savings-screen {
+  background: #f4f2ee;
+  color: #1e293b;
+}
+
+/* ── Loans / wallet / fx screens ── */
+html[style*="color-scheme: light"] .loan-screen,
+html[style*="color-scheme: light"] .wallet-screen,
+html[style*="color-scheme: light"] .wallet-detail-screen,
+html[style*="color-scheme: light"] .fx-screen,
+html[style*="color-scheme: light"] .loans-landing {
+  background: #f4f2ee;
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .loan-card,
+html[style*="color-scheme: light"] .wallet-card,
+html[style*="color-scheme: light"] .fx-card,
+html[style*="color-scheme: light"] .loan-summary-card,
+html[style*="color-scheme: light"] .wallet-total,
+html[style*="color-scheme: light"] .fx-exchange-box,
+html[style*="color-scheme: light"] .fx-ex-summary {
+  background: #faf9f6;
+  border-color: rgba(0,0,0,0.06);
+}
+html[style*="color-scheme: light"] .loan-badge {
+  background: rgba(59,114,212,0.08);
+  color: #3b72d4;
+  border-color: rgba(59,114,212,0.15);
+}
+html[style*="color-scheme: light"] .loan-badge.gold {
+  background: rgba(184,148,46,0.08);
+  color: #b8942e;
+  border-color: rgba(184,148,46,0.15);
+}
+html[style*="color-scheme: light"] .loans-option-card {
+  background: #faf9f6;
+  border-color: rgba(0,0,0,0.06);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+html[style*="color-scheme: light"] .loan-field-input,
+html[style*="color-scheme: light"] .loan-textarea {
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.08);
+  color: #1e293b;
+}
+
+/* ── Loans option metrics ── */
+html[style*="color-scheme: light"] .loans-option-metric-val {
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .loans-option-metric-val.blue {
+  color: #3b72d4;
+}
+html[style*="color-scheme: light"] .loans-option-metric-val.gold {
+  color: #b8942e;
+}
+
+/* ── FX ── */
+html[style*="color-scheme: light"] .fx-ex-input {
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.08);
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .fx-rate strong {
+  color: #1e293b;
+}
+
+/* ── Wallet FX mini cards ── */
+html[style*="color-scheme: light"] .fx-wallet-card {
+  background: #faf9f6;
+  border-color: rgba(0,0,0,0.06);
+}
+html[style*="color-scheme: light"] .wallet-detail-balance-card.eur,
+html[style*="color-scheme: light"] .wallet-detail-balance-card.usd {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+}
+html[style*="color-scheme: light"] .wallet-detail-info-item,
+html[style*="color-scheme: light"] .wallet-detail-equivalence {
+  background: #faf9f6;
+  border-color: rgba(0,0,0,0.06);
+}
+
+/* ── Buttons ── */
+html[style*="color-scheme: light"] .btn-primary {
+  background: linear-gradient(135deg, #3b72d4, #2a5ab8);
+  box-shadow: 0 4px 16px rgba(59,114,212,0.25);
+  color: #fff;
+}
+html[style*="color-scheme: light"] .btn-secondary {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.08);
+  color: #64748b;
+}
+html[style*="color-scheme: light"] .hub-cta,
+html[style*="color-scheme: light"] .fx-confirm-btn {
+  background: #3b72d4;
+  box-shadow: 0 6px 20px rgba(59,114,212,0.25);
+}
+html[style*="color-scheme: light"] .loan-btn-confirm {
+  background: #3b72d4;
+  box-shadow: 0 6px 20px rgba(59,114,212,0.25);
+}
+html[style*="color-scheme: light"] .loan-btn-secondary {
+  background: rgba(0,0,0,0.05);
+  color: #64748b;
+}
+
+/* ── Transactions / activity ── */
+html[style*="color-scheme: light"] .transaction-footer {
+  background: rgba(244,242,238,0.95);
+  border-top-color: rgba(0,0,0,0.06);
+}
+html[style*="color-scheme: light"] .transaction-confirm {
+  background: #3b72d4;
+  box-shadow: 0 6px 20px rgba(59,114,212,0.25);
+}
+html[style*="color-scheme: light"] .phone-input-wrap {
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.08);
+}
+html[style*="color-scheme: light"] .phone-prefix {
+  color: #64748b;
+}
+
+/* ── Auth screens ── */
+html[style*="color-scheme: light"] .auth-scroll {
+  background: #f4f2ee;
+}
+html[style*="color-scheme: light"] .auth-brand-name {
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .auth-tab {
+  color: #94a3b8;
+  background: transparent;
+}
+html[style*="color-scheme: light"] .auth-tab.active {
+  background: linear-gradient(135deg, #3b72d4, #2a5ab8);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(59,114,212,0.25);
+}
+html[style*="color-scheme: light"] .field-input {
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.08);
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .field-input::placeholder {
+  color: rgba(0,0,0,0.25);
+}
+html[style*="color-scheme: light"] .field-input:focus {
+  border-color: rgba(59,114,212,0.4);
+  background: rgba(59,114,212,0.04);
+  box-shadow: 0 0 0 3px rgba(59,114,212,0.08);
+}
+html[style*="color-scheme: light"] .field-label {
+  color: #64748b;
+}
+html[style*="color-scheme: light"] .field-icon {
+  color: #94a3b8;
+}
+html[style*="color-scheme: light"] .prefix-select {
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.08);
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .form-section-title {
+  color: #94a3b8;
+}
+html[style*="color-scheme: light"] .social-divider {
+  color: #94a3b8;
+}
+html[style*="color-scheme: light"] .step-dot {
+  background: #faf9f6;
+  border-color: rgba(0,0,0,0.1);
+  color: #94a3b8;
+}
+html[style*="color-scheme: light"] .step-dot.done {
+  background: #3b72d4;
+  border-color: #3b72d4;
+  color: #fff;
+  box-shadow: 0 0 8px rgba(59,114,212,0.3);
+}
+html[style*="color-scheme: light"] .step-line {
+  background: rgba(0,0,0,0.08);
+}
+html[style*="color-scheme: light"] .step-line.done {
+  background: #3b72d4;
+}
+html[style*="color-scheme: light"] .check-box {
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.1);
+}
+html[style*="color-scheme: light"] .check-box.checked {
+  background: #3b72d4;
+  border-color: #3b72d4;
+}
+html[style*="color-scheme: light"] .info-box {
+  background: rgba(59,114,212,0.04);
+  border-color: rgba(59,114,212,0.1);
+}
+html[style*="color-scheme: light"] .otp-box {
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.08);
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .otp-box.active {
+  border-color: rgba(59,114,212,0.4);
+  background: rgba(59,114,212,0.06);
+}
+
+/* ── PIN setup ── */
+html[style*="color-scheme: light"] .pin-setup-wrap {
+  background: #f4f2ee;
+}
+html[style*="color-scheme: light"] .reg-pin-input {
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.08);
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .pin-dot {
+  border-color: rgba(0,0,0,0.15);
+}
+html[style*="color-scheme: light"] .pin-dot.filled {
+  background: #3b72d4;
+  border-color: #3b72d4;
+  box-shadow: 0 0 8px rgba(59,114,212,0.3);
+}
+
+/* ── Notification panel ── */
+html[style*="color-scheme: light"] .notif-overlay {
+  background: rgba(0,0,0,0.25);
+  backdrop-filter: blur(8px);
+}
+html[style*="color-scheme: light"] .notif-panel {
+  background: linear-gradient(180deg, #faf9f6, #f4f2ee);
+  border-color: rgba(0,0,0,0.08);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.12);
+}
+html[style*="color-scheme: light"] .notif-panel-head {
+  border-bottom-color: rgba(0,0,0,0.05);
+}
+html[style*="color-scheme: light"] .notif-panel-title {
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .notif-panel-item {
+  background: rgba(0,0,0,0.02);
+}
+html[style*="color-scheme: light"] .notif-panel-item:hover,
+html[style*="color-scheme: light"] .notif-panel-item:active {
+  background: rgba(0,0,0,0.04);
+}
+html[style*="color-scheme: light"] .notif-panel-item-title {
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .notif-panel-item-time,
+html[style*="color-scheme: light"] .notif-panel-time {
+  color: #94a3b8;
+}
+html[style*="color-scheme: light"] .notif-panel-close {
+  background: rgba(0,0,0,0.02);
+  border-top-color: rgba(0,0,0,0.05);
+  color: #64748b;
+}
+
+/* ── Quick notif popup ── */
+html[style*="color-scheme: light"] .quick-notif-card {
+  background: linear-gradient(160deg, #faf9f6, #f0eee9);
+  border-color: rgba(184,148,46,0.2);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 0 40px rgba(184,148,46,0.06);
+}
+
+/* ── Card modal ── */
+html[style*="color-scheme: light"] .card-modal-overlay {
+  background: rgba(0,0,0,0.3);
+}
+html[style*="color-scheme: light"] .card-modal {
+  background: linear-gradient(180deg, #faf9f6, #f4f2ee);
+  border-color: rgba(0,0,0,0.08);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.12);
+}
+html[style*="color-scheme: light"] .card-modal-title {
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .card-setting-row {
+  background: rgba(0,0,0,0.02);
+  border-color: rgba(0,0,0,0.05);
+}
+html[style*="color-scheme: light"] .card-setting-title {
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .card-mini-stat {
+  background: rgba(0,0,0,0.02);
+  border-color: rgba(0,0,0,0.05);
+}
+html[style*="color-scheme: light"] .pin-display {
+  background: rgba(184,148,46,0.04);
+  border-color: rgba(184,148,46,0.1);
+}
+html[style*="color-scheme: light"] .pin-code {
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .pin-code.revealed {
+  color: #b8942e;
+}
+
+/* ── BC modal ── */
+html[style*="color-scheme: light"] .bc-modal {
+  background: linear-gradient(180deg, #faf9f6, #f0eee9);
+  border-color: rgba(184,148,46,0.12);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.12);
+}
+
+/* ── Mini switch ── */
+html[style*="color-scheme: light"] .mini-switch {
+  background: rgba(0,0,0,0.06);
+  border-color: rgba(0,0,0,0.1);
+}
+html[style*="color-scheme: light"] .mini-switch::after {
+  background: #94a3b8;
+}
+html[style*="color-scheme: light"] .mini-switch.active {
+  background: rgba(59,114,212,0.15);
+  border-color: rgba(59,114,212,0.3);
+}
+html[style*="color-scheme: light"] .mini-switch.active::after {
+  background: #3b72d4;
+  box-shadow: 0 0 6px rgba(59,114,212,0.3);
+}
+
+/* ── Dashboard cards / tiles ── */
+html[style*="color-scheme: light"] .tab-card {
+  background: #faf9f6;
+  border-color: rgba(0,0,0,0.06);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+html[style*="color-scheme: light"] .finance-card {
+  background: #faf9f6;
+  border-color: rgba(0,0,0,0.06);
+}
+html[style*="color-scheme: light"] .stat-card {
+  background: #faf9f6;
+  border-color: rgba(0,0,0,0.06);
+}
+
+/* ── Search ── */
+html[style*="color-scheme: light"] .services-search input {
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.06);
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .services-search input::placeholder {
+  color: rgba(0,0,0,0.25);
+}
+html[style*="color-scheme: light"] .services-search input:focus {
+  border-color: rgba(59,114,212,0.35);
+}
+
+/* ── Tontine / members ── */
+html[style*="color-scheme: light"] .tontine-progress {
+  background: rgba(244,63,94,0.04);
+  border-color: rgba(244,63,94,0.08);
+}
+html[style*="color-scheme: light"] .member-row {
+  background: #faf9f6;
+  border-color: rgba(0,0,0,0.05);
+}
+html[style*="color-scheme: light"] .member-row.current {
+  background: rgba(59,114,212,0.06);
+  border-color: rgba(59,114,212,0.2);
+}
+
+/* ── Exchange / swap ── */
+html[style*="color-scheme: light"] .exchange-box {
+  background: #faf9f6;
+  border-color: rgba(0,0,0,0.06);
+}
+html[style*="color-scheme: light"] .exchange-box.receive {
+  background: rgba(59,114,212,0.06);
+  border-color: rgba(59,114,212,0.15);
+}
+html[style*="color-scheme: light"] .exchange-box.receive .exchange-kicker {
+  color: #3b72d4;
+}
+
+/* ── Savings ── */
+html[style*="color-scheme: light"] .savings-card {
+  background: linear-gradient(145deg, rgba(16,185,129,0.1), rgba(6,78,59,0.06));
+  border-color: rgba(16,185,129,0.15);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+}
+html[style*="color-scheme: light"] .savings-bar {
+  background: rgba(0,0,0,0.06);
+}
+html[style*="color-scheme: light"] .savings-btn {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.08);
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .savings-btn.primary {
+  background: #1a9a4a;
+  color: #fff;
+  border-color: rgba(16,185,129,0.3);
+}
+html[style*="color-scheme: light"] .savings-note {
+  background: rgba(0,0,0,0.02);
+  border-color: rgba(0,0,0,0.05);
+}
+
+/* ── Profile screen ── */
+html[style*="color-scheme: light"] .profile-screen {
+  background: #f4f2ee;
+}
+
+/* ── Cards screen ── */
+html[style*="color-scheme: light"] .cards-screen {
+  background: #f4f2ee;
+}
+
+/* ── Payments screen ── */
+html[style*="color-scheme: light"] .payments-screen {
+  background: #f4f2ee;
+}
+
+/* ── Loan confirm ── */
+html[style*="color-scheme: light"] .loan-confirm-card {
+  background: #faf9f6;
+}
+html[style*="color-scheme: light"] .loan-confirm-icon {
+  background: rgba(59,114,212,0.1);
+  border-color: rgba(59,114,212,0.2);
+  color: #3b72d4;
+}
+html[style*="color-scheme: light"] .loan-confirm-title {
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .loan-recap-item {
+  background: rgba(0,0,0,0.02);
+  border-color: rgba(0,0,0,0.05);
+}
+html[style*="color-scheme: light"] .loan-recap-value {
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .loan-recap-item.highlight {
+  background: rgba(59,114,212,0.05);
+  border-color: rgba(59,114,212,0.12);
+}
+html[style*="color-scheme: light"] .loan-summary-row {
+  color: #64748b;
+}
+html[style*="color-scheme: light"] .loan-summary-row span:last-child {
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .loan-summary-card {
+  border-color: rgba(0,0,0,0.06);
+}
+html[style*="color-scheme: light"] .loan-summary-card.gold {
+  background: rgba(184,148,46,0.04);
+  border-color: rgba(184,148,46,0.12);
+}
+html[style*="color-scheme: light"] .loan-summary-row.total.gold span:last-child {
+  color: #b8942e;
+}
+html[style*="color-scheme: light"] .loan-notice {
+  background: rgba(59,114,212,0.04);
+  border-color: rgba(59,114,212,0.1);
+}
+
+/* ── Loans landing ── */
+html[style*="color-scheme: light"] .loans-landing {
+  background: #f4f2ee;
+}
+html[style*="color-scheme: light"] .loans-landing-title {
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .loans-option-icon.blue {
+  background: rgba(59,114,212,0.1);
+  color: #3b72d4;
+}
+html[style*="color-scheme: light"] .loans-option-icon.gold {
+  background: rgba(184,148,46,0.1);
+  color: #b8942e;
+}
+html[style*="color-scheme: light"] .loans-option-badge.blue {
+  background: rgba(59,114,212,0.08);
+  color: #3b72d4;
+  border-color: rgba(59,114,212,0.15);
+}
+html[style*="color-scheme: light"] .loans-option-badge.gold {
+  background: rgba(184,148,46,0.08);
+  color: #b8942e;
+  border-color: rgba(184,148,46,0.15);
+}
+html[style*="color-scheme: light"] .loans-option-name {
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .loans-option-desc {
+  color: #64748b;
+}
+html[style*="color-scheme: light"] .loans-option-card.gold {
+  border-color: rgba(184,148,46,0.1);
+  background: rgba(184,148,46,0.02);
+}
+html[style*="color-scheme: light"] .loans-info-banner {
+  background: rgba(0,0,0,0.02);
+  border-color: rgba(0,0,0,0.05);
+}
+
+/* ── Wallet detail ── */
+html[style*="color-scheme: light"] .wallet-detail-title {
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .wallet-detail-card-label {
+  color: #64748b;
+}
+html[style*="color-scheme: light"] .wallet-detail-card-amount {
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .wallet-detail-card-equiv {
+  color: #64748b;
+}
+html[style*="color-scheme: light"] .wallet-detail-info-label {
+  color: #64748b;
+}
+html[style*="color-scheme: light"] .wallet-detail-info-value {
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .wallet-detail-notice {
+  background: rgba(0,0,0,0.02);
+  border-color: rgba(0,0,0,0.05);
+}
+
+/* ── Operator cards ── */
+html[style*="color-scheme: light"] .operator-card {
+  background: #faf9f6;
+  border-color: rgba(0,0,0,0.06);
+}
+html[style*="color-scheme: light"] .operator-card span {
+  color: #1e293b;
+}
+
+/* ── Loan duration buttons ── */
+html[style*="color-scheme: light"] .loan-duration-btn {
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.06);
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .loan-duration-btn.active {
+  background: rgba(59,114,212,0.08);
+  border-color: rgba(59,114,212,0.2);
+}
+html[style*="color-scheme: light"] .loan-duration-btn.gold.active {
+  background: rgba(184,148,46,0.08);
+  border-color: rgba(184,148,46,0.2);
+}
+
+/* ── Loan presets ── */
+html[style*="color-scheme: light"] .loan-preset-btn {
+  background: rgba(0,0,0,0.03);
+  border-color: transparent;
+  color: #94a3b8;
+}
+html[style*="color-scheme: light"] .loan-preset-btn.active {
+  background: rgba(59,114,212,0.1);
+  color: #3b72d4;
+  border-color: rgba(59,114,212,0.2);
+}
+
+/* ── Pin action buttons ── */
+html[style*="color-scheme: light"] .pin-action-btn {
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.06);
+  color: #64748b;
+}
+html[style*="color-scheme: light"] .pin-action-btn.danger {
+  background: rgba(214,69,69,0.04);
+  border-color: rgba(214,69,69,0.1);
+  color: #d64545;
+}
+
+/* ── Dashboard tab kicker override (keep gold) ── */
+html[style*="color-scheme: light"] .tab-kicker {
+  color: #b8942e;
+}
+
+/* ── Activity items (dashboard) ── */
+html[style*="color-scheme: light"] .activity-wrap {
+  background: transparent;
+}
+
+/* ── Loan screen summary row ── */
+html[style*="color-scheme: light"] .loan-amount-value {
+  color: #1e293b;
+}
+html[style*="color-scheme: light"] .loan-amount-value.gold .loan-amount-value {
+  color: #b8942e;
+}
+
+/* ── Social buttons ── */
+html[style*="color-scheme: light"] .btn-social {
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.06);
+  color: #1e293b;
+}
+
+/* ── Auth link ── */
+html[style*="color-scheme: light"] .auth-link {
+  color: #94a3b8;
+}
+
+/* ── Notif swipe actions ── */
+html[style*="color-scheme: light"] .notif-swipe-wrap {
+  background: transparent;
+}
+html[style*="color-scheme: light"] .notif-swipe-btn.notif-swipe-pin {
+  background: #3b72d4;
+}
+html[style*="color-scheme: light"] .notif-swipe-btn.notif-swipe-delete {
+  background: #d64545;
 }

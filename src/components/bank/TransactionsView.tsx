@@ -110,19 +110,47 @@ export default function TransactionsView({
               <div>
                 <small>{type === 'depot' ? 'Frais' : `Frais (2% — ${formatCurrency(fees)} XAF)`}</small>
                 <strong>{formatCurrency(total)} XAF</strong>
-                <div style={{ fontSize: 10, color: type === 'depot' ? '#22c55e' : 'var(--dim)', fontWeight: 600, marginTop: 2 }}>{type === 'depot' ? 'Gratuit — 0% de frais' : `Net reçu: ${formatCurrency(total)} XAF`}</div>
+                <div style={{ fontSize: 10, color: type === 'depot' ? '#22c55e' : 'var(--dim)', fontWeight: 600, marginTop: 2 }}>{type === 'depot' ? 'Gratuit — 0% de frais' : `Net reçu: ${formatCurrency(Number(amount) - fees)} XAF`}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <span>Estimation</span>
                 <p>Instantané</p>
               </div>
             </div>
-            <button className="transaction-confirm" onClick={onSubmit}>
-              {type === 'depot' ? 'Confirmer le dépôt' : 'Valider le retrait'}
-            </button>
           </div>
         </div>
       </div>
+
+      {/* Fixed Confirm Button - Positioned just above the nav bar */}
+      <button 
+        className="transaction-confirm" 
+        onClick={onSubmit}
+        style={{
+          position: 'fixed',
+          bottom: 60,
+          left: 0,
+          right: 0,
+          margin: '0 auto',
+          maxWidth: '360px',
+          width: 'calc(100% - 32px)',
+          zIndex: 1000
+        }}
+      >
+        {type === 'depot' ? 'Confirmer le dépôt' : 'Valider le retrait'}
+      </button>
+
+      <style>{`
+        @media (max-width: 600px) {
+          .transaction-confirm {
+            position: fixed !important;
+            bottom: 60px !important;
+            left: 16px !important;
+            right: 16px !important;
+            width: calc(100% - 32px) !important;
+            margin: 0 !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

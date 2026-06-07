@@ -615,6 +615,7 @@ export default function TransactionsView({
 
   /* ── Derived states ── */
   const parsedAmount = Number(amount) || 0;
+  const showFooter = parsedAmount > 0;
 
   const phoneValid = useMemo(() => {
     // Phone is valid if it has at least 9 digits
@@ -668,8 +669,8 @@ export default function TransactionsView({
   /* ── NORMAL FORM VIEW ── */
   return (
     <div className="app-screen active">
-      <div className="content-scrollable service-scrollable transaction-safe">
-        <div className="transaction-screen" style={{ position: 'relative' }}>
+      <div className="content-scrollable service-scrollable transaction-safe" style={{ paddingBottom: showFooter ? 80 : 0 }}>
+        <div className="transaction-screen" style={{ position: 'relative', justifyContent: showFooter ? 'flex-start' : 'center' }}>
           {/* Processing overlay */}
           {processing && <ProcessingOverlay />}
 
@@ -690,7 +691,7 @@ export default function TransactionsView({
             </div>
           </div>
 
-          <div className="transaction-body">
+          <div className="transaction-body" style={{ paddingBottom: showFooter ? 100 : 20, flex: showFooter ? '1' : '0 0 auto' }}>
             {/* ── Amount input ── */}
             <div className="transaction-group">
               <label className="transaction-label" style={{ color: '#D4A437' }}>
@@ -852,6 +853,7 @@ export default function TransactionsView({
             </div>
           </div>
 
+          {showFooter && (
           <div className="transaction-footer">
             <div className="transaction-recap">
               <div>
@@ -866,6 +868,7 @@ export default function TransactionsView({
               {type === 'depot' ? 'Confirmer le dépôt' : 'Valider le retrait'}
             </button>
           </div>
+          )}
 
           {/* ── Confirmation modal ── */}
           {confirming && (

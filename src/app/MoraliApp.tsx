@@ -65,6 +65,7 @@ import {
 import AuthView, { type ProfileFormData } from "@/components/bank/AuthView";
 import DashboardView from "@/components/bank/DashboardView";
 import NotificationsPanel from "@/components/bank/NotificationsPanel";
+import SwipeableTransactionItem from "@/components/bank/SwipeableTransactionItem";
 import ProfileView from "@/components/bank/ProfileView";
 import QrScanner from "@/components/bank/QrScanner";
 import CardsView from "@/components/bank/CardsView";
@@ -6423,19 +6424,7 @@ function App() {
                         );
                       }
                       return transferOnly.slice(0, 5).map((tx, idx) => (
-                        <div className="activity-item" key={tx.receiptId || `act-${idx}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 4px", borderBottom: idx < transferOnly.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
-                          <div style={{ width: 40, height: 40, borderRadius: 12, background: tx.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <AppIcon name={tx.icon} size={18} stroke={tx.type === "credit" ? "#60a5fa" : "rgba(255,255,255,0.82)"} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tx.name}</div>
-                            <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 2 }}>{tx.dateTimestamp ? timeAgo(tx.dateTimestamp) : tx.date}</div>
-                          </div>
-                          <div style={{ textAlign: "right" }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: tx.type === "credit" ? "#22c55e" : "var(--fg)" }}>{tx.type === "credit" ? "+" : "-"}{tx.amount}</div>
-                            <div style={{ fontSize: 10, color: "var(--dim)", marginTop: 2 }}>{tx.category}</div>
-                          </div>
-                        </div>
+                        <SwipeableTransactionItem key={tx.receiptId || `act-${idx}`} tx={tx} />
                       ));
                     })()}
                   </div>

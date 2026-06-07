@@ -251,8 +251,11 @@ export default function NotificationsPanel({
             {/* ── Transaction History Section ── */}
             {filteredTransactions.length > 0 && (
               <>
-                <div style={{ padding: "6px 4px 8px", fontSize: 10, fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--gold)" }}>
-                  Historique des transactions
+                <div style={{ padding: "6px 4px 2px", fontSize: 10, fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--gold)" }}>
+                  Activité récente
+                </div>
+                <div style={{ padding: "0 4px 8px", fontSize: 11, color: "#64748b", fontWeight: 600, lineHeight: 1.4 }}>
+                  Vos dernières opérations et mouvements de fonds
                 </div>
                 {filteredTransactions.map((tx, idx) => {
                   const txId = `tx-${tx.receiptId || tx.name}-${idx}`;
@@ -289,11 +292,16 @@ export default function NotificationsPanel({
             {/* ── App Notifications Section ── */}
             {filteredNotifications.length > 0 && (
               <>
-                {filteredTransactions.length > 0 && (
-                  <div style={{ padding: "12px 4px 8px", fontSize: 10, fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase", color: "#D4A437" }}>
-                    Messages
-                  </div>
-                )}
+                {filteredTransactions.length > 0 ? (
+                  <>
+                    <div style={{ padding: "12px 4px 2px", fontSize: 10, fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase", color: "#D4A437" }}>
+                      Messages
+                    </div>
+                    <div style={{ padding: "0 4px 8px", fontSize: 11, color: "#64748b", fontWeight: 600, lineHeight: 1.4 }}>
+                      Alertes, confirmations et infos de votre compte
+                    </div>
+                  </>
+                ) : null}
                 {filteredNotifications.map((item) => (
                   <div key={item.id} className="notif-swipe-wrap">
                     {renderSwipeActions(item.id)}

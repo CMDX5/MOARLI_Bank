@@ -534,6 +534,7 @@ function App() {
   const [servicesQuery, setServicesQuery] = useState("");
   const [servicesFocused, setServicesFocused] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const skipNextNotifClose = React.useRef(false);
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [contactQuery, setContactQuery] = useState("");
   const [contactSearchLoading, setContactSearchLoading] = useState(false);
@@ -1200,6 +1201,10 @@ function App() {
   }, [authTab, currentStep, showRegisterSuccess, showPinSetup]);
 
   useEffect(() => {
+    if (skipNextNotifClose.current) {
+      skipNextNotifClose.current = false;
+      return;
+    }
     setNotificationsOpen(false);
   }, [screen]);
 
@@ -6571,7 +6576,7 @@ function App() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 2px" }}>
                     <p className="tab-kicker" style={{ color: "var(--gold)" }}>Activité récente</p>
-                    <span style={{ fontSize: 10, color: "#3b82f6", fontWeight: 800, cursor: "pointer" }} onClick={() => { setScreen("dashboard"); setNavActive("Accueil"); setNotificationsOpen(true); }}>Voir tout →</span>
+                    <span style={{ fontSize: 10, color: "#3b82f6", fontWeight: 800, cursor: "pointer" }} onClick={() => { skipNextNotifClose.current = true; setNotificationsOpen(true); }}>Voir tout →</span>
                   </div>
                   <div className="activity-wrap">
                     {(() => {

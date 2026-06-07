@@ -27,6 +27,12 @@ const nextConfig: NextConfig = {
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
           // SECURITY: Prevent clickjacking — deny all iframe embedding.
           { key: "X-Frame-Options", value: "DENY" },
+          // SECURITY: Disable MIME type sniffing
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          // SECURITY: Enable XSS protection in legacy browsers
+          { key: "X-XSS-Protection", value: "1; mode=block" },
+          // SECURITY: Prevent browsers from prefetching DNS, connecting, or preloading to untrusted domains
+          { key: "X-DNS-Prefetch-Control", value: "off" },
         ],
       },
       {

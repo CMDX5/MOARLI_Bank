@@ -74,10 +74,14 @@ service cloud.firestore {
   }
 
   // ─────────────────────────────────────────────
-  //  USER DIRECTORY — Read-only for authenticated
+  //  USER DIRECTORY — Restricted read access
+  //  SECURITY: Users can only search for specific users they know,
+  //  not enumerate all users. Implement search validation in API.
   // ─────────────────────────────────────────────
   match /databases/{db}/documents/userDirectory/{userId} {
-    allow read: if isAuth(); // Search needs read access
+    // Restricted: Only allow reads via API with proper validation
+    // Clients should use /api/users/search endpoint instead
+    allow read: if false; // Use API layer for user search
     allow write: if false; // Registration via Admin SDK
   }
 

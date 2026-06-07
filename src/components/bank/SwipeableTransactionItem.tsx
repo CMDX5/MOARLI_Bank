@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useCallback, useState } from 'react';
+import type { IconName } from '@/types/morali';
 import { AppIcon } from '@/components/bank/Icons';
 import { timeAgo } from '@/lib/helpers';
 
@@ -13,7 +14,7 @@ interface SwipeableTransactionItemProps {
     amount: string;
     type: string;
     category?: string;
-    icon: string;
+    icon: IconName;
     bg: string;
   };
   onDelete?: (receiptId: string) => void;
@@ -222,11 +223,11 @@ export default function SwipeableTransactionItem({ tx, onDelete, onPin }: Swipea
           <AppIcon name={tx.icon} size={18} stroke={tx.type === "credit" ? "#60a5fa" : "rgba(255,255,255,0.82)"} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--fg)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tx.name}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tx.name}</div>
           <div style={{ fontSize: 11, color: "var(--dim)", marginTop: 2 }}>{tx.dateTimestamp ? timeAgo(tx.dateTimestamp) : tx.date}</div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: tx.type === "credit" ? "#22c55e" : "var(--fg)" }}>{tx.type === "credit" ? "+" : "-"}{tx.amount}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: tx.type === "credit" ? "#22c55e" : "var(--text)" }}>{tx.type === "credit" ? "+" : "-"}{tx.amount}</div>
           <div style={{ fontSize: 10, color: "var(--dim)", marginTop: 2 }}>{tx.category}</div>
         </div>
       </div>

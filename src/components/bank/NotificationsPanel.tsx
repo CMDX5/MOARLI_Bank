@@ -3,6 +3,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import type { NotificationItem, Transaction } from '@/types/morali';
 import { AppIcon } from '@/components/bank/Icons';
+import { timeAgo } from '@/lib/helpers';
 
 interface NotificationsPanelProps {
   notifications: NotificationItem[];
@@ -272,7 +273,7 @@ export default function NotificationsPanel({
                         </div>
                         <div className="notif-panel-body">
                           <p className="notif-panel-item-title">{tx.name}</p>
-                          <p className="notif-panel-time">{tx.dateTimestamp ? new Date(tx.dateTimestamp).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : tx.date}</p>
+                          <p className="notif-panel-time">{tx.dateTimestamp ? timeAgo(tx.dateTimestamp) : tx.date}</p>
                           <span className={`notif-panel-item-badge ${tx.type === "credit" ? "nb-green" : "nb-blue"}`}>
                             {tx.type === "credit" ? "+" : "-"}{tx.amount}
                           </span>

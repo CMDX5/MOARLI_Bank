@@ -37,8 +37,7 @@ export function timeAgo(timestamp: number): string {
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
 
-  if (seconds < 10) return "À l'instant";
-  if (seconds < 60) return `Il y a ${seconds}s`;
+  if (seconds < 60) return "À l'instant";
   if (minutes < 60) return `Il y a ${minutes} min`;
   if (hours < 24) return `Il y a ${hours}h`;
   if (days === 1) return "Hier";

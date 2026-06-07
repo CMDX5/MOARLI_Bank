@@ -13,9 +13,6 @@ const nextConfig: NextConfig = {
   // Blocks: "X-Powered-By: Next.js" header exposure
   poweredByHeader: false,
 
-  // Allow cross-origin HMR from agent-browser (127.0.0.1)
-  allowedDevOrigins: ["127.0.0.1"],
-
   async headers() {
     return [
       {
@@ -30,6 +27,10 @@ const nextConfig: NextConfig = {
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
           // SECURITY: Prevent clickjacking — deny all iframe embedding.
           { key: "X-Frame-Options", value: "DENY" },
+          // SECURITY: Enable XSS protection in legacy browsers
+          { key: "X-XSS-Protection", value: "1; mode=block" },
+          // SECURITY: Prevent browsers from prefetching DNS, connecting, or preloading to untrusted domains
+          { key: "X-DNS-Prefetch-Control", value: "off" },
         ],
       },
       {

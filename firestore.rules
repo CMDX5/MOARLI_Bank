@@ -74,10 +74,14 @@ service cloud.firestore {
   }
 
   // ─────────────────────────────────────────────
-  //  USER DIRECTORY — Read-only for authenticated
+  //  USER DIRECTORY — Restricted read access
+  //  SECURITY: Users can only search for specific users they know,
+  //  not enumerate all users. Implement search validation in API.
   // ─────────────────────────────────────────────
   match /databases/{db}/documents/userDirectory/{userId} {
-    allow read: if isAuth(); // Search needs read access
+    // Restricted: Only allow reads via API with proper validation
+    // Clients should use /api/users/search endpoint instead
+    allow read: if false; // Use API layer for user search
     allow write: if false; // Registration via Admin SDK
   }
 
@@ -129,13 +133,6 @@ service cloud.firestore {
   // ─────────────────────────────────────────────
   match /databases/{db}/documents/pendingCredits/{docId} {
     allow read, write: if false;
-  }
-
-  // ─────────────────────────────────────────────
-  //  CHAT SUPPORT — Users read/write their own chat messages
-  // ─────────────────────────────────────────────
-  match /databases/{db}/documents/chats/{userId} {
-    allow read, write: if isOwner(userId);
   }
 
   // ─────────────────────────────────────────────

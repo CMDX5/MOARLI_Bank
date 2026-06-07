@@ -297,9 +297,12 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
         body.imageUrl = imageUrl;
       }
 
+      // Get auth headers (Firebase Bearer token)
+      const authHeaders = await getAuthHeaders();
+
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify(body),
         signal: abortCtrl.signal,
       });

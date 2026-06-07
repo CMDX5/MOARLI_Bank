@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
   // Blocks: "X-Powered-By: Next.js" header exposure
   poweredByHeader: false,
 
+  // Allow cross-origin HMR from agent-browser (127.0.0.1)
+  allowedDevOrigins: ["127.0.0.1"],
+
   async headers() {
     return [
       {

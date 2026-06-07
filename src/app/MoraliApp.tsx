@@ -580,6 +580,7 @@ function App() {
   const [pinResetNewPin, setPinResetNewPin] = useState("");
   const [pinResetConfirmPin, setPinResetConfirmPin] = useState("");
   const cardPinExistsRef = useRef(false);
+  const transactionPinInputRef = useRef<HTMLInputElement>(null);
   const [securityModalOpen, setSecurityModalOpen] = useState(false);
   const [passwordStage, setPasswordStage] = useState<"menu" | "change">("menu");
   const [changePwOld, setChangePwOld] = useState("");
@@ -4306,6 +4307,17 @@ function App() {
     setPendingPinAction(null);
   };
 
+  // Auto-focus the hidden PIN input when the modal opens
+  React.useEffect(() => {
+    if (transactionPinOpen && !transactionProcessing && !transactionSuccess) {
+      // Small delay to ensure the input is rendered
+      const timer = setTimeout(() => {
+        transactionPinInputRef.current?.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [transactionPinOpen, transactionProcessing, transactionSuccess]);
+
   // Destination is always "cash" (airtime/credit d'appel removed)
   const openTransactionPinDirect = () => {
     setTransactionChoiceOpen(false);
@@ -4453,6 +4465,64 @@ function App() {
           return;
         }
         // PIN verified — proceed with transaction
+        setTransactionPinVerifying(false);
+        if (pendingPinAction) {
+          const action = pendingPinAction;
+          setPendingPinAction(null);
+          window.setTimeout(async () => {
+            closeTransactionPin();
+            if (action.type === "merchant") {
+              executeServiceDebit(action.amount, "Paiement Marchand", "qr");
+            } else if (action.type === "savings_deposit") {
+              executeSavingsTransfer("deposit");
+            } else if (action.type === "savings_withdraw") {
+              executeSavingsTransfer("withdraw");
+            }
+          }, 200);
+          return;
+        }
+        window.setTimeout(() => executeTransaction(), 120);
+      } catch {
+        showToast("Erreur de vérification PIN");
+        setTransactionPin("");
+        setTransactionPinVerifying(false);
+      }
+    }
+  };
+
+  // Keyboard-based PIN input handler (replaces numeric pad)
+  const handleTransactionPinKeyboard = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (transactionProcessing || transactionSuccess) return;
+    // Only keep digits, max 4
+    const raw = e.target.value.replace(/\D/g, "").slice(0, 4);
+    setTransactionPin(raw);
+
+    if (raw.length === 4) {
+      // ── SERVER-SIDE PIN VERIFICATION ──
+      if (!cardPinExistsRef.current) {
+        window.setTimeout(() => executeTransaction(), 120);
+        return;
+      }
+      setTransactionPinVerifying(true);
+      try {
+        const res = await fetch("/api/verify-pin", {
+          method: "POST",
+          headers: await getAuthHeaders(),
+          body: JSON.stringify({ pin: raw }),
+        });
+        const data = await res.json();
+        if (res.status === 429) {
+          setTransactionPin("");
+          showToast(data.error || "Trop de tentatives");
+          setTransactionPinVerifying(false);
+          return;
+        }
+        if (!data.valid) {
+          setTransactionPin("");
+          showToast("Code PIN incorrect");
+          setTransactionPinVerifying(false);
+          return;
+        }
         setTransactionPinVerifying(false);
         if (pendingPinAction) {
           const action = pendingPinAction;
@@ -8138,8 +8208,8 @@ function App() {
         )}
 
         {transactionPinOpen && (
-          <div className="transaction-flow-overlay" onClick={transactionProcessing ? undefined : closeTransactionPin}>
-            <div className="transaction-flow-modal" onClick={(event) => event.stopPropagation()}>
+          <div className="transaction-flow-overlay" style={{ alignItems: 'flex-start', padding: '0 20px 20px' }} onClick={transactionProcessing ? undefined : closeTransactionPin}>
+            <div className="transaction-flow-modal" style={{ borderRadius: '0 0 28px 28px', animation: 'pinModalSlideDown .3s cubic-bezier(.34,1.2,.64,1) forwards', transform: 'none', opacity: 1, marginTop: 0 }} onClick={(event) => event.stopPropagation()}>
               <div className="transaction-flow-head">
                 <div>
                   <div className="transaction-flow-title">Code PIN</div>
@@ -8182,6 +8252,27 @@ function App() {
 
               {!transactionProcessing && !transactionSuccess && (
                 <>
+                  {/* Hidden keyboard input — captures device keyboard */}
+                  <input
+                    ref={transactionPinInputRef}
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={4}
+                    value={transactionPin}
+                    onChange={handleTransactionPinKeyboard}
+                    style={{
+                      position: 'absolute',
+                      opacity: 0,
+                      width: 1,
+                      height: 1,
+                      padding: 0,
+                      margin: -1,
+                      overflow: 'hidden',
+                      border: 'none',
+                      pointerEvents: 'none',
+                    }}
+                  />
                   <div className="pin-dots">
                     {[0, 1, 2, 3].map((dot) => (
                       <div key={dot} className={`pin-dot ${transactionPinVerifying ? "verifying" : transactionPin.length > dot ? "filled" : ""}`} />
@@ -8190,21 +8281,8 @@ function App() {
                   {transactionPinVerifying ? (
                     <div className="pin-helper" style={{ color: "#60a5fa" }}>Vérification du code PIN en cours…</div>
                   ) : (
-                    <div className="pin-helper">Les chiffres restent masqués. La vérification démarre automatiquement au 4e appui.</div>
+                    <div className="pin-helper">Saisissez votre PIN depuis le clavier. La vérification démarre automatiquement.</div>
                   )}
-                  <div className="pin-pad">
-                    {["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "back"].map((key, index) => (
-                      <button
-                        key={`${key}-${index}`}
-                        className={`pin-key ${key === "" ? "ghost" : ""}`}
-                        onClick={() => key && handleTransactionPinKey(key)}
-                        type="button"
-                        disabled={transactionPinVerifying}
-                      >
-                        {key === "back" ? "⌫" : key}
-                      </button>
-                    ))}
-                  </div>
                 </>
               )}
 

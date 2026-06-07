@@ -865,7 +865,7 @@ export default function TransactionsView({
         display: 'flex',
         flexDirection: 'column',
         gap: 10,
-        zIndex: 10,
+        zIndex: 30,
       }}>
         {/* Recap row */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>

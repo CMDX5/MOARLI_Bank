@@ -5,12 +5,6 @@ import { type TransactionType } from '@/types/morali';
 import { formatCurrency } from '@/lib/helpers';
 
 /* ─────────────────────────────────────────────
-   PRESET AMOUNTS
-   ───────────────────────────────────────────── */
-const PRESET_AMOUNTS = [1000, 2000, 5000, 10000, 20000, 50000] as const;
-const PRESET_LABELS = ['1K', '2K', '5K', '10K', '20K', '50K'] as const;
-
-/* ─────────────────────────────────────────────
    CONFIRMATION MODAL
    ───────────────────────────────────────────── */
 function ConfirmationModal({
@@ -557,10 +551,6 @@ function injectKeyframes() {
       0%, 100% { box-shadow: 0 0 40px rgba(34,197,94,0.15); }
       50% { box-shadow: 0 0 60px rgba(34,197,94,0.3); }
     }
-    @keyframes presetIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
   `;
   document.head.appendChild(style);
 }
@@ -690,7 +680,7 @@ export default function TransactionsView({
           <div className="transaction-body">
             {/* ── Amount input ── */}
             <div className="transaction-group">
-              <label className="transaction-label">
+              <label className="transaction-label" style={{ color: '#D4A437' }}>
                 {type === 'depot' ? 'Montant à déposer' : 'Montant à retirer'}
               </label>
               <div className="transaction-amount">
@@ -731,58 +721,9 @@ export default function TransactionsView({
               )}
             </div>
 
-            {/* ── Preset amount buttons ── */}
-            <div className="transaction-group">
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 8,
-                  overflowX: 'auto',
-                  paddingBottom: 4,
-                  scrollbarWidth: 'none',
-                  msOverflowStyle: 'none',
-                }}
-              >
-                {PRESET_AMOUNTS.map((preset, i) => {
-                  const isActive = parsedAmount === preset;
-                  return (
-                    <button
-                      key={preset}
-                      onClick={() => onAmountChange(String(preset))}
-                      style={{
-                        flexShrink: 0,
-                        minWidth: 58,
-                        height: 40,
-                        borderRadius: 14,
-                        border: isActive
-                          ? '1px solid rgba(59,130,246,0.5)'
-                          : '1px solid rgba(255,255,255,0.06)',
-                        background: isActive
-                          ? 'rgba(59,130,246,0.14)'
-                          : 'rgba(255,255,255,0.03)',
-                        color: isActive ? '#60a5fa' : '#94a3b8',
-                        fontSize: 13,
-                        fontWeight: 800,
-                        fontFamily: "'Montserrat', sans-serif",
-                        cursor: 'pointer',
-                        transition: 'all .2s',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: isActive ? '0 0 16px rgba(59,130,246,0.15)' : 'none',
-                        animation: `presetIn 0.3s ease ${i * 0.04}s both`,
-                      }}
-                    >
-                      {PRESET_LABELS[i]}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
             {/* ── Operator selector ── */}
             <div className="transaction-group">
-              <label className="transaction-label">Opérateur local</label>
+              <label className="transaction-label" style={{ color: '#D4A437' }}>Opérateur local</label>
               <div className="operator-grid">
                 <button
                   className={`operator-card ${method === 'mtn' ? 'active-mtn' : ''}`}
@@ -806,7 +747,7 @@ export default function TransactionsView({
 
             {/* ── Phone input ── */}
             <div className="transaction-group">
-              <label className="transaction-label">Numéro du compte</label>
+              <label className="transaction-label" style={{ color: '#D4A437' }}>Numéro du compte</label>
               <div
                 className="phone-input-wrap"
                 style={{

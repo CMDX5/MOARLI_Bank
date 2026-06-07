@@ -176,6 +176,14 @@ export default function NotificationsPanel({
     (item) => !deletedIds.has(item.id)
   );
 
+  // Split transactions: deposits/withdrawals vs rest (transfers, services, etc.)
+  const depositWithdrawalTxs = filteredTransactions.filter(
+    (tx) => tx.category === "Revenus" || tx.category === "Retrait"
+  );
+  const otherTxs = filteredTransactions.filter(
+    (tx) => tx.category !== "Revenus" && tx.category !== "Retrait"
+  );
+
   const totalItems = filteredTransactions.length + filteredNotifications.length;
 
   const resetSwipe = (id: string) => {
@@ -248,16 +256,17 @@ export default function NotificationsPanel({
 
         {totalItems > 0 ? (
           <div className="notif-panel-list">
-            {/* ── Transaction History Section ── */}
-            {filteredTransactions.length > 0 && (
+            {/* ── Activité récente: transfers, payments, services ── */}
+            {(otherTxs.length > 0 || filteredNotifications.length > 0) && (
               <>
                 <div style={{ padding: "6px 4px 2px", fontSize: 10, fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--gold)" }}>
                   Activité récente
                 </div>
                 <div style={{ padding: "0 4px 8px", fontSize: 11, color: "#64748b", fontWeight: 600, lineHeight: 1.4 }}>
-                  Vos dernières opérations et mouvements de fonds
+                  Transferts, paiements de factures et services
                 </div>
-                {filteredTransactions.map((tx, idx) => {
+                {/* Non-depot/retrait transactions (transfers, etc.) */}
+                {otherTxs.map((tx, idx) => {
                   const txId = `tx-${tx.receiptId || tx.name}-${idx}`;
                   return (
                     <div key={txId} className="notif-swipe-wrap">
@@ -286,22 +295,7 @@ export default function NotificationsPanel({
                     </div>
                   );
                 })}
-              </>
-            )}
-
-            {/* ── App Notifications Section ── */}
-            {filteredNotifications.length > 0 && (
-              <>
-                {filteredTransactions.length > 0 ? (
-                  <>
-                    <div style={{ padding: "12px 4px 2px", fontSize: 10, fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase", color: "#D4A437" }}>
-                      Messages
-                    </div>
-                    <div style={{ padding: "0 4px 8px", fontSize: 11, color: "#64748b", fontWeight: 600, lineHeight: 1.4 }}>
-                      Alertes, confirmations et infos de votre compte
-                    </div>
-                  </>
-                ) : null}
+                {/* App notifications (service alerts, confirmations, etc.) */}
                 {filteredNotifications.map((item) => (
                   <div key={item.id} className="notif-swipe-wrap">
                     {renderSwipeActions(item.id)}
@@ -328,6 +322,47 @@ export default function NotificationsPanel({
                     </button>
                   </div>
                 ))}
+              </>
+            )}
+
+            {/* ── Transactions récentes: deposits & withdrawals only ── */}
+            {depositWithdrawalTxs.length > 0 && (
+              <>
+                <div style={{ padding: "12px 4px 2px", fontSize: 10, fontWeight: 800, letterSpacing: ".14em", textTransform: "uppercase", color: "#D4A437" }}>
+                  Transactions récentes
+                </div>
+                <div style={{ padding: "0 4px 8px", fontSize: 11, color: "#64748b", fontWeight: 600, lineHeight: 1.4 }}>
+                  Dépôts et retraits Mobile Money
+                </div>
+                {depositWithdrawalTxs.map((tx, idx) => {
+                  const txId = `tx-${tx.receiptId || tx.name}-${idx}`;
+                  return (
+                    <div key={txId} className="notif-swipe-wrap">
+                      {renderSwipeActions(txId)}
+                      <div
+                        id={`notif-swipe-${txId}`}
+                        className={`notif-panel-item ${tx.dateTimestamp && (Date.now() - tx.dateTimestamp) < 120000 ? "unread" : "read"}`}
+                        style={{ cursor: "default" }}
+                        onTouchStart={(e) => handleTouchStart(txId, e)}
+                        onTouchMove={(e) => handleTouchMove(txId, e)}
+                        onTouchEnd={() => handleTouchEnd(txId)}
+                        onClick={() => resetSwipe(txId)}
+                      >
+                        <div className="notif-panel-ico" style={{ background: tx.bg, color: tx.type === "credit" ? "#60a5fa" : tx.icon === "bolt" ? "#D4A437" : "rgba(255,255,255,0.82)" }}>
+                          <AppIcon name={tx.icon} size={18} stroke="currentColor" />
+                        </div>
+                        <div className="notif-panel-body">
+                          <p className="notif-panel-item-title">{tx.name}</p>
+                          <p className="notif-panel-time">{tx.dateTimestamp ? timeAgo(tx.dateTimestamp) : tx.date}</p>
+                          <span className={`notif-panel-item-badge ${tx.type === "credit" ? "nb-green" : "nb-blue"}`}>
+                            {tx.type === "credit" ? "+" : "-"}{tx.amount}
+                          </span>
+                        </div>
+                        {tx.dateTimestamp && (Date.now() - tx.dateTimestamp) < 120000 && <span className="notif-panel-unread" />}
+                      </div>
+                    </div>
+                  );
+                })}
               </>
             )}
           </div>

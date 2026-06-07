@@ -215,6 +215,33 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
     }
   }, [authUid]);
 
+  // Typing safety timeout: if Firestore onSnapshot never fires, generate local reply
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup typing timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
+  }, []);
+
+  const triggerFallbackReply = useCallback((msgText: string) => {
+    const fallbackText = getRandomFallback();
+    const replyId = `local-${Date.now()}-${localIdCounter.current++}`;
+    const supportMsg: ChatMessageItem = {
+      id: replyId,
+      sender: 'support',
+      text: fallbackText,
+      timestamp: Date.now(),
+      read: false,
+      local: true,
+    };
+    setMessages((prev) => [...prev, supportMsg]);
+    sendToFirestore({ sender: 'support', text: fallbackText });
+    setIsTyping(false);
+    setSending(false);
+  }, [sendToFirestore]);
+
   const sendMessage = useCallback(async (text: string, imageUrl?: string | null) => {
     if (!text.trim() && !imageUrl) return;
     setSending(true);
@@ -245,6 +272,19 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
     // LLM/VLM-powered reply via API
     setIsTyping(true);
 
+    // Safety timeout: if no Firestore response arrives within 12s, use local fallback
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      // Only trigger if still typing (no response received via onSnapshot)
+      setIsTyping((stillTyping) => {
+        if (stillTyping) {
+          console.warn('[ChatSupport] Typing timeout — no Firestore response, using fallback');
+          triggerFallbackReply(msgText);
+        }
+        return false;
+      });
+    }, 12000);
+
     try {
       const body: Record<string, string> = { text: msgText };
       if (imageUrl) {
@@ -258,28 +298,21 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
       });
 
       if (!res.ok) {
-        console.warn('[ChatSupport] API error', res.status);
+        console.warn('[ChatSupport] API error', res.status, '— using fallback reply');
+        // API returned error (401, 403, 500, etc.) — use local fallback
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        triggerFallbackReply(msgText);
+        return;
       }
     } catch (err) {
-      console.error('[ChatSupport] API error, using fallback:', err);
-      const fallbackText = getRandomFallback();
-      const replyId = `local-${Date.now()}-${localIdCounter.current++}`;
-      const supportMsg: ChatMessageItem = {
-        id: replyId,
-        sender: 'support',
-        text: fallbackText,
-        timestamp: Date.now(),
-        read: false,
-        local: true,
-      };
-      setMessages((prev) => [...prev, supportMsg]);
-      await sendToFirestore({ sender: 'support', text: fallbackText });
-      setIsTyping(false);
+      console.error('[ChatSupport] API network error, using fallback:', err);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      triggerFallbackReply(msgText);
       return;
     }
 
     setSending(false);
-  }, [sendToFirestore]);
+  }, [sendToFirestore, triggerFallbackReply]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();

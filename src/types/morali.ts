@@ -251,6 +251,7 @@ export type ChatMessage = {
   text: string;
   timestamp: unknown;
   read: boolean;
+  imageUrl?: string;
 };
 
 // ── Onboarding ──

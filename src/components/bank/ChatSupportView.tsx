@@ -17,7 +17,16 @@ interface ChatMessageItem {
   timestamp: unknown;
   read: boolean;
   local?: boolean;
+  imageUrl?: string;
 }
+
+// Quick replies
+const AUTO_REPLIES: Record<string, string> = {
+  "Mon solde": "Je souhaite connaître mon solde",
+  "Faire un virement": "Comment faire un virement ?",
+  "Problème de transaction": "J'ai un problème avec une transaction",
+  "Parler à un agent": "Je souhaite parler à un agent humain",
+};
 
 // Fallback reply if API fails
 const FALLBACK_REPLIES = [
@@ -49,6 +58,46 @@ function getDateSeparator(timestamp: unknown): string | null {
   return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
+/** Compress image to max 800px width and reduce quality for Firestore limits */
+function compressImage(file: File): Promise<{ base64: string; mimeType: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_W = 800;
+        const MAX_H = 1000;
+        let w = img.width;
+        let h = img.height;
+
+        if (w > MAX_W) {
+          h = (h * MAX_W) / w;
+          w = MAX_W;
+        }
+        if (h > MAX_H) {
+          w = (w * MAX_H) / h;
+          h = MAX_H;
+        }
+
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('Canvas context failed'));
+        ctx.drawImage(img, 0, 0, w, h);
+
+        const mimeType = 'image/jpeg';
+        const base64 = canvas.toDataURL(mimeType, 0.7);
+        resolve({ base64, mimeType });
+      };
+      img.onerror = reject;
+      img.src = reader.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function ChatSupportView({ authUid, onBack, showToast, getAuthHeaders }: ChatSupportViewProps) {
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -57,9 +106,13 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
   const [unreadCount, setUnreadCount] = useState(0);
   const [initialLoad, setInitialLoad] = useState(true);
   const [firestoreReady, setFirestoreReady] = useState(true);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedImageBase64, setSelectedImageBase64] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const lastAutoReplyRef = useRef<string>('');
   const unreadCountRef = useRef(0);
   const localIdCounter = useRef(0);
@@ -89,6 +142,7 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
           text: data.text || '',
           timestamp: data.timestamp,
           read: data.read !== false,
+          imageUrl: data.imageUrl || undefined,
         });
         if (data.sender === 'support' && !data.read) {
           unread++;
@@ -113,7 +167,6 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
     }, (err) => {
       console.error('[ChatSupport] onSnapshot error:', err);
       setInitialLoad(false);
-      // Firestore rules may block — fall back to local-only mode
       if (String(err).includes('permission') || String(err).includes('PERMISSION_DENIED')) {
         setFirestoreReady(false);
       }
@@ -142,15 +195,19 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
     })();
   }, [authUid, messages, unreadCount]);
 
-  const sendToFirestore = useCallback(async (msgData: { sender: string; text: string }) => {
+  const sendToFirestore = useCallback(async (msgData: { sender: string; text: string; imageUrl?: string }) => {
     if (!authUid || !firebaseDb) return false;
     try {
-      await addDoc(collection(firebaseDb, 'chats', authUid, 'messages'), {
+      const docData: Record<string, unknown> = {
         sender: msgData.sender,
         text: msgData.text,
         timestamp: serverTimestamp(),
         read: msgData.sender === 'user',
-      });
+      };
+      if (msgData.imageUrl) {
+        docData.imageUrl = msgData.imageUrl;
+      }
+      await addDoc(collection(firebaseDb, 'chats', authUid, 'messages'), docData);
       return true;
     } catch (err) {
       console.error('[ChatSupport] firestore write error:', err);
@@ -158,51 +215,53 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
     }
   }, [authUid]);
 
-  const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim()) return;
+  const sendMessage = useCallback(async (text: string, imageUrl?: string | null) => {
+    if (!text.trim() && !imageUrl) return;
     setSending(true);
 
     const trimmed = text.trim();
+    const msgText = trimmed || (imageUrl ? '📷 Image' : '');
 
     // Optimistic: add user message locally immediately
     const localId = `local-${Date.now()}-${localIdCounter.current++}`;
     const userMsg: ChatMessageItem = {
       id: localId,
       sender: 'user',
-      text: trimmed,
+      text: msgText,
       timestamp: Date.now(),
       read: true,
       local: true,
+      imageUrl: imageUrl || undefined,
     };
 
     setMessages((prev) => [...prev, userMsg]);
     setNewMessage('');
+    setImagePreview(null);
+    setSelectedImageBase64(null);
 
     // Try Firestore write
-    const sent = await sendToFirestore({ sender: 'user', text: trimmed });
+    await sendToFirestore({ sender: 'user', text: msgText, imageUrl: imageUrl || undefined });
 
-    if (!sent) {
-      // Remove local flag — message stays visible but marked as local-only
-      console.warn('[ChatSupport] Message saved locally only');
-    }
-
-    // Remove the optimistic local message once Firestore syncs (handled by onSnapshot merge)
-
-    // LLM-powered reply via API
+    // LLM/VLM-powered reply via API
     setIsTyping(true);
 
     try {
+      const body: Record<string, string> = { text: msgText };
+      if (imageUrl) {
+        body.imageUrl = imageUrl;
+      }
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: trimmed }),
+        body: JSON.stringify(body),
       });
 
-      // API handles Firestore persistence — just wait for it
-      // The onSnapshot listener will pick up the reply
+      if (!res.ok) {
+        console.warn('[ChatSupport] API error', res.status);
+      }
     } catch (err) {
       console.error('[ChatSupport] API error, using fallback:', err);
-      // Fallback: add local reply
       const fallbackText = getRandomFallback();
       const replyId = `local-${Date.now()}-${localIdCounter.current++}`;
       const supportMsg: ChatMessageItem = {
@@ -224,8 +283,8 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    sendMessage(newMessage);
-  }, [newMessage, sendMessage]);
+    sendMessage(newMessage, selectedImageBase64);
+  }, [newMessage, sendMessage, selectedImageBase64]);
 
   const handleQuickReply = useCallback((text: string) => {
     sendMessage(text);
@@ -235,6 +294,42 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
     if (inputRef.current) {
       inputRef.current.focus();
     }
+  }, []);
+
+  // Handle image file selection
+  const handleImageSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      showToast('Veuillez sélectionner une image valide');
+      return;
+    }
+
+    // Validate file size (max 10MB before compression)
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('Image trop volumineuse (max 10 Mo)');
+      return;
+    }
+
+    try {
+      const { base64 } = await compressImage(file);
+      setImagePreview(base64);
+      setSelectedImageBase64(base64);
+    } catch (err) {
+      console.error('[ChatSupport] Image compression error:', err);
+      showToast('Erreur lors du traitement de l\'image');
+    }
+
+    // Reset file input so same file can be re-selected
+    e.target.value = '';
+  }, [showToast]);
+
+  // Remove image preview
+  const removeImagePreview = useCallback(() => {
+    setImagePreview(null);
+    setSelectedImageBase64(null);
   }, []);
 
   // Group messages by date
@@ -405,7 +500,7 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
                     )}
                     <div style={{ maxWidth: '80%' }}>
                       <div style={{
-                        padding: '10px 14px',
+                        padding: msg.imageUrl && !msg.text ? '4px' : '10px 14px',
                         borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                         background: isUser
                           ? 'linear-gradient(135deg, #3b82f6, #2563eb)'
@@ -417,8 +512,38 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
                         wordBreak: 'break-word',
                         whiteSpace: 'pre-wrap',
                         boxShadow: isUser ? '0 4px 12px rgba(59,130,246,0.25)' : 'none',
+                        overflow: 'hidden',
                       }}>
-                        {msg.text}
+                        {/* Image display */}
+                        {msg.imageUrl && (
+                          <div style={{ position: 'relative' }}>
+                            <img
+                              src={msg.imageUrl}
+                              alt="Image partagée"
+                              style={{
+                                maxWidth: '100%',
+                                maxHeight: 240,
+                                borderRadius: isUser ? '12px 12px 0 12px' : '12px 12px 12px 0',
+                                display: 'block',
+                                objectFit: 'cover',
+                              }}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                          </div>
+                        )}
+                        {/* Text content */}
+                        {msg.text && msg.text !== '📷 Image' && (
+                          <div style={msg.imageUrl ? { padding: '8px 10px 2px' } : undefined}>
+                            {msg.text}
+                          </div>
+                        )}
+                        {msg.text === '📷 Image' && !msg.imageUrl && (
+                          <div style={{ padding: '0 2px', opacity: 0.6, fontSize: 12 }}>
+                            Image
+                          </div>
+                        )}
                       </div>
                       <div style={{
                         fontSize: 9, color: '#64748b', marginTop: 3,
@@ -503,14 +628,108 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
         </div>
       )}
 
+      {/* Image Preview Bar */}
+      {imagePreview && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '10px 16px', background: '#0a0f1e',
+          borderTop: '1px solid rgba(59,130,246,0.08)', flexShrink: 0,
+        }}>
+          <div style={{
+            width: 52, height: 52, borderRadius: 12, overflow: 'hidden', flexShrink: 0,
+            border: '1px solid rgba(59,130,246,0.15)',
+          }}>
+            <img
+              src={imagePreview}
+              alt="Aperçu"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 12, color: '#fff', fontWeight: 600 }}>Image sélectionnée</div>
+            <div style={{ fontSize: 10, color: '#64748b' }}>Prête à être envoyée</div>
+          </div>
+          <button
+            onClick={removeImagePreview}
+            style={{
+              width: 32, height: 32, borderRadius: 10, border: '1px solid rgba(239,68,68,0.2)',
+              background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', cursor: 'pointer', color: '#ef4444',
+            }}
+            aria-label="Supprimer l'image"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       {/* Message Input */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
+        display: 'flex', alignItems: 'center', gap: 8,
         padding: '10px 16px calc(env(safe-area-inset-bottom, 0px) + 12px)',
         background: '#0a0f1e', borderTop: '1px solid rgba(59,130,246,0.08)',
         flexShrink: 0,
       }}>
-        <form onSubmit={handleSubmit} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <form onSubmit={handleSubmit} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Gallery button */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageSelect}
+            style={{ display: 'none' }}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={sending}
+            style={{
+              width: 44, height: 44, borderRadius: 14, border: '1px solid rgba(59,130,246,0.12)',
+              background: 'rgba(255,255,255,0.04)', flexShrink: 0,
+              color: '#60a5fa', cursor: sending ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 0.2s',
+            }}
+            aria-label="Joindre une image"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+          </button>
+
+          {/* Camera button */}
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleImageSelect}
+            style={{ display: 'none' }}
+          />
+          <button
+            type="button"
+            onClick={() => cameraInputRef.current?.click()}
+            disabled={sending}
+            style={{
+              width: 44, height: 44, borderRadius: 14, border: '1px solid rgba(59,130,246,0.12)',
+              background: 'rgba(255,255,255,0.04)', flexShrink: 0,
+              color: '#60a5fa', cursor: sending ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 0.2s',
+            }}
+            aria-label="Prendre une photo"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+              <circle cx="12" cy="13" r="4" />
+            </svg>
+          </button>
+
           <input
             ref={inputRef}
             type="text"
@@ -526,15 +745,15 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
           />
           <button
             type="submit"
-            disabled={sending || !newMessage.trim()}
+            disabled={sending || (!newMessage.trim() && !selectedImageBase64)}
             style={{
               width: 44, height: 44, borderRadius: 14, border: 'none', flexShrink: 0,
-              background: sending || !newMessage.trim()
+              background: sending || (!newMessage.trim() && !selectedImageBase64)
                 ? 'rgba(59,130,246,0.2)'
                 : 'linear-gradient(135deg, #3b82f6, #2563eb)',
-              color: '#fff', cursor: sending || !newMessage.trim() ? 'not-allowed' : 'pointer',
+              color: '#fff', cursor: sending || (!newMessage.trim() && !selectedImageBase64) ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: sending || !newMessage.trim() ? 'none' : '0 4px 14px rgba(59,130,246,0.4)',
+              boxShadow: sending || (!newMessage.trim() && !selectedImageBase64) ? 'none' : '0 4px 14px rgba(59,130,246,0.4)',
               transition: 'all 0.2s',
             }}
             aria-label="Envoyer"

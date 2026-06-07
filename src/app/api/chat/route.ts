@@ -5,10 +5,10 @@ import { requireAuth } from "@/lib/auth-verify";
 import ZAI from "z-ai-web-dev-sdk";
 
 /**
- * Chat Support API — IDOR-PROTECTED with LLM-powered responses
+ * Chat Support API — IDOR-PROTECTED with LLM/VLM-powered responses
  *
  * - GET: Load chat history (paginated, latest 50)
- * - POST: Send message + LLM auto-reply
+ * - POST: Send message (+ optional image) + LLM/VLM auto-reply
  *
  * Firestore path: chats/{uid}/messages
  */
@@ -26,6 +26,16 @@ Règles strictes :
 8. Si on te demande comment tu vas, réponds brièvement et propose ton aide
 9. Ne donne JAMAIS d'informations personnelles, ne simule JAMAIS des opérations bancaires réelles
 10. Pour toute demande technique (problème de transaction, carte bloquée), oriente l'utilisateur vers la section appropriée de l'app`;
+
+const IMAGE_SYSTEM_PROMPT = `Tu es le conseiller virtuel de MOARLI Bank. L'utilisateur vient d'envoyer une image dans le chat de support. Analyse l'image avec attention et réponds de manière utile.
+
+Règles :
+1. Si l'image montre un reçu, une facture, un ticket de transaction — identifie les informations bancaires pertinentes
+2. Si l'image montre un problème technique (screenshot d'erreur) — aide à résoudre le problème
+3. Si l'image montre un document d'identité — confirme la réception et explique les prochaines étapes pour la vérification KYC
+4. Si l'image n'est pas pertinente pour les services bancaires MOARLI — redirige poliment
+5. Réponds TOUJOURS en français, de façon concise et professionnelle
+6. Si tu ne peux pas identifier clairement l'image, demande des précisions`;
 
 // In-memory conversation history per user (last 10 messages for context)
 const userConversations = new Map<string, { role: string; content: string }[]>();
@@ -73,6 +83,44 @@ async function getLLMResponse(uid: string, userMessage: string): Promise<string>
   } catch (err) {
     console.error("[chat] LLM error:", err);
     return "Une interruption technique est survenue. Je suis toujours là pour vous aider avec vos services MOARLI. Que puis-je faire pour vous ?";
+  }
+}
+
+async function getVLMResponse(uid: string, userMessage: string, imageUrl: string): Promise<string> {
+  try {
+    const zai = await ZAI.create();
+
+    const prompt = userMessage && userMessage !== "📷 Image"
+      ? userMessage
+      : "Analysez cette image envoyée dans le chat de support MOARLI Bank et aidez l'utilisateur.";
+
+    const response = await zai.chat.completions.createVision({
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: IMAGE_SYSTEM_PROMPT },
+            { type: "text", text: prompt },
+            {
+              type: "image_url",
+              image_url: { url: imageUrl },
+            },
+          ],
+        },
+      ],
+      thinking: { type: "disabled" },
+    });
+
+    const reply = response.choices[0]?.message?.content;
+
+    if (!reply || reply.trim().length === 0) {
+      return "J'ai bien reçu votre image. Pourriez-vous me préciser ce que vous souhaitez concernant cette image ? Je suis là pour vous aider avec vos services MOARLI.";
+    }
+
+    return reply.trim().slice(0, 500);
+  } catch (err) {
+    console.error("[chat] VLM error:", err);
+    return "J'ai bien reçu votre image. Pourriez-vous me décrire ce qu'elle montre et comment je peux vous aider avec vos services bancaires MOARLI ?";
   }
 }
 
@@ -133,34 +181,54 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { text } = body;
+    const { text, imageUrl } = body as { text?: string; imageUrl?: string };
 
-    if (!text || typeof text !== "string" || text.trim().length === 0) {
+    if ((!text || typeof text !== "string" || text.trim().length === 0) && !imageUrl) {
       return NextResponse.json({ error: "Message vide" }, { status: 400 });
     }
 
-    if (text.length > 500) {
-      return NextResponse.json({ error: "Message trop long (max 500 caractères)" }, { status: 400 });
+    const sanitized = (text || "").trim().replace(/<[^>]*>/g, "").slice(0, 500);
+    const msgText = sanitized || (imageUrl ? "📷 Image" : "");
+
+    // Validate imageUrl if provided
+    let safeImageUrl: string | undefined;
+    if (imageUrl) {
+      if (typeof imageUrl !== "string" || !imageUrl.startsWith("data:image/")) {
+        return NextResponse.json({ error: "Format d'image invalide" }, { status: 400 });
+      }
+      // Limit base64 size (~1.5MB max in Firestore)
+      if (imageUrl.length > 1_500_000) {
+        return NextResponse.json({ error: "Image trop volumineuse" }, { status: 400 });
+      }
+      safeImageUrl = imageUrl;
     }
 
-    const sanitized = text.trim().replace(/<[^>]*>/g, "").slice(0, 500);
+    if (msgText.length > 500) {
+      return NextResponse.json({ error: "Message trop long (max 500 caractères)" }, { status: 400 });
+    }
 
     const adminDb = await getAdminFirestore();
     if (!adminDb) return NextResponse.json({ error: "Service indisponible" }, { status: 503 });
 
     // Save user message
-    await adminDb.collection("chats").doc(auth.uid).collection("messages").add({
+    const userMsgData: Record<string, unknown> = {
       sender: "user",
-      text: sanitized,
+      text: msgText,
       timestamp: new Date(),
       read: true,
-    });
+    };
+    if (safeImageUrl) {
+      userMsgData.imageUrl = safeImageUrl;
+    }
+    await adminDb.collection("chats").doc(auth.uid).collection("messages").add(userMsgData);
 
-    // Add to conversation history for LLM context
-    addToHistory(auth.uid, "user", sanitized);
+    // Add to conversation history for LLM context (text only, no base64)
+    addToHistory(auth.uid, "user", msgText);
 
-    // Get LLM reply
-    const replyText = await getLLMResponse(auth.uid, sanitized);
+    // Get LLM or VLM reply
+    const replyText = safeImageUrl
+      ? await getVLMResponse(auth.uid, msgText, safeImageUrl)
+      : await getLLMResponse(auth.uid, msgText);
 
     // Add reply to conversation history
     addToHistory(auth.uid, "assistant", replyText);

@@ -3,6 +3,7 @@ import React from "react";
 import type { Transaction, NotificationItem, TransactionType } from "@/types/morali";
 import { formatCurrency, formatStat, timeAgo } from "@/lib/helpers";
 import { MoraliShield, AppIcon, renderQuickActionIcon } from "./Icons";
+import SwipeableTransactionItem from "./SwipeableTransactionItem";
 
 // ── Chart day shape ──
 export interface ChartDay {
@@ -572,24 +573,8 @@ export default function DashboardView({
                 </div>
               );
             }
-            return txList.map((tx, idx) => (
-              <div className="tx-item" key={tx.receiptId || `${tx.name}-${tx.date}-${idx}`} onClick={() => showToast(`${tx.name} · ${tx.amount}`)}>
-                <div className="tx-ico" style={{ background: tx.bg }}>
-                  <AppIcon
-                    name={tx.icon}
-                    size={18}
-                    stroke={tx.type === "credit" ? "#60a5fa" : tx.icon === "bolt" ? "#D4A437" : "rgba(255,255,255,0.82)"}
-                  />
-                </div>
-                <div className="tx-info">
-                  <div className="tx-name">{tx.name}</div>
-                  <div className="tx-date">{tx.dateTimestamp ? timeAgo(tx.dateTimestamp) : tx.date}</div>
-                </div>
-                <div className="tx-right">
-                  <div className={`tx-amt ${tx.type === "credit" ? "cr" : "dr"}`}>{renderProtectedAmount(`tx-${tx.name}`, tx.amount)}</div>
-                  <div className="tx-cat">{tx.category}</div>
-                </div>
-              </div>
+            return txList.slice(0, 8).map((tx, idx) => (
+              <SwipeableTransactionItem key={tx.receiptId || `${tx.name}-${tx.date}-${idx}`} tx={tx} />
             ));
           })()}
         </div>

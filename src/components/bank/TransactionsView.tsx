@@ -947,7 +947,7 @@ export default function TransactionsView({
           <style>{`
             .transaction-confirm {
               position: fixed;
-              bottom: calc(70px + env(safe-area-inset-bottom, 0px) + 74px);
+              bottom: calc(70px + env(safe-area-inset-bottom, 0px) + 160px);
               left: 50%;
               transform: translateX(-50%);
               width: calc(100% - 32px);

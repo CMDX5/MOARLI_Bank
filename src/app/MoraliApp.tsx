@@ -2026,8 +2026,9 @@ function App() {
     }
   };
 
-  const showQuickNotif = (_type: string, _label: string, _amount: string, _icon: IconName, _color: string) => {
-    // Quick notification popup disabled — notifications shown via bell panel
+  const showQuickNotif = (type: string, label: string, amount: string, icon: IconName, color: string) => {
+    setQuickNotif({ open: true, type, label, amount, icon, color });
+    setTimeout(() => setQuickNotif(null), 3200);
   };
 
   const openRequestQr = () => {

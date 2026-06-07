@@ -260,7 +260,7 @@ export default function NotificationsPanel({
                       {renderSwipeActions(txId)}
                       <div
                         id={`notif-swipe-${txId}`}
-                        className="notif-panel-item read"
+                        className={`notif-panel-item ${tx.dateTimestamp && (Date.now() - tx.dateTimestamp) < 120000 ? "unread" : "read"}`}
                         style={{ cursor: "default" }}
                         onTouchStart={(e) => handleTouchStart(txId, e)}
                         onTouchMove={(e) => handleTouchMove(txId, e)}
@@ -277,6 +277,7 @@ export default function NotificationsPanel({
                             {tx.type === "credit" ? "+" : "-"}{tx.amount}
                           </span>
                         </div>
+                        {tx.dateTimestamp && (Date.now() - tx.dateTimestamp) < 120000 && <span className="notif-panel-unread" />}
                       </div>
                     </div>
                   );

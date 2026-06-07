@@ -4089,6 +4089,9 @@ function App() {
 
   const openTransaction = (type: TransactionType) => {
     setTransactionType(type);
+    setTransactionAmount("");
+    setTransactionPhone("");
+    setTransactionMethod("mtn");
     setTransactionReturnScreen(screen);
     setScreen("transaction");
   };

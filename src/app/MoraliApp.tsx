@@ -503,7 +503,7 @@ function App() {
   const [xafAmount, setXafAmount] = useState("");
   const [currencyAmount, setCurrencyAmount] = useState("");
   const [targetCurrency, setTargetCurrency] = useState<"EUR" | "USD">("EUR");
-  const [currencyRates, setCurrencyRates] = useState<Record<string, number>>({ EUR: 0.00152, USD: 0.00160 });
+  const [currencyRates, setCurrencyRates] = useState<Record<string, number>>({});
   const [currencyDirection, setCurrencyDirection] = useState<"sell" | "buy">("sell");
   const [fxSwapping, setFxSwapping] = useState(false);
   const [eurWallet, setEurWallet] = useState(0);
@@ -528,8 +528,8 @@ function App() {
   const [tontineName, setTontineName] = useState("");
   const [tontineContributionAmount, setTontineContributionAmount] = useState("");
   const [tontineNewMemberName, setTontineNewMemberName] = useState("");
-  // Indicative USDT/XAF rate — not fetched from a live API (crypto pairs unsupported by frankfurter.app)
-  const [cryptoRate, setCryptoRate] = useState(650);
+  // Real-time USDT/XAF rate fetched from API (CoinGecko + ECB)
+  const [cryptoRate, setCryptoRate] = useState<number | null>(null);
   const [merchantAmount, setMerchantAmount] = useState("");
   const [servicesQuery, setServicesQuery] = useState("");
   const [servicesFocused, setServicesFocused] = useState(false);
@@ -1510,28 +1510,26 @@ function App() {
   const personalLoanMonthlyRepayment = (personalLoanAmount + personalLoanInterest) / personalLoanDuration;
   const personalLoanTotalToRepay = personalLoanAmount + personalLoanInterest;
   const microMonthlyRepayment = microCreditDuration <= 30 ? microTotalToPay : microTotalToPay;
-  const cryptoUsdtValue = xafAmount ? (parseFloat(xafAmount) / cryptoRate).toFixed(2) : "0.00";
+  const cryptoUsdtValue = xafAmount && cryptoRate ? (parseFloat(xafAmount) / cryptoRate).toFixed(2) : xafAmount ? "..." : "0.00";
   const currencyFee = 0.015; // 1.5% commission
   const currencyConverted = currencyAmount ? (parseFloat(currencyAmount) * currencyRates[targetCurrency]).toFixed(2) : "0.00";
-  // Fetch real-time exchange rates from the API
+  // Fetch real-time exchange rates from the API (all currencies at once)
   useEffect(() => {
     const fetchRates = async () => {
       try {
-        const [eurRes, usdRes] = await Promise.all([
-          fetch("/api/exchange-rate?from=XAF&to=EUR", { headers: await getAuthHeaders() }),
-          fetch("/api/exchange-rate?from=XAF&to=USD", { headers: await getAuthHeaders() }),
-        ]);
-        const newRates: Record<string, number> = { ...currencyRates };
-        if (eurRes.ok) {
-          const eurData = await eurRes.json();
-          newRates["EUR"] = eurData.rate; // how many EUR per 1 XAF
+        const res = await fetch("/api/exchange-rate?all=true", { headers: await getAuthHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.EUR_XAF) {
+          setCurrencyRates((prev) => ({ ...prev, EUR: 1 / data.EUR_XAF })); // 1 XAF = ? EUR
         }
-        if (usdRes.ok) {
-          const usdData = await usdRes.json();
-          newRates["USD"] = usdData.rate; // how many USD per 1 XAF
+        if (data.USD_XAF) {
+          setCurrencyRates((prev) => ({ ...prev, USD: 1 / data.USD_XAF })); // 1 XAF = ? USD
         }
-        setCurrencyRates(newRates);
-      } catch { /* keep default fallback rates */ }
+        if (data.USDT_XAF) {
+          setCryptoRate(data.USDT_XAF); // 1 USDT = ? XAF (real rate)
+        }
+      } catch { /* keep previous rates */ }
     };
     fetchRates();
     const interval = setInterval(fetchRates, 10 * 60 * 1000); // refresh every 10 min
@@ -1541,6 +1539,12 @@ function App() {
   const savingsAnnualRate = 4.5;
   const savingsMonthlyGain = (savingsAmount * (savingsAnnualRate / 100)) / 12;
   const tontineMembers: { name: string; status: string; current: boolean }[] = [];
+
+  // Safe rate accessors — return null until real rates are loaded
+  const eurRate = currencyRates["EUR"] || null;   // 1 XAF = ? EUR
+  const usdRate = currencyRates["USD"] || null;   // 1 XAF = ? USD
+  const eurXaf = eurRate ? Math.round(1 / eurRate) : null;  // 1 EUR = ? XAF
+  const usdXaf = usdRate ? Math.round(1 / usdRate) : null;  // 1 USD = ? XAF
 
   const filteredServices = useMemo(() => {
     if (!servicesQuery.trim()) return [] as SearchServiceItem[];
@@ -5463,7 +5467,7 @@ function App() {
                       </div>
                       <div className="loans-option-divider" />
                       <div className="loans-option-metric">
-                        <div className="loans-option-metric-val">1 € = {Math.round(1 / currencyRates["EUR"])}</div>
+                        <div className="loans-option-metric-val">1 € = {eurXaf ?? "..."}</div>
                         <div className="loans-option-metric-lbl">FCFA</div>
                       </div>
                       <div className="loans-option-divider" />
@@ -5498,7 +5502,7 @@ function App() {
                       </div>
                       <div className="loans-option-divider" />
                       <div className="loans-option-metric">
-                        <div className="loans-option-metric-val">1 $ = {Math.round(1 / currencyRates["USD"])}</div>
+                        <div className="loans-option-metric-val">1 $ = {usdXaf ?? "..."}</div>
                         <div className="loans-option-metric-lbl">FCFA</div>
                       </div>
                       <div className="loans-option-divider" />
@@ -5626,7 +5630,7 @@ function App() {
                   <div className="fx-ex-summary">
                     <div className="fx-ex-sum-row">
                       <span>Taux</span>
-                      <span>1 {targetCurrency} = {Math.round(1 / currencyRates[targetCurrency])} FCFA</span>
+                      <span>1 {targetCurrency} = {currencyRates[targetCurrency] ? Math.round(1 / currencyRates[targetCurrency]) : "..."} FCFA</span>
                     </div>
                     <div className="fx-ex-sum-row">
                       <span>Frais (1.5%)</span>
@@ -5649,7 +5653,7 @@ function App() {
                   <div className="fx-ex-summary" style={{ opacity: 0.5 }}>
                     <div className="fx-ex-sum-row">
                       <span>Taux</span>
-                      <span>1 {targetCurrency} = {Math.round(1 / currencyRates[targetCurrency])} FCFA</span>
+                      <span>1 {targetCurrency} = {currencyRates[targetCurrency] ? Math.round(1 / currencyRates[targetCurrency]) : "..."} FCFA</span>
                     </div>
                   </div>
                 )}
@@ -5759,7 +5763,7 @@ function App() {
                   <div className="wallet-detail-card-orb" />
                   <div className="wallet-detail-card-label">Solde disponible</div>
                   <div className="wallet-detail-card-amount">{eurWallet.toFixed(2)} <span style={{ fontSize: 18, fontWeight: 700, opacity: 0.7 }}>EUR</span></div>
-                  <div className="wallet-detail-card-equiv">≈ {formatCurrency(Math.round(eurWallet / currencyRates["EUR"]))} FCFA</div>
+                  <div className="wallet-detail-card-equiv">≈ {eurRate ? formatCurrency(Math.round(eurWallet / eurRate)) : "..."} FCFA</div>
                 </div>
 
                 {/* Infos clés */}
@@ -5774,7 +5778,7 @@ function App() {
                   </div>
                   <div className="wallet-detail-info-item">
                     <div className="wallet-detail-info-label">Taux actuel</div>
-                    <div className="wallet-detail-info-value">1 € = {Math.round(1 / currencyRates["EUR"])} FCFA</div>
+                    <div className="wallet-detail-info-value">1 € = {eurXaf ?? "..."} FCFA</div>
                   </div>
                   <div className="wallet-detail-info-item">
                     <div className="wallet-detail-info-label">Commission</div>
@@ -5786,23 +5790,23 @@ function App() {
                 <div className="wallet-detail-equivalence">
                   <div className="wallet-detail-eq-row">
                     <span>1 EUR</span>
-                    <span>→ {Math.round(1 / currencyRates["EUR"])} FCFA</span>
+                    <span>→ {eurXaf ?? "..."} FCFA</span>
                   </div>
                   <div className="wallet-detail-eq-row">
                     <span>10 EUR</span>
-                    <span>→ {formatCurrency(Math.round(10 / currencyRates["EUR"]))} FCFA</span>
+                    <span>→ {eurXaf ? formatCurrency(eurXaf * 10) : "..."} FCFA</span>
                   </div>
                   <div className="wallet-detail-eq-row">
                     <span>50 EUR</span>
-                    <span>→ {formatCurrency(Math.round(50 / currencyRates["EUR"]))} FCFA</span>
+                    <span>→ {eurXaf ? formatCurrency(eurXaf * 50) : "..."} FCFA</span>
                   </div>
                   <div className="wallet-detail-eq-row">
                     <span>100 EUR</span>
-                    <span>→ {formatCurrency(Math.round(100 / currencyRates["EUR"]))} FCFA</span>
+                    <span>→ {eurXaf ? formatCurrency(eurXaf * 100) : "..."} FCFA</span>
                   </div>
                   <div className="wallet-detail-eq-row">
                     <span>500 EUR</span>
-                    <span>→ {formatCurrency(Math.round(500 / currencyRates["EUR"]))} FCFA</span>
+                    <span>→ {eurXaf ? formatCurrency(eurXaf * 500) : "..."} FCFA</span>
                   </div>
                 </div>
 
@@ -5848,7 +5852,7 @@ function App() {
                   <div className="wallet-detail-card-orb" />
                   <div className="wallet-detail-card-label">Solde disponible</div>
                   <div className="wallet-detail-card-amount">{usdWallet.toFixed(2)} <span style={{ fontSize: 18, fontWeight: 700, opacity: 0.7 }}>USD</span></div>
-                  <div className="wallet-detail-card-equiv">≈ {formatCurrency(Math.round(usdWallet / currencyRates["USD"]))} FCFA</div>
+                  <div className="wallet-detail-card-equiv">≈ {usdRate ? formatCurrency(Math.round(usdWallet / usdRate)) : "..."} FCFA</div>
                 </div>
 
                 {/* Infos clés */}
@@ -5863,7 +5867,7 @@ function App() {
                   </div>
                   <div className="wallet-detail-info-item">
                     <div className="wallet-detail-info-label">Taux actuel</div>
-                    <div className="wallet-detail-info-value">1 $ = {Math.round(1 / currencyRates["USD"])} FCFA</div>
+                    <div className="wallet-detail-info-value">1 $ = {usdXaf ?? "..."} FCFA</div>
                   </div>
                   <div className="wallet-detail-info-item">
                     <div className="wallet-detail-info-label">Commission</div>
@@ -5875,23 +5879,23 @@ function App() {
                 <div className="wallet-detail-equivalence">
                   <div className="wallet-detail-eq-row">
                     <span>1 USD</span>
-                    <span>→ {Math.round(1 / currencyRates["USD"])} FCFA</span>
+                    <span>→ {usdXaf ?? "..."} FCFA</span>
                   </div>
                   <div className="wallet-detail-eq-row">
                     <span>10 USD</span>
-                    <span>→ {formatCurrency(Math.round(10 / currencyRates["USD"]))} FCFA</span>
+                    <span>→ {usdXaf ? formatCurrency(usdXaf * 10) : "..."} FCFA</span>
                   </div>
                   <div className="wallet-detail-eq-row">
                     <span>50 USD</span>
-                    <span>→ {formatCurrency(Math.round(50 / currencyRates["USD"]))} FCFA</span>
+                    <span>→ {usdXaf ? formatCurrency(usdXaf * 50) : "..."} FCFA</span>
                   </div>
                   <div className="wallet-detail-eq-row">
                     <span>100 USD</span>
-                    <span>→ {formatCurrency(Math.round(100 / currencyRates["USD"]))} FCFA</span>
+                    <span>→ {usdXaf ? formatCurrency(usdXaf * 100) : "..."} FCFA</span>
                   </div>
                   <div className="wallet-detail-eq-row">
                     <span>500 USD</span>
-                    <span>→ {formatCurrency(Math.round(500 / currencyRates["USD"]))} FCFA</span>
+                    <span>→ {usdXaf ? formatCurrency(usdXaf * 500) : "..."} FCFA</span>
                   </div>
                 </div>
 
@@ -6367,7 +6371,7 @@ function App() {
                     <div className="exchange-box receive">
                       <div className="exchange-kicker">
                         <span>Vous recevez</span>
-                        <span>Taux indicatif: 1 USDT ≈ {cryptoRate} F</span>
+                        <span>Taux indicatif: 1 USDT ≈ {cryptoRate ?? "Chargement..."} F</span>
                       </div>
                       <div className="exchange-row">
                         <div style={{ fontSize: 30, fontWeight: 800, fontFamily: "Montserrat, sans-serif" }}>{cryptoUsdtValue}</div>

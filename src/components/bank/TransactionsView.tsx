@@ -667,9 +667,9 @@ export default function TransactionsView({
 
   /* ── NORMAL FORM VIEW ── */
   return (
-    <div className="app-screen active" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div className="content-scrollable service-scrollable" style={{ paddingBottom: 0 }}>
-        <div className="transaction-screen" style={{ paddingBottom: 0 }}>
+    <div className="app-screen active">
+      <div className="content-scrollable service-scrollable transaction-safe">
+        <div className="transaction-screen">
           {/* Processing overlay */}
           {processing && <ProcessingOverlay />}
 
@@ -852,59 +852,58 @@ export default function TransactionsView({
             </div>
           </div>
 
+          <div className="transaction-footer">
+            <div className="transaction-recap">
+              <div>
+                <strong>{formatCurrency(total)} XAF <small style={{ fontSize: 10, fontWeight: 600, color: type === 'depot' ? '#22c55e' : 'var(--dim)', marginLeft: 6 }}>({type === 'depot' ? 'Gratuit' : `${formatCurrency(fees)} XAF`})</small></strong>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <span>Estimation</span>
+                <p>Instantané</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Fixed Confirm Button - sits above the bottom nav bar */}
+          <button
+            className="transaction-confirm"
+            onClick={handleSubmit}
+          >
+            {type === 'depot' ? 'Confirmer le dépôt' : 'Valider le retrait'}
+          </button>
+
+          {/* ── Confirmation modal ── */}
+          {confirming && (
+            <ConfirmationModal
+              type={type}
+              amount={amount}
+              method={method}
+              phone={phone}
+              fees={fees}
+              total={total}
+              onConfirm={handleConfirm}
+              onCancel={handleCancelConfirm}
+            />
+          )}
+
+          <style>{`
+            .transaction-confirm {
+              position: fixed;
+              bottom: calc(70px + env(safe-area-inset-bottom, 0px) + 74px);
+              left: 50%;
+              transform: translateX(-50%);
+              width: calc(100% - 32px);
+              max-width: 398px;
+              z-index: 25;
+            }
+            @media (max-width: 480px) {
+              .transaction-confirm {
+                max-width: calc(100% - 32px);
+              }
+            }
+          `}</style>
         </div>
       </div>
-
-      {/* ── Sticky bottom bar: recap + confirm button, sits above nav ── */}
-      <div style={{
-        flexShrink: 0,
-        background: 'linear-gradient(180deg,rgba(10,14,23,0.97),rgba(10,14,23,1))',
-        borderTop: '1px solid rgba(255,255,255,0.07)',
-        padding: '12px 16px',
-        paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-        zIndex: 30,
-      }}>
-        {/* Recap row */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
-          <div>
-            <strong style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>
-              {formatCurrency(total)} XAF
-            </strong>
-            <small style={{ display: 'block', fontSize: 11, fontWeight: 600, color: type === 'depot' ? '#22c55e' : '#94a3b8', marginTop: 2 }}>
-              {type === 'depot' ? '✓ Gratuit — 0% de frais' : `Frais: ${formatCurrency(fees)} XAF`}
-            </small>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#64748b' }}>Estimation</span>
-            <p style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', marginTop: 2 }}>Instantané</p>
-          </div>
-        </div>
-        {/* Confirm button */}
-        <button
-          className="transaction-confirm"
-          onClick={handleSubmit}
-          style={{ margin: 0, width: '100%', maxWidth: '100%', position: 'static', transform: 'none' }}
-        >
-          {type === 'depot' ? 'Confirmer le dépôt' : 'Valider le retrait'}
-        </button>
-      </div>
-
-      {/* ── Confirmation modal ── */}
-      {confirming && (
-        <ConfirmationModal
-          type={type}
-          amount={amount}
-          method={method}
-          phone={phone}
-          fees={fees}
-          total={total}
-          onConfirm={handleConfirm}
-          onCancel={handleCancelConfirm}
-        />
-      )}
     </div>
   );
 }

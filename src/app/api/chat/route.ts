@@ -7,18 +7,38 @@ import fs from "fs";
 import path from "path";
 
 // Ensure .z-ai-config exists for z-ai-web-dev-sdk (required at runtime)
-// On Vercel: reads from env vars. On local: falls back to /etc/.z-ai-config or project file.
+// The SDK reads from: process.cwd()/.z-ai-config → os.homedir()/.z-ai-config → /etc/.z-ai-config
+// On Vercel (read-only filesystem): we write to /tmp and redirect HOME so os.homedir() resolves there.
+// On local dev: writes to process.cwd() normally.
 (function ensureZAIConfig() {
-  const configPath = path.join(process.cwd(), ".z-ai-config");
-  if (!fs.existsSync(configPath)) {
-    const config = {
-      baseUrl: process.env.ZAI_BASE_URL || "https://internal-api.z.ai/v1",
-      apiKey: process.env.ZAI_API_KEY || "Z.ai",
-      chatId: process.env.ZAI_CHAT_ID || "chat-01dfd386-2ed2-451a-88a6-af7660da4c2b",
-      userId: process.env.ZAI_USER_ID || "d524f435-033c-468e-80ec-904f9cf4c90a",
-      token: process.env.ZAI_TOKEN || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiZDUyNGY0MzUtMDMzYy00NjhlLTgwZWMtOTA0ZjljZjRjOTBhIiwiY2hhdF9pZCI6ImNoYXQtMDFkZmQzODYtMmVkMi00NTFhLTg4YTYtYWY3NjYwZGE0YzJiIiwicGxhdGZvcm0iOiJ6YWkifQ.RCNwzYJkfsWGdTN_KlU_iBEI9fBLamxB3Hp0iut7_gA",
-    };
-    fs.writeFileSync(configPath, JSON.stringify(config));
+  const config = {
+    baseUrl: process.env.ZAI_BASE_URL || "https://internal-api.z.ai/v1",
+    apiKey: process.env.ZAI_API_KEY || "Z.ai",
+    chatId: process.env.ZAI_CHAT_ID || "chat-01dfd386-2ed2-451a-88a6-af7660da4c2b",
+    userId: process.env.ZAI_USER_ID || "d524f435-033c-468e-80ec-904f9cf4c90a",
+    token: process.env.ZAI_TOKEN || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiZDUyNGY0MzUtMDMzYy00NjhlLTgwZWMtOTA0ZjljZjRjOTBhIiwiY2hhdF9pZCI6ImNoYXQtMDFkZmQzODYtMmVkMi00NTFhLTg4YTYtYWY3NjYwZGE0YzJiIiwicGxhdGZvcm0iOiJ6YWkifQ.RCNwzYJkfsWGdTN_KlU_iBEI9fBLamxB3Hp0iut7_gA",
+  };
+  const configJson = JSON.stringify(config);
+
+  // On Vercel serverless, cwd is read-only — write to /tmp and redirect HOME
+  const tmpDir = "/tmp";
+  const tmpPath = path.join(tmpDir, ".z-ai-config");
+  try {
+    fs.writeFileSync(tmpPath, configJson);
+  } catch {
+    // /tmp not available (unlikely)
+  }
+  // Force HOME so os.homedir() returns /tmp → SDK finds config
+  process.env.HOME = tmpDir;
+
+  // Also try cwd for local dev
+  const cwdPath = path.join(process.cwd(), ".z-ai-config");
+  try {
+    if (!fs.existsSync(cwdPath)) {
+      fs.writeFileSync(cwdPath, configJson);
+    }
+  } catch {
+    // cwd read-only on Vercel, ignore
   }
 })();
 
@@ -101,6 +121,17 @@ async function getLLMResponse(uid: string, userMessage: string): Promise<string>
     return response.trim().slice(0, 500);
   } catch (err) {
     console.error("[chat] LLM error:", err);
+    // Try to provide a meaningful response even if LLM fails
+    const lower = userMessage.toLowerCase();
+    if (["bonjour", "bonsoir", "salut", "coucou", "bonjour!", "bonsoir!", "hello", "hi"].some(g => lower === g || lower.startsWith(g))) {
+      return "Bonjour ! Bienvenue sur MOARLI Bank. Comment puis-je vous aider aujourd'hui ?";
+    }
+    if (lower.includes("merci")) {
+      return "Je vous en prie ! N'hésitez pas si vous avez d'autres questions. MOARLI Bank est à votre service.";
+    }
+    if (lower.includes("aide") || lower.includes("help") || lower.includes("service")) {
+      return "Je suis le conseiller MOARLI Bank. Je peux vous aider avec : virements, dépôts, retraits, épargne, cartes, prêts, change de devises, et bien plus. Que souhaitez-vous ?";
+    }
     return "Une interruption technique est survenue. Je suis toujours là pour vous aider avec vos services MOARLI. Que puis-je faire pour vous ?";
   }
 }

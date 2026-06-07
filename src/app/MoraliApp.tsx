@@ -6265,13 +6265,13 @@ function App() {
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <p className="tab-kicker">Envoyer à un contact</p>
+                  <p className="tab-kicker gold-text">Envoyer à un contact</p>
                   <div className="contacts-scroll">
                     <div className="contact-item add-new" onClick={addNewContact}>
                       <div className="add-circle">
                         <AppIcon name="request" size={20} stroke="currentColor" />
                       </div>
-                      <span className="contact-name">Nouveau</span>
+                      <span className="contact-name gold-text">Nouveau</span>
                     </div>
                     {paymentContacts.map((contact) => (
                       <div key={contact.name} className="contact-item" onClick={() => { openPaymentsTab(); setServicesQuery(""); closeContactModal(); }}>

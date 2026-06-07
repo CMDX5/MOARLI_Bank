@@ -68,7 +68,7 @@ export default function ProfileView({
 
           {profileGroups.map((group) => (
             <div key={group.title} className="profile-group">
-              <p className="tab-kicker">{group.title}</p>
+              <p className="tab-kicker gold-text">{group.title}</p>
               {group.items.map((item) => (
                 <button key={item.label} className="profile-item" onClick={() => onAction(item.label)}>
                   <div className="profile-item-left">

@@ -1237,6 +1237,8 @@ html[style*="color-scheme: light"] .vc-brand-name {
 }
 
 /* Section titles with var(--gold) — fine in both modes */
+.gold-text { color: #D4A437 !important; }
+html[style*="color-scheme: light"] .gold-text { color: #b8942e !important; }
 
 /* Stat card text */
 html[style*="color-scheme: light"] .bc-stat-v {

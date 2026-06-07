@@ -63,7 +63,7 @@ export async function middleware(request: NextRequest) {
   //            - Content-Security-Policy-Report-Only for monitoring
   const cspValue = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' https://js.sentry-cdn.com`,
+    `script-src 'self' 'nonce-${nonce}' 'unsafe-eval' https://js.sentry-cdn.com`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: blob: https:",

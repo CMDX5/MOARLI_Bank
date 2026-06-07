@@ -7274,12 +7274,21 @@ function App() {
         )}
 
         {supportOpen && (
-          <ChatSupportView
-            authUid={authUid}
-            onBack={closeSupportModal}
-            showToast={showToast}
-            getAuthHeaders={getAuthHeaders}
-          />
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: '#050b1a',
+            display: 'flex',
+            flexDirection: 'column',
+          }}>
+            <ChatSupportView
+              authUid={authUid}
+              onBack={closeSupportModal}
+              showToast={showToast}
+              getAuthHeaders={getAuthHeaders}
+            />
+          </div>
         )}
 
         {termsOpen && (

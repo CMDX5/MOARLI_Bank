@@ -883,14 +883,6 @@ export default function TransactionsView({
             </button>
           </div>
 
-          {/* Fixed Confirm Button - sits above the bottom nav bar */}
-          <button
-            className="transaction-confirm"
-            onClick={handleSubmit}
-          >
-            {type === 'depot' ? 'Confirmer le dépôt' : 'Valider le retrait'}
-          </button>
-
           {/* ── Confirmation modal ── */}
           {confirming && (
             <ConfirmationModal
@@ -905,22 +897,7 @@ export default function TransactionsView({
             />
           )}
 
-          <style>{`
-            .transaction-confirm {
-              position: fixed;
-              bottom: calc(70px + env(safe-area-inset-bottom, 0px) + 160px);
-              left: 50%;
-              transform: translateX(-50%);
-              width: calc(100% - 32px);
-              max-width: 398px;
-              z-index: 25;
-            }
-            @media (max-width: 480px) {
-              .transaction-confirm {
-                max-width: calc(100% - 32px);
-              }
-            }
-          `}</style>
+
         </div>
       </div>
     </div>

@@ -8211,8 +8211,8 @@ function App() {
         )}
 
         {transactionPinOpen && (
-          <div className="transaction-flow-overlay" style={{ alignItems: 'flex-start', padding: '0 20px 20px' }} onClick={transactionProcessing ? undefined : closeTransactionPin}>
-            <div className="transaction-flow-modal" style={{ borderRadius: '0 0 28px 28px', animation: 'pinModalSlideDown .3s cubic-bezier(.34,1.2,.64,1) forwards', transform: 'none', opacity: 1, marginTop: 0 }} onClick={(event) => event.stopPropagation()}>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 2400, background: 'rgba(3,8,16,0.78)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 20px', animation: 'fadeIn .3s ease' }} onClick={transactionProcessing ? undefined : closeTransactionPin}>
+            <div style={{ width: '100%', maxWidth: 360, background: 'linear-gradient(180deg, #101a30 0%, #080f1e 100%)', border: '1px solid rgba(59,130,246,0.22)', borderRadius: 28, boxShadow: '0 30px 80px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.05)', padding: '26px 22px 22px', display: 'flex', flexDirection: 'column', gap: 18, animation: 'panelSpringUp .3s cubic-bezier(.34,1.2,.64,1) forwards' }} onClick={(event) => event.stopPropagation()}>
               <div className="transaction-flow-head">
                 <div>
                   <div className="transaction-flow-title">Code PIN</div>
@@ -8254,39 +8254,42 @@ function App() {
               )}
 
               {!transactionProcessing && !transactionSuccess && (
-                <>
-                  {/* Hidden keyboard input — captures device keyboard */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                   <input
                     ref={transactionPinInputRef}
-                    type="tel"
+                    type="password"
                     inputMode="numeric"
                     autoComplete="off"
                     maxLength={4}
                     value={transactionPin}
                     onChange={handleTransactionPinKeyboard}
+                    placeholder="••••"
                     style={{
-                      position: 'absolute',
-                      opacity: 0,
-                      width: 1,
-                      height: 1,
-                      padding: 0,
-                      margin: -1,
-                      overflow: 'hidden',
-                      border: 'none',
-                      pointerEvents: 'none',
+                      width: '100%',
+                      maxWidth: 200,
+                      height: 56,
+                      padding: '0 16px',
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1.5px solid rgba(59,130,246,0.35)',
+                      borderRadius: 16,
+                      color: '#fff',
+                      fontSize: 24,
+                      fontWeight: 900,
+                      textAlign: 'center',
+                      letterSpacing: '0.35em',
+                      outline: 'none',
+                      fontFamily: "'Montserrat', sans-serif",
+                      transition: 'all .2s',
+                      WebkitAppearance: 'none',
+                      MozAppearance: 'textfield',
                     }}
                   />
-                  <div className="pin-dots">
-                    {[0, 1, 2, 3].map((dot) => (
-                      <div key={dot} className={`pin-dot ${transactionPinVerifying ? "verifying" : transactionPin.length > dot ? "filled" : ""}`} />
-                    ))}
-                  </div>
                   {transactionPinVerifying ? (
-                    <div className="pin-helper" style={{ color: "#60a5fa" }}>Vérification du code PIN en cours…</div>
+                    <div className="pin-helper" style={{ color: "#60a5fa" }}>Vérification du code PIN…</div>
                   ) : (
-                    <div className="pin-helper">Saisissez votre PIN depuis le clavier. La vérification démarre automatiquement.</div>
+                    <div className="pin-helper">La vérification démarre automatiquement.</div>
                   )}
-                </>
+                </div>
               )}
 
               {transactionProcessing && (

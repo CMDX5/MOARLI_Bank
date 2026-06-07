@@ -32,13 +32,26 @@ function ConfirmationModal({
 
   return (
     <div
-      className="card-modal-overlay"
-      style={{ zIndex: 2500, alignItems: 'center', justifyContent: 'center' }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 2500,
+        background: 'rgba(3,8,16,0.78)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '0 20px',
+        animation: 'fadeIn .3s ease',
+      }}
     >
       <div
         style={{
           width: '100%',
           maxWidth: 360,
+          maxHeight: '85dvh',
+          overflow: 'hidden',
           background: 'linear-gradient(180deg, #101a30 0%, #080f1e 100%)',
           border: '1px solid rgba(59,130,246,0.22)',
           borderRadius: 28,

@@ -796,16 +796,20 @@ export default function TransactionsView({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 6,
-                    marginTop: 4,
-                    padding: '6px 10px',
-                    borderRadius: 10,
-                    background: 'rgba(239,68,68,0.06)',
-                    border: '1px solid rgba(239,68,68,0.15)',
+                    gap: 8,
+                    marginTop: 8,
+                    padding: '10px 14px',
+                    borderRadius: 12,
+                    background: 'rgba(239,68,68,0.12)',
+                    border: '1px solid rgba(239,68,68,0.3)',
                   }}
                 >
-                  <span style={{ fontSize: 11, fontWeight: 600, color: '#f87171' }}>
-                    Numéro trop court — minimum 9 chiffres requis
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="7" stroke="#f87171" strokeWidth="1.5" opacity="0.5" />
+                    <text x="8" y="12" textAnchor="middle" fill="#f87171" fontSize="10" fontWeight="800">!</text>
+                  </svg>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#fca5a5' }}>
+                    Numéro trop court — 9 chiffres min.
                   </span>
                 </div>
               )}
@@ -815,16 +819,20 @@ export default function TransactionsView({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 6,
-                    marginTop: 4,
-                    padding: '6px 10px',
-                    borderRadius: 10,
-                    background: 'rgba(34,197,94,0.06)',
-                    border: '1px solid rgba(34,197,94,0.15)',
+                    gap: 8,
+                    marginTop: 8,
+                    padding: '10px 14px',
+                    borderRadius: 12,
+                    background: 'rgba(34,197,94,0.12)',
+                    border: '1px solid rgba(34,197,94,0.3)',
                   }}
                 >
-                  <span style={{ fontSize: 11, fontWeight: 600, color: '#4ade80' }}>
-                    Numéro valide
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="7" stroke="#4ade80" strokeWidth="1.5" opacity="0.5" />
+                    <path d="M5 8.2L7 10.2L11 6" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#86efac' }}>
+                    Numéro valide ✓
                   </span>
                 </div>
               )}

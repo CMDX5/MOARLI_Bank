@@ -747,7 +747,7 @@ export default function TransactionsView({
 
             {/* ── Phone input ── */}
             <div className="transaction-group">
-              <label className="transaction-label" style={{ color: '#D4A437' }}>Numéro du compte</label>
+              <label className="transaction-label" style={{ color: '#D4A437' }}>Numéro de téléphone</label>
               <div
                 className="phone-input-wrap"
                 style={{

@@ -45,6 +45,7 @@ prisma/*.db
 
 # secrets - NEVER commit these
 service-account-key.json
+.z-ai-config
 
 # uploads and temp
 upload/

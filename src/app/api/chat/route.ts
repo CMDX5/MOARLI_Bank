@@ -64,9 +64,9 @@ async function getLLMResponse(uid: string, userMessage: string): Promise<string>
     const zai = await ZAI.create();
 
     const messages = [
-      { role: "assistant", content: SYSTEM_PROMPT },
+      { role: "assistant" as const, content: SYSTEM_PROMPT },
       ...history,
-      { role: "user", content: userMessage },
+      { role: "user" as const, content: userMessage },
     ];
 
     const completion = await zai.chat.completions.create({

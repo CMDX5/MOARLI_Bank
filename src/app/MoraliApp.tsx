@@ -4739,21 +4739,43 @@ function App() {
                   </button>
                 </div>
 
+                {/* Merchant header with icon orb */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+                  <div style={{ width: 64, height: 64, borderRadius: 20, background: 'linear-gradient(135deg, rgba(34,197,94,.15), rgba(59,130,246,.15))', border: '1px solid rgba(34,197,94,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <AppIcon name="qr" size={28} stroke="#34d399" />
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(34,197,94,.7)', textTransform: 'uppercase', letterSpacing: 1.5 }}>Paiement sécurisé</div>
+                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,.5)', marginTop: 4 }}>Scannez ou saisissez le montant</div>
+                  </div>
+                </div>
+
                 <div className="hub-card">
-                  <div style={{ display: "flex", justifyContent: "center", padding: "24px 0" }}>
-                    <button onClick={openCameraScanner} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "28px 40px", borderRadius: 28, border: "2px solid rgba(59,130,246,.3)", background: "rgba(59,130,246,.08)", color: "#60a5fa", fontWeight: 800, fontSize: 14, cursor: "pointer", transition: "all .2s" }}>
-                      <AppIcon name="camera" size={32} stroke="#60a5fa" />
-                      Scanner marchand
+                  {/* QR Scanner */}
+                  <div style={{ display: "flex", justifyContent: "center", padding: "20px 0 24px" }}>
+                    <button onClick={openCameraScanner} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "24px 36px", borderRadius: 24, border: "2px solid rgba(34,197,94,.25)", background: "rgba(34,197,94,.06)", color: "#34d399", fontWeight: 800, fontSize: 13, cursor: "pointer", transition: "all .2s", boxShadow: "0 0 30px rgba(34,197,94,.08)" }}>
+                      <div style={{ width: 44, height: 44, borderRadius: 14, background: "rgba(34,197,94,.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <AppIcon name="camera" size={22} stroke="#34d399" />
+                      </div>
+                      Scanner le QR Code
                     </button>
                   </div>
 
-                  <div className="exchange-box">
+                  {/* Divider */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                    <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent)' }} />
+                    <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,.25)', textTransform: 'uppercase', letterSpacing: 1 }}>ou saisir manuellement</span>
+                    <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent)' }} />
+                  </div>
+
+                  {/* Amount input */}
+                  <div className="exchange-box" style={{ borderColor: 'rgba(59,130,246,.2)', background: 'rgba(59,130,246,.04)' }}>
                     <div className="exchange-kicker" style={{ justifyContent: "center" }}>
-                      <span>Montant à régler</span>
+                      <span style={{ color: 'rgba(255,255,255,.5)' }}>Montant à régler</span>
                     </div>
                     <div className="hub-center" style={{ paddingTop: 0 }}>
-                      <h3>
-                        {merchantAmount || "0"} <span>XAF</span>
+                      <h3 style={{ fontFamily: "'Montserrat',sans-serif", fontSize: 32, fontWeight: 900, letterSpacing: -1 }}>
+                        {merchantAmount ? formatCurrency(Number(merchantAmount)) : "0"} <span style={{ fontSize: 14, fontWeight: 600, color: '#60a5fa' }}>XAF</span>
                       </h3>
                     </div>
                     <div style={{ padding: "0 6px" }}>
@@ -4763,12 +4785,43 @@ function App() {
                         placeholder="0"
                         value={merchantAmount}
                         onChange={(e) => setMerchantAmount(e.target.value.replace(/\D/g, ""))}
-                        style={{ width: "100%", background: "transparent", border: "none", outline: "none", color: "white", fontSize: 18, fontWeight: 800, textAlign: "center" }}
+                        style={{ width: "100%", background: "transparent", border: "none", outline: "none", color: "white", fontSize: 18, fontWeight: 800, textAlign: "center", fontFamily: "'Montserrat',sans-serif" }}
                       />
                     </div>
                   </div>
 
-                  <button className="hub-cta" onClick={() => { const amt = Number(merchantAmount || 0); if (amt <= 0) { showToast("Entrez un montant"); return; } setPendingPinAction({ type: "merchant", amount: amt }); openTransactionPin(); }}>Confirmer le paiement</button>
+                  {/* Quick amounts */}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 16, marginBottom: 20, overflowX: 'auto', scrollbarWidth: 'none' }}>
+                    {[500, 1000, 2000, 5000, 10000, 25000].map((preset) => (
+                      <button
+                        key={preset}
+                        onClick={() => setMerchantAmount(String(preset))}
+                        style={{
+                          flexShrink: 0, padding: '8px 14px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                          fontSize: 12, fontWeight: 700, fontFamily: "'Montserrat',sans-serif",
+                          background: merchantAmount === String(preset) ? 'rgba(34,197,94,.18)' : 'rgba(255,255,255,.04)',
+                          color: merchantAmount === String(preset) ? '#34d399' : 'rgba(255,255,255,.45)',
+                          border: merchantAmount === String(preset) ? '1px solid rgba(34,197,94,.3)' : '1px solid rgba(255,255,255,.06)',
+                          transition: 'all .2s'
+                        }}
+                      >{preset >= 1000 ? `${preset / 1000}K` : preset}</button>
+                    ))}
+                  </div>
+
+                  {/* Balance warning */}
+                  {Number(merchantAmount || 0) > 0 && Number(merchantAmount) > (firestoreBalance !== null ? firestoreBalance : dashboardData.balance) && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16, padding: '8px 12px', borderRadius: 10, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.15)' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2"><path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      <span style={{ fontSize: 11, color: '#fca5a5', fontWeight: 600 }}>Solde insuffisant pour ce montant</span>
+                    </div>
+                  )}
+
+                  <button className="hub-cta" style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)', boxShadow: '0 8px 24px rgba(34,197,94,.25)' }} onClick={() => { const amt = Number(merchantAmount || 0); if (amt <= 0) { showToast("Entrez un montant"); return; } setPendingPinAction({ type: "merchant", amount: amt }); openTransactionPin(); }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                      Confirmer le paiement
+                    </span>
+                  </button>
 
                   <div className="tontine-progress" style={{ background: 'rgba(37,99,235,.06)', borderColor: 'rgba(59,130,246,.12)' }}>
                     <div className="service-wide-main" style={{ gap: 12 }}>
@@ -4816,6 +4869,39 @@ function App() {
                         <div className="savings-metric-bottom">~ {formatCurrency(Math.floor(savingsMonthlyGain))} F</div>
                       </div>
                     </div>
+
+                    {/* Savings progress ring */}
+                    <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 16, padding: '14px 16px', borderRadius: 16, background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.12)' }}>
+                      <div style={{ position: 'relative', width: 48, height: 48, flexShrink: 0 }}>
+                        <svg width="48" height="48" viewBox="0 0 48 48" style={{ transform: 'rotate(-90deg)' }}>
+                          <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,.06)" strokeWidth="4" />
+                          <circle cx="24" cy="24" r="20" fill="none" stroke="#34d399" strokeWidth="4" strokeLinecap="round" strokeDasharray={`${2 * Math.PI * 20}`} strokeDashoffset={`${2 * Math.PI * 20 * (1 - Math.min(1, savingsAmount / Math.max(1, 500000)))}`} style={{ transition: 'stroke-dashoffset .8s cubic-bezier(.4,0,.2,1)' }} />
+                        </svg>
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: '#34d399' }}>{Math.min(100, Math.round((savingsAmount / Math.max(1, 500000)) * 100))}%</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(34,197,94,.7)', textTransform: 'uppercase', letterSpacing: 1 }}>Objectif : 500 000 F</div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,.6)', marginTop: 3 }}>{savingsAmount >= 500000 ? '🎉 Objectif atteint !' : `Encore ${formatCurrency(500000 - savingsAmount)} F`}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Preset amounts */}
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 16, overflowX: 'auto', scrollbarWidth: 'none', padding: '2px 0' }}>
+                    {[1000, 2000, 5000, 10000, 20000, 50000].map((preset) => (
+                      <button
+                        key={preset}
+                        onClick={() => setSavingsCustomAmount(String(preset))}
+                        style={{
+                          flexShrink: 0, padding: '8px 16px', borderRadius: 12, border: 'none', cursor: 'pointer',
+                          fontSize: 12, fontWeight: 700, fontFamily: "'Montserrat',sans-serif",
+                          background: String(savingsCustomAmount) === String(preset) ? 'rgba(52,211,153,.18)' : 'rgba(255,255,255,.04)',
+                          color: String(savingsCustomAmount) === String(preset) ? '#34d399' : 'rgba(255,255,255,.55)',
+                          border: String(savingsCustomAmount) === String(preset) ? '1px solid rgba(52,211,153,.3)' : '1px solid rgba(255,255,255,.06)',
+                          transition: 'all .2s'
+                        }}
+                      >{preset >= 1000 ? `${preset / 1000}K` : preset} F</button>
+                    ))}
                   </div>
 
                   <div className="transaction-group" style={{ marginBottom: 16 }}>
@@ -4826,11 +4912,30 @@ function App() {
                         <div className="exchange-unit">XAF</div>
                       </div>
                     </div>
+                    {Number(savingsCustomAmount || 0) > 0 && Number(savingsCustomAmount) > savingsAmount && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.15)' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2"><path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span style={{ fontSize: 11, color: '#fca5a5', fontWeight: 600 }}>Solde épargne insuffisant</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="savings-actions">
                     <button className="savings-btn" onClick={() => { const amt = Number(savingsCustomAmount || 0); if (amt <= 0) { showToast("Entrez un montant"); return; } setPendingPinAction({ type: "savings_withdraw", amount: amt }); openTransactionPin(); }}>Retirer</button>
                     <button className="savings-btn primary" onClick={() => { const amt = Number(savingsCustomAmount || 0); if (amt <= 0) { showToast("Entrez un montant"); return; } setPendingPinAction({ type: "savings_deposit", amount: amt }); openTransactionPin(); }}>Déposer +</button>
+                  </div>
+
+                  {/* Savings tips */}
+                  <div style={{ marginTop: 16, padding: '14px 16px', borderRadius: 16, background: 'rgba(59,130,246,.06)', border: '1px solid rgba(59,130,246,.12)' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(59,130,246,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <AppIcon name="spark" size={16} stroke="#60a5fa" />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa', marginBottom: 4 }}>Astuce Morali</div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,.55)', lineHeight: 1.5 }}>Épargnez régulièrement pour atteindre vos objectifs plus vite. Activez les dépôts automatiques dans vos paramètres.</div>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="savings-note">
@@ -6087,9 +6192,20 @@ function App() {
                   </button>
                 </div>
 
+                {/* Hero orb */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+                  <div style={{ width: 56, height: 56, borderRadius: 18, background: 'linear-gradient(135deg, rgba(244,63,94,.15), rgba(251,113,133,.1))', border: '1px solid rgba(244,63,94,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <AppIcon name="users" size={26} stroke="#fb7185" />
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(244,63,94,.7)', textTransform: 'uppercase', letterSpacing: 1.5 }}>Épargne collective</div>
+                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,.45)', marginTop: 3 }}>{tontineGroups.length} tontine{tontineGroups.length > 1 ? 's' : ''} active{tontineGroups.length > 1 ? 's' : ''}</div>
+                  </div>
+                </div>
+
                 <div className="hub-card">
                   <div className="tontine-head">
-                    <h2 className="hub-title" style={{ fontSize: 22 }}>Tontine Digitale</h2>
+                    <h2 className="hub-title" style={{ fontSize: 20 }}>Tontine Digitale</h2>
                     <p className="tontine-sub">Créez et gérez vos tontines</p>
                   </div>
 
@@ -6100,8 +6216,12 @@ function App() {
                   </div>
 
                   {tontineGroups.length === 0 ? (
-                    <div className="member-list" style={{ padding: "24px 0" }}>
-                      <p style={{ textAlign: "center", color: "#64748b", fontSize: 13, lineHeight: 1.6 }}>Aucune tontine active. Créez-en une pour commencer.</p>
+                    <div style={{ padding: "32px 20px", textAlign: "center" }}>
+                      <div style={{ width: 64, height: 64, borderRadius: 20, background: 'rgba(244,63,94,.06)', border: '1px solid rgba(244,63,94,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                        <AppIcon name="users" size={28} stroke="rgba(244,63,94,.3)" />
+                      </div>
+                      <p style={{ color: "#64748b", fontSize: 13, lineHeight: 1.6, marginBottom: 6 }}>Aucune tontine active</p>
+                      <p style={{ color: "rgba(255,255,255,.25)", fontSize: 11 }}>Créez votre première tontine pour commencer à épargner collectivement</p>
                     </div>
                   ) : (
                     tontineGroups.map((group, gi) => {
@@ -6111,8 +6231,15 @@ function App() {
                       return (
                         <div key={gi} className="tontine-group-card">
                           <div className="tontine-group-header">
-                            <div className="tontine-group-name">{group.name}</div>
-                            <div className="tontine-group-amount">{formatCurrency(Number(group.contributionAmount))} F / membre</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div style={{ width: 36, height: 36, borderRadius: 12, background: 'linear-gradient(135deg, rgba(244,63,94,.15), rgba(251,113,133,.1))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <AppIcon name="users" size={16} stroke="#fb7185" />
+                              </div>
+                              <div>
+                                <div className="tontine-group-name">{group.name}</div>
+                                <div className="tontine-group-amount">{formatCurrency(Number(group.contributionAmount))} F / membre</div>
+                              </div>
+                            </div>
                           </div>
 
                           <div className="hub-metrics" style={{ marginBottom: 12 }}>
@@ -6124,6 +6251,10 @@ function App() {
                               <div className="hub-metric-label">Contributions</div>
                               <div className="hub-metric-value" style={{ color: "#fb7185" }}>{paidCount}/{totalMembers}</div>
                             </div>
+                            <div className="hub-metric">
+                              <div className="hub-metric-label">Pot</div>
+                              <div className="hub-metric-value" style={{ color: "#fbbf24", fontFamily: "'Montserrat',sans-serif" }}>{formatCurrency(group.pot || 0)} F</div>
+                            </div>
                           </div>
 
                           {totalMembers > 0 && (
@@ -6133,14 +6264,14 @@ function App() {
                                 <strong style={{ color: "#fb7185" }}>{progressPct}%</strong>
                               </div>
                               <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,.06)", marginTop: 8, overflow: "hidden" }}>
-                                <div className="tontine-bar" style={{ width: `${progressPct}%`, height: "100%", borderRadius: 3, background: "linear-gradient(90deg, #f43f5e, #fb7185)" }} />
+                                <div className="tontine-bar" style={{ width: `${progressPct}%`, height: "100%", borderRadius: 3, background: "linear-gradient(90deg, #f43f5e, #fb7185)", transition: 'width .5s cubic-bezier(.4,0,.2,1)' }} />
                               </div>
                             </div>
                           )}
 
                           <div className="member-add-row">
                             <input type="text" placeholder="Nom du membre" value={tontineNewMemberName} onChange={(e) => setTontineNewMemberName(e.target.value)} />
-                            <button className="member-add-btn" onClick={() => { if (!tontineNewMemberName.trim()) { showToast("Entrez un nom"); return; } const next = tontineGroups.map((g, idx) => idx === gi ? { ...g, members: [...g.members, { name: tontineNewMemberName.trim(), paid: false }] } : g); setTontineGroups(next); saveTontineGroups(next); setTontineNewMemberName(""); }}>Ajouter</button>
+                            <button className="member-add-btn" onClick={() => { if (!tontineNewMemberName.trim()) { showToast("Entrez un nom"); return; } const next = tontineGroups.map((g, idx) => idx === gi ? { ...g, members: [...g.members, { name: tontineNewMemberName.trim(), paid: false }] } : g); setTontineGroups(next); saveTontineGroups(next); setTontineNewMemberName(""); showToast(`${tontineNewMemberName.trim()} ajouté(e)`); }}>Ajouter</button>
                           </div>
 
                           {group.members.length > 0 && (
@@ -6155,7 +6286,7 @@ function App() {
                                     </div>
                                   </div>
                                   {!member.paid && (
-                                    <button className="member-add-btn" style={{ height: 34, padding: "0 12px", fontSize: 11 }} onClick={async () => { const contribAmt = Number(group.contributionAmount); const userBal = firestoreBalance !== null ? firestoreBalance : dashboardData.balance; if (contribAmt > userBal) { showToast("Solde insuffisant pour cette contribution"); return; } await executeServiceDebit(contribAmt, `Tontine ${group.name}`, "users"); const next = tontineGroups.map((g, idx) => idx === gi ? { ...g, pot: (g.pot || 0) + contribAmt, members: g.members.map((m, midx) => midx === mi ? { ...m, paid: true } : m) } : g); setTontineGroups(next); saveTontineGroups(next); }}>Contribuer</button>
+                                    <button className="member-add-btn" style={{ height: 34, padding: "0 12px", fontSize: 11, background: 'linear-gradient(135deg, rgba(244,63,94,.2), rgba(244,63,94,.1))', border: '1px solid rgba(244,63,94,.3)', color: '#fb7185' }} onClick={async () => { const contribAmt = Number(group.contributionAmount); const userBal = firestoreBalance !== null ? firestoreBalance : dashboardData.balance; if (contribAmt > userBal) { showToast("Solde insuffisant pour cette contribution"); return; } await executeServiceDebit(contribAmt, `Tontine ${group.name}`, "users"); const next = tontineGroups.map((g, idx) => idx === gi ? { ...g, pot: (g.pot || 0) + contribAmt, members: g.members.map((m, midx) => midx === mi ? { ...m, paid: true } : m) } : g); setTontineGroups(next); saveTontineGroups(next); showToast(`Contribution de ${formatCurrency(contribAmt)} F enregistrée`); }}>Contribuer</button>
                                   )}
                                 </div>
                               ))}
@@ -6163,11 +6294,11 @@ function App() {
                           )}
 
                           {/* Pot display and distribute button */}
-                          <div style={{ marginTop: 12, padding: 12, borderRadius: 14, background: "rgba(212,164,55,0.06)", border: "1px solid rgba(212,164,55,0.15)" }}>
+                          <div style={{ marginTop: 12, padding: 14, borderRadius: 14, background: "rgba(212,164,55,0.06)", border: "1px solid rgba(212,164,55,0.15)" }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                               <div>
                                 <div style={{ fontSize: 9, color: "rgba(212,164,55,0.7)", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700 }}>Pot total</div>
-                                <div style={{ fontSize: 18, fontWeight: 800, color: "#fbbf24", fontFamily: "'Montserrat',sans-serif", marginTop: 2 }}>{formatCurrency(group.pot || 0)} F</div>
+                                <div style={{ fontSize: 20, fontWeight: 900, color: "#fbbf24", fontFamily: "'Montserrat',sans-serif", marginTop: 2 }}>{formatCurrency(group.pot || 0)} F</div>
                               </div>
                               {totalMembers > 0 && paidCount === totalMembers && (group.pot || 0) > 0 ? (
                                 <button
@@ -6176,12 +6307,17 @@ function App() {
                                     setTontineDistConfirm({ groupIndex: gi, pot: group.pot || 0, members: totalMembers, sharePerMember });
                                   }}
                                   style={{
-                                    height: 36, borderRadius: 10, border: "none", cursor: "pointer",
+                                    height: 38, borderRadius: 12, border: "none", cursor: "pointer",
                                     background: "linear-gradient(135deg, #D4A437, #b8862d)", color: "#000",
-                                    fontSize: 11, fontWeight: 800, padding: "0 14px",
-                                    boxShadow: "0 4px 12px rgba(212,164,55,0.3)",
+                                    fontSize: 12, fontWeight: 800, padding: "0 16px",
+                                    boxShadow: "0 4px 16px rgba(212,164,55,0.35)",
                                   }}
-                                >Distribuer le pot</button>
+                                >
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" /></svg>
+                                    Distribuer
+                                  </span>
+                                </button>
                               ) : (
                                 <div style={{ fontSize: 10, color: "#64748b", textAlign: "right", maxWidth: 120 }}>
                                   {paidCount}/{totalMembers} contributions nécessaires

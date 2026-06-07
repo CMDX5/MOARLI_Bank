@@ -865,19 +865,32 @@ export default function TransactionsView({
             </div>
           </div>
 
-          <div className="transaction-footer">
-            <div className="transaction-recap">
+          <div style={{
+            position: 'fixed',
+            bottom: 'calc(60px + env(safe-area-inset-bottom, 0px))',
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+            padding: '10px 16px 12px',
+            background: 'linear-gradient(180deg,rgba(13,18,29,0.97),rgba(13,18,29,1))',
+            borderTop: '1px solid rgba(255,255,255,0.07)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, padding: '0 4px' }}>
               <div>
-                <strong>{formatCurrency(total)} XAF <small style={{ fontSize: 10, fontWeight: 600, color: type === 'depot' ? '#22c55e' : 'var(--dim)', marginLeft: 6 }}>({type === 'depot' ? 'Gratuit' : `${formatCurrency(fees)} XAF`})</small></strong>
+                <strong style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>{formatCurrency(total)} XAF</strong>
+                <small style={{ display: 'block', fontSize: 11, fontWeight: 600, color: type === 'depot' ? '#22c55e' : '#94a3b8', marginTop: 2 }}>
+                  {type === 'depot' ? 'Gratuit' : `${formatCurrency(fees)} XAF`}
+                </small>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <span>Estimation</span>
-                <p>Instantané</p>
+                <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#64748b' }}>Estimation</span>
+                <p style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', marginTop: 2 }}>Instantané</p>
               </div>
             </div>
             <button
               className="transaction-confirm"
               onClick={handleSubmit}
+              style={{ width: '100%' }}
             >
               {type === 'depot' ? 'Confirmer le dépôt' : 'Valider le retrait'}
             </button>

@@ -4797,7 +4797,7 @@ function App() {
                         key={preset}
                         onClick={() => setMerchantAmount(String(preset))}
                         style={{
-                          flexShrink: 0, padding: '8px 14px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                          flexShrink: 0, padding: '8px 14px', borderRadius: 10, cursor: 'pointer',
                           fontSize: 12, fontWeight: 700, fontFamily: "'Montserrat',sans-serif",
                           background: merchantAmount === String(preset) ? 'rgba(34,197,94,.18)' : 'rgba(255,255,255,.04)',
                           color: merchantAmount === String(preset) ? '#34d399' : 'rgba(255,255,255,.45)',
@@ -4893,7 +4893,7 @@ function App() {
                         key={preset}
                         onClick={() => setSavingsCustomAmount(String(preset))}
                         style={{
-                          flexShrink: 0, padding: '8px 16px', borderRadius: 12, border: 'none', cursor: 'pointer',
+                          flexShrink: 0, padding: '8px 16px', borderRadius: 12, cursor: 'pointer',
                           fontSize: 12, fontWeight: 700, fontFamily: "'Montserrat',sans-serif",
                           background: String(savingsCustomAmount) === String(preset) ? 'rgba(52,211,153,.18)' : 'rgba(255,255,255,.04)',
                           color: String(savingsCustomAmount) === String(preset) ? '#34d399' : 'rgba(255,255,255,.55)',

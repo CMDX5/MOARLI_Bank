@@ -113,6 +113,7 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const lastAutoReplyRef = useRef<string>('');
   const unreadCountRef = useRef(0);
   const localIdCounter = useRef(0);
@@ -271,6 +272,11 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
 
     // LLM/VLM-powered reply via API
     setIsTyping(true);
+    setSending(true);
+
+    // Create abort controller for stop button
+    const abortCtrl = new AbortController();
+    abortControllerRef.current = abortCtrl;
 
     // Safety timeout: if no Firestore response arrives within 12s, use local fallback
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -295,16 +301,21 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+        signal: abortCtrl.signal,
       });
 
       if (!res.ok) {
         console.warn('[ChatSupport] API error', res.status, '— using fallback reply');
-        // API returned error (401, 403, 500, etc.) — use local fallback
         if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         triggerFallbackReply(msgText);
         return;
       }
-    } catch (err) {
+    } catch (err: unknown) {
+      // If aborted by user (stop button), don't show fallback
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        console.log('[ChatSupport] Request aborted by user');
+        return;
+      }
       console.error('[ChatSupport] API network error, using fallback:', err);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       triggerFallbackReply(msgText);
@@ -318,6 +329,18 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
     e.preventDefault();
     sendMessage(newMessage, selectedImageBase64);
   }, [newMessage, sendMessage, selectedImageBase64]);
+
+  const handleStopGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    setIsTyping(false);
+    setSending(false);
+  }, []);
 
   const handleQuickReply = useCallback((text: string) => {
     sendMessage(text);
@@ -776,30 +799,53 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
               color: '#fff', fontSize: 14, outline: 'none', minHeight: 44,
             }}
           />
-          <button
-            type="submit"
-            disabled={sending || (!newMessage.trim() && !selectedImageBase64)}
-            style={{
-              width: 44, height: 44, borderRadius: 14, border: 'none', flexShrink: 0,
-              background: sending || (!newMessage.trim() && !selectedImageBase64)
-                ? 'rgba(59,130,246,0.2)'
-                : 'linear-gradient(135deg, #3b82f6, #2563eb)',
-              color: '#fff', cursor: sending || (!newMessage.trim() && !selectedImageBase64) ? 'not-allowed' : 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: sending || (!newMessage.trim() && !selectedImageBase64) ? 'none' : '0 4px 14px rgba(59,130,246,0.4)',
-              transition: 'all 0.2s',
-            }}
-            aria-label="Envoyer"
-          >
-            {sending ? (
-              <span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} />
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <line x1="22" y1="2" x2="11" y2="13" />
-                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+          {isTyping ? (
+            /* STOP button — replaces send during bot generation */
+            <button
+              type="button"
+              onClick={handleStopGeneration}
+              style={{
+                width: 44, height: 44, borderRadius: 14, flexShrink: 0,
+                background: 'rgba(239,68,68,0.15)',
+                border: '1px solid rgba(239,68,68,0.3)',
+                color: '#ef4444', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 4px 14px rgba(239,68,68,0.2)',
+                transition: 'all 0.2s',
+                animation: 'stopPulse 1.5s ease-in-out infinite',
+              }}
+              aria-label="Arrêter la génération"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="6" width="12" height="12" rx="2" />
               </svg>
-            )}
-          </button>
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={sending || (!newMessage.trim() && !selectedImageBase64)}
+              style={{
+                width: 44, height: 44, borderRadius: 14, border: 'none', flexShrink: 0,
+                background: sending || (!newMessage.trim() && !selectedImageBase64)
+                  ? 'rgba(59,130,246,0.2)'
+                  : 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                color: '#fff', cursor: sending || (!newMessage.trim() && !selectedImageBase64) ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: sending || (!newMessage.trim() && !selectedImageBase64) ? 'none' : '0 4px 14px rgba(59,130,246,0.4)',
+                transition: 'all 0.2s',
+              }}
+              aria-label="Envoyer"
+            >
+              {sending ? (
+                <span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} />
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+              )}
+            </button>
+          )}
         </form>
       </div>
 
@@ -808,6 +854,10 @@ export default function ChatSupportView({ authUid, onBack, showToast, getAuthHea
         @keyframes typingBounce {
           0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
           30% { transform: translateY(-6px); opacity: 1; }
+        }
+        @keyframes stopPulse {
+          0%, 100% { box-shadow: 0 4px 14px rgba(239,68,68,0.2); }
+          50% { box-shadow: 0 4px 20px rgba(239,68,68,0.4); }
         }
       `}</style>
     </div>

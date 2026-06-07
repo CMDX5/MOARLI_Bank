@@ -4598,7 +4598,7 @@ function App() {
                 </div>
 
                 <section className="services-section">
-                  <div className="services-kicker">Quotidien</div>
+                  <div className="services-kicker" style={{ color: "#D4A437" }}>Quotidien</div>
                   <div className="services-grid">
                     {serviceTiles.map((tile) => (
                       <button
@@ -4645,8 +4645,8 @@ function App() {
 
                 <section className="services-section" style={{ marginTop: 34 }}>
                   <div className="services-section-head">
-                    <div className="services-kicker">Finance & Investissement</div>
-                    <span className="services-premium-badge">PREMIUM</span>
+                    <div className="services-kicker" style={{ color: "#D4A437" }}>Finance & Investissement</div>
+                    <span className="services-premium-badge" style={{ background: "rgba(212,164,55,.1)", color: "#D4A437", borderColor: "rgba(212,164,55,.2)" }}>PREMIUM</span>
                   </div>
 
                   <div className="services-grid">

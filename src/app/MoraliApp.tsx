@@ -4646,7 +4646,7 @@ function App() {
                 <section className="services-section" style={{ marginTop: 34 }}>
                   <div className="services-section-head">
                     <div className="services-kicker" style={{ color: "#D4A437" }}>Finance & Investissement</div>
-                    <span className="services-premium-badge" style={{ background: "rgba(212,164,55,.1)", color: "#D4A437", borderColor: "rgba(212,164,55,.2)" }}>PREMIUM</span>
+                    <span className="services-premium-badge">PREMIUM</span>
                   </div>
 
                   <div className="services-grid">

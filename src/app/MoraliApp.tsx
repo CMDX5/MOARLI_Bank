@@ -4302,10 +4302,14 @@ function App() {
   };
 
   const closeTransactionPin = () => {
+    // Si la transaction a réussi, fermer tout et retourner au dashboard
+    if (transactionSuccess) {
+      finishTransactionFlow();
+      return;
+    }
     setTransactionPinOpen(false);
     setTransactionPin("");
     setTransactionProcessing(false);
-    setTransactionSuccess(false);
     setTransactionPinVerifying(false);
     setPendingPinAction(null);
   };
@@ -8218,7 +8222,7 @@ function App() {
                   <div className="transaction-flow-title">Code PIN</div>
                   <div className="transaction-flow-sub">Saisissez votre code secret à 4 chiffres pour sécuriser l’opération.</div>
                 </div>
-                {!transactionProcessing && !transactionSuccess && (
+                {!transactionProcessing && (
                   <button className="transaction-flow-close" onClick={closeTransactionPin} aria-label="Fermer">
                     <span className="close-x">×</span>
                   </button>

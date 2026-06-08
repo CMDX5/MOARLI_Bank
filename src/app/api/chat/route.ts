@@ -2,45 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/admin-firestore";
 import { rateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
-import ZAI from "z-ai-web-dev-sdk";
-import fs from "fs";
-import path from "path";
-
-// Ensure .z-ai-config exists for z-ai-web-dev-sdk (required at runtime)
-// The SDK reads from: process.cwd()/.z-ai-config → os.homedir()/.z-ai-config → /etc/.z-ai-config
-// On Vercel (read-only filesystem): we write to /tmp and redirect HOME so os.homedir() resolves there.
-// On local dev: writes to process.cwd() normally.
-(function ensureZAIConfig() {
-  const config = {
-    baseUrl: process.env.ZAI_BASE_URL || "https://internal-api.z.ai/v1",
-    apiKey: process.env.ZAI_API_KEY || "Z.ai",
-    chatId: process.env.ZAI_CHAT_ID || "chat-01dfd386-2ed2-451a-88a6-af7660da4c2b",
-    userId: process.env.ZAI_USER_ID || "d524f435-033c-468e-80ec-904f9cf4c90a",
-    token: process.env.ZAI_TOKEN || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiZDUyNGY0MzUtMDMzYy00NjhlLTgwZWMtOTA0ZjljZjRjOTBhIiwiY2hhdF9pZCI6ImNoYXQtMDFkZmQzODYtMmVkMi00NTFhLTg4YTYtYWY3NjYwZGE0YzJiIiwicGxhdGZvcm0iOiJ6YWkifQ.RCNwzYJkfsWGdTN_KlU_iBEI9fBLamxB3Hp0iut7_gA",
-  };
-  const configJson = JSON.stringify(config);
-
-  // On Vercel serverless, cwd is read-only — write to /tmp and redirect HOME
-  const tmpDir = "/tmp";
-  const tmpPath = path.join(tmpDir, ".z-ai-config");
-  try {
-    fs.writeFileSync(tmpPath, configJson);
-  } catch {
-    // /tmp not available (unlikely)
-  }
-  // Force HOME so os.homedir() returns /tmp → SDK finds config
-  process.env.HOME = tmpDir;
-
-  // Also try cwd for local dev
-  const cwdPath = path.join(process.cwd(), ".z-ai-config");
-  try {
-    if (!fs.existsSync(cwdPath)) {
-      fs.writeFileSync(cwdPath, configJson);
-    }
-  } catch {
-    // cwd read-only on Vercel, ignore
-  }
-})();
+// Z.ai config — direct HTTP (pas de SDK pour éviter les problèmes de filesystem sur Vercel)
+const ZAI_BASE_URL = process.env.ZAI_BASE_URL || "https://internal-api.z.ai/v1";
+const ZAI_TOKEN = process.env.ZAI_TOKEN || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiZDUyNGY0MzUtMDMzYy00NjhlLTgwZWMtOTA0ZjljZjRjOTBhIiwiY2hhdF9pZCI6ImNoYXQtMDFkZmQzODYtMmVkMi00NTFhLTg4YTYtYWY3NjYwZGE0YzJiIiwicGxhdGZvcm0iOiJ6YWkifQ.RCNwzYJkfsWGdTN_KlU_iBEI9fBLamxB3Hp0iut7_gA";
 
 /**
  * Chat Support API — IDOR-PROTECTED with LLM/VLM-powered responses
@@ -99,20 +63,33 @@ async function getLLMResponse(uid: string, userMessage: string): Promise<string>
   const history = getConversationHistory(uid);
 
   try {
-    const zai = await ZAI.create();
-
     const messages = [
-      { role: "assistant" as const, content: SYSTEM_PROMPT },
+      { role: "system", content: SYSTEM_PROMPT },
       ...history,
-      { role: "user" as const, content: userMessage },
+      { role: "user", content: userMessage },
     ];
 
-    const completion = await zai.chat.completions.create({
-      messages: messages as any,
-      thinking: { type: "disabled" },
+    const res = await fetch(`${ZAI_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${ZAI_TOKEN}`,
+      },
+      body: JSON.stringify({
+        model: "glm-4-flash",
+        messages,
+        max_tokens: 300,
+        temperature: 0.7,
+      }),
     });
 
-    const response = completion.choices[0]?.message?.content;
+    if (!res.ok) {
+      console.error("[chat] Z.ai HTTP error:", res.status, await res.text());
+      throw new Error(`Z.ai error ${res.status}`);
+    }
+
+    const data = await res.json();
+    const response = data.choices?.[0]?.message?.content;
 
     if (!response || response.trim().length === 0) {
       return "Je vous remercie pour votre message. Comment puis-je vous aider avec vos services bancaires MOARLI ?";
@@ -121,9 +98,8 @@ async function getLLMResponse(uid: string, userMessage: string): Promise<string>
     return response.trim().slice(0, 500);
   } catch (err) {
     console.error("[chat] LLM error:", err);
-    // Try to provide a meaningful response even if LLM fails
     const lower = userMessage.toLowerCase();
-    if (["bonjour", "bonsoir", "salut", "coucou", "bonjour!", "bonsoir!", "hello", "hi"].some(g => lower === g || lower.startsWith(g))) {
+    if (["bonjour", "bonsoir", "salut", "coucou", "hello", "hi"].some(g => lower === g || lower.startsWith(g))) {
       return "Bonjour ! Bienvenue sur MOARLI Bank. Comment puis-je vous aider aujourd'hui ?";
     }
     if (lower.includes("merci")) {
@@ -138,31 +114,37 @@ async function getLLMResponse(uid: string, userMessage: string): Promise<string>
 
 async function getVLMResponse(uid: string, userMessage: string, imageUrl: string): Promise<string> {
   try {
-    const zai = await ZAI.create();
-
     const prompt = userMessage && userMessage !== "📷 Image"
       ? userMessage
       : "Analysez cette image envoyée dans le chat de support MOARLI Bank et aidez l'utilisateur.";
 
-    const response = await zai.chat.completions.createVision({
-      model: "glm-4.6v",
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: IMAGE_SYSTEM_PROMPT },
-            { type: "text", text: prompt },
-            {
-              type: "image_url",
-              image_url: { url: imageUrl },
-            },
-          ],
-        },
-      ],
-      thinking: { type: "disabled" },
-    } as any);
+    const res = await fetch(`${ZAI_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${ZAI_TOKEN}`,
+      },
+      body: JSON.stringify({
+        model: "glm-4v-flash",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: IMAGE_SYSTEM_PROMPT },
+              { type: "text", text: prompt },
+              { type: "image_url", image_url: { url: imageUrl } },
+            ],
+          },
+        ],
+        max_tokens: 300,
+        temperature: 0.7,
+      }),
+    });
 
-    const reply = response.choices[0]?.message?.content;
+    if (!res.ok) throw new Error(`VLM error ${res.status}`);
+
+    const data = await res.json();
+    const reply = data.choices?.[0]?.message?.content;
 
     if (!reply || reply.trim().length === 0) {
       return "J'ai bien reçu votre image. Pourriez-vous me préciser ce que vous souhaitez concernant cette image ? Je suis là pour vous aider avec vos services MOARLI.";

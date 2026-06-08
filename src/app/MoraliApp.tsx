@@ -7648,7 +7648,7 @@ function App() {
                 </div>
                 <button className="bc-close" onClick={closeReceiptsModal} aria-label="Fermer">&times;</button>
               </div>
-              <div className="card-manage-stack">
+              <div className="card-manage-stack" style={{ maxHeight: "35dvh", overflowY: "auto", scrollbarWidth: "none" }}>
                 {(liveTransactions.length ? liveTransactions : dashboardData.transactions).map((tx, index) => (
                   <div key={`${tx.name}-${tx.date}-${index}`} className="card-setting-row">
                     <div style={{ flex: 1 }}>

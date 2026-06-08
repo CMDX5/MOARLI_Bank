@@ -2636,28 +2636,105 @@ function App() {
     }
   };
 
-  // ── Face ID / WebAuthn prompt ──
+  // ── Face ID / WebAuthn — Système complet ──
+
+  // Étape 1 : Enregistrement (lors de l'activation dans les paramètres)
+  const registerBiometric = async (): Promise<boolean> => {
+    try {
+      if (!window.PublicKeyCredential) return false;
+      const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      if (!available) return false;
+
+      // 1. Obtenir un challenge serveur
+      const challengeRes = await fetch("/api/biometric/challenge", {
+        method: "POST",
+        headers: await getAuthHeaders(),
+      });
+      if (!challengeRes.ok) return false;
+      const { challenge: challengeB64 } = await challengeRes.json();
+      const challengeBytes = Uint8Array.from(atob(challengeB64.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+
+      // 2. Créer le credential — le téléphone scanne le visage ici
+      const userId = authUid ? new TextEncoder().encode(authUid.slice(0, 16)) : new Uint8Array(16);
+      const credential = await navigator.credentials.create({
+        publicKey: {
+          challenge: challengeBytes,
+          rp: { id: window.location.hostname, name: "Morali Bank" },
+          user: { id: userId, name: authUid || "morali-user", displayName: "Morali" },
+          pubKeyCredParams: [
+            { type: "public-key", alg: -7 },   // ES256
+            { type: "public-key", alg: -257 },  // RS256
+          ],
+          authenticatorSelection: {
+            authenticatorAttachment: "platform",
+            userVerification: "required",
+            residentKey: "preferred",
+          },
+          timeout: 60000,
+        },
+      }) as PublicKeyCredential | null;
+
+      if (!credential) return false;
+
+      // 3. Sauvegarder le credentialId côté serveur
+      const credentialId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)))
+        .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+
+      const saveRes = await fetch("/api/biometric/register", {
+        method: "POST",
+        headers: { ...(await getAuthHeaders()), "Content-Type": "application/json" },
+        body: JSON.stringify({ credentialId }),
+      });
+
+      return saveRes.ok;
+    } catch (err: unknown) {
+      console.error("Biometric register error:", err);
+      return false;
+    }
+  };
+
+  // Étape 2 : Vérification (lors de chaque transaction)
   const promptBiometric = async (): Promise<boolean> => {
     try {
       if (!window.PublicKeyCredential) return false;
       const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
       if (!available) return false;
-      // Create a challenge for Face ID verification
-      const challenge = new Uint8Array(32);
-      crypto.getRandomValues(challenge);
-      const credential = await navigator.credentials.create({
-        publicKey: {
-          challenge,
-          rp: { name: "Morali Pay" },
-          user: { id: new Uint8Array(16), name: "morali-user", displayName: "Utilisateur Morali" },
-          pubKeyCredParams: [{ type: "public-key", alg: -7 }],
-          authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
-          timeout: 30000,
-        },
+
+      // 1. Obtenir un challenge serveur (one-time use)
+      const challengeRes = await fetch("/api/biometric/challenge", {
+        method: "POST",
+        headers: await getAuthHeaders(),
       });
-      return !!credential;
+      if (!challengeRes.ok) return false;
+      const { challenge: challengeB64 } = await challengeRes.json();
+      const challengeBytes = Uint8Array.from(atob(challengeB64.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+
+      // 2. Demander la vérification — le téléphone scanne le visage
+      const assertion = await navigator.credentials.get({
+        publicKey: {
+          challenge: challengeBytes,
+          userVerification: "required",
+          timeout: 60000,
+          // Pas de allowCredentials → le téléphone choisit automatiquement
+          // le bon credential enregistré pour ce site
+        },
+      }) as PublicKeyCredential | null;
+
+      if (!assertion) return false;
+
+      // 3. Vérifier côté serveur que le credentialId correspond
+      const credentialId = btoa(String.fromCharCode(...new Uint8Array(assertion.rawId)))
+        .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+
+      const verifyRes = await fetch("/api/biometric/verify", {
+        method: "POST",
+        headers: { ...(await getAuthHeaders()), "Content-Type": "application/json" },
+        body: JSON.stringify({ credentialId }),
+      });
+      const data = await verifyRes.json();
+      return data.valid === true;
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === "NotAllowedError") return false;
+      console.error("Biometric verify error:", err);
       return false;
     }
   };
@@ -2666,30 +2743,25 @@ function App() {
   const handleFaceIdToggle = async () => {
     if (!platformAuthSupported) return;
     if (securitySettings.faceId) {
-      // Désactiver directement
-      const updated = { ...securitySettings, faceId: false };
-      setSecuritySettings(updated);
-      if (authUid) {
-        try {
-          await setDoc(doc(firebaseDb, "users", authUid, "meta", "securitySettings"), { ...updated, updatedAt: serverTimestamp() }, { merge: true });
-        } catch { localStorage.setItem("morali_security_settings", JSON.stringify(updated)); }
-      }
+      // Désactiver — supprimer le credential côté serveur
+      showToast("Désactivation…");
+      try {
+        await fetch("/api/biometric/register", {
+          method: "DELETE",
+          headers: await getAuthHeaders(),
+        });
+      } catch { /* silent */ }
+      setSecuritySettings((c) => ({ ...c, faceId: false }));
       showToast("Face ID désactivé");
     } else {
-      // Activer — demander l'authentification d'abord
-      showToast("Authentification en cours…");
-      const ok = await promptBiometric();
+      // Activer — enregistrer le vrai credential biométrique
+      showToast("Scannez votre visage pour activer…");
+      const ok = await registerBiometric();
       if (ok) {
-        const updated = { ...securitySettings, faceId: true };
-        setSecuritySettings(updated);
-        if (authUid) {
-          try {
-            await setDoc(doc(firebaseDb, "users", authUid, "meta", "securitySettings"), { ...updated, updatedAt: serverTimestamp() }, { merge: true });
-          } catch { localStorage.setItem("morali_security_settings", JSON.stringify(updated)); }
-        }
-        showToast("Face ID activé ✓");
+        setSecuritySettings((c) => ({ ...c, faceId: true }));
+        showToast("Face ID activé ✓ Votre visage a été enregistré");
       } else {
-        showToast("Authentification échouée ou annulée");
+        showToast("Enregistrement annulé ou échoué");
       }
     }
   };

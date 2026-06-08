@@ -6645,22 +6645,23 @@ function App() {
                   </div>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <p className="tab-kicker gold-text">Envoyer à un contact</p>
-                  <div className="contacts-scroll">
-                    <div className="contact-item add-new" onClick={addNewContact}>
-                      <div className="add-circle">
-                        <AppIcon name="request" size={20} stroke="currentColor" />
-                      </div>
-                      <span className="contact-name gold-text">Nouveau</span>
+                {/* ── Contacts favoris en ligne horizontale avec +(Nouveau) ── */}
+                <div className="contacts-scroll">
+                  <div className="contact-item add-new" onClick={addNewContact}>
+                    <div className="add-circle">
+                      <span style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}>+</span>
                     </div>
-                    {paymentContacts.map((contact) => (
-                      <div key={contact.name} className="contact-item" onClick={() => { openPaymentsTab(); setServicesQuery(""); closeContactModal(); }}>
-                        <div className={`contact-circle ${contact.tone}`}>{contact.name[0]}</div>
-                        <span className="contact-name">{contact.name}</span>
-                      </div>
-                    ))}
+                    <span className="contact-name gold-text">Nouveau</span>
                   </div>
+                  {paymentContacts.map((contact) => (
+                    <div key={contact.name} className="contact-item" onClick={() => {
+                      transferInitialQueryRef.current = contact.name;
+                      setTransferOpen(true);
+                    }}>
+                      <div className={`contact-circle ${contact.tone}`}>{contact.name[0].toUpperCase()}</div>
+                      <span className="contact-name">{contact.name}</span>
+                    </div>
+                  ))}
                 </div>
 
                 {contactModalOpen && (
@@ -6726,14 +6727,14 @@ function App() {
                       </button>
                       <div className="qr-glass-card">
                         <div className="qr-header">
-                          <span className="qr-label">MON QR CODE MORALI</span>
+                          <span className="qr-label">DEMander un paiement</span>
                           <div className="qr-status-dot" />
                         </div>
                         <div className="qr-main">
                           <div className="qr-frame">
                             <QRCodeSVG
-                              value={JSON.stringify({ app: "MoraliBank", userId: bankingIdentity.id || `@${firebaseAuth.currentUser?.email?.split("@")[0]}`, name: dashboardName, ts: Date.now() })}
-                              size={180}
+                              value={JSON.stringify({ app: "MoraliBank", userId: bankingIdentity.id || `@${firebaseAuth.currentUser?.email?.split("@")[0]}`, name: dashboardName, ts: Date.now(), token: crypto.randomUUID() })}
+                              size={200}
                               bgColor="#ffffff"
                               fgColor="#0d1b3e"
                               level="H"
@@ -6744,22 +6745,23 @@ function App() {
                         </div>
                         <div className="qr-footer">
                           <span className="user-id">{bankingIdentity.id || `@${firebaseAuth.currentUser?.email?.split("@")[0]}`}</span>
-                          <p className="qr-instruction">Scanner pour me payer instantanément</p>
+                          <p className="qr-instruction">Scannez ce code pour me payer</p>
+                          <p style={{ fontSize: 10, color: "#64748b", marginTop: 4, textAlign: "center" }}>QR unique — regénéré à chaque ouverture</p>
                         </div>
                       </div>
                       <div className="share-actions">
                         <button className="btn-share" onClick={() => {
-                          const qrPayload = JSON.stringify({ app: "MoraliBank", userId: bankingIdentity.id || `@${firebaseAuth.currentUser?.email?.split("@")[0]}`, name: dashboardName });
-                          navigator.clipboard.writeText(qrPayload).then(() => showToast("Lien copié !")).catch(() => showToast("Erreur de copie"));
+                          const qrPayload = JSON.stringify({ app: "MoraliBank", userId: bankingIdentity.id || `@${firebaseAuth.currentUser?.email?.split("@")[0]}`, name: dashboardName, ts: Date.now(), token: crypto.randomUUID() });
+                          navigator.clipboard.writeText(qrPayload).then(() => showToast("Lien de paiement copié !")).catch(() => showToast("Erreur de copie"));
                         }}>Copier le lien</button>
                         <button className="btn-share secondary" onClick={async () => {
-                          const qrPayload = JSON.stringify({ app: "MoraliBank", userId: bankingIdentity.id || `@${firebaseAuth.currentUser?.email?.split("@")[0]}`, name: dashboardName });
+                          const qrPayload = JSON.stringify({ app: "MoraliBank", userId: bankingIdentity.id || `@${firebaseAuth.currentUser?.email?.split("@")[0]}`, name: dashboardName, ts: Date.now(), token: crypto.randomUUID() });
                           if (navigator.share) {
                             try {
-                              await navigator.share({ title: "Paiement Morali Pay", text: `Paiement via Morali Pay pour ${dashboardName}`, url: qrPayload });
+                              await navigator.share({ title: "Demande de paiement — Morali Pay", text: `Paiement via Morali Pay pour ${dashboardName}`, url: qrPayload });
                             } catch {}
                           } else {
-                            navigator.clipboard.writeText(qrPayload).then(() => showToast("Lien copié !")).catch(() => showToast("Erreur de copie"));
+                            navigator.clipboard.writeText(qrPayload).then(() => showToast("Lien de paiement copié !")).catch(() => showToast("Erreur de copie"));
                           }
                         }}>Partager</button>
                       </div>

@@ -10,7 +10,7 @@ import { FieldValue } from "firebase-admin/firestore";
  */
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
-  if (auth.error) return auth.error;
+  if (auth.error || !auth.uid) return auth.error ?? NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   const uid = auth.uid;
 
   try {
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   const auth = await requireAuth(req);
-  if (auth.error) return auth.error;
+  if (auth.error || !auth.uid) return auth.error ?? NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   const uid = auth.uid;
 
   try {

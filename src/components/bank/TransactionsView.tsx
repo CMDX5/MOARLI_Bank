@@ -867,7 +867,7 @@ export default function TransactionsView({
 
           <div style={{
             position: 'fixed',
-            bottom: 'calc(150px + env(safe-area-inset-bottom, 0px))',
+            bottom: 'calc(180px + env(safe-area-inset-bottom, 0px))',
             left: 0,
             right: 0,
             zIndex: 9999,

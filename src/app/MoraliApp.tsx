@@ -7631,7 +7631,7 @@ function App() {
                   </div>
                 ))}
               </div>
-              <button className="bc-btn-full" style={{ height: 58, borderRadius: 18 }} onClick={closeReceiptsModal}>Fermer</button>
+              <button className="bc-btn-full btn-profile-58" onClick={closeReceiptsModal}>Fermer</button>
             </div>
           </div>
         )}
@@ -8201,8 +8201,8 @@ function App() {
 
               {passwordStage === "menu" ? (
                 <>
-                  <button className="btn-save-elite" style={{ marginTop: 14 }} onClick={saveSecuritySettings}>Enregistrer les changements</button>
-                  <button style={{ width: "100%", height: 58, border: "1px solid rgba(59,130,246,.2)", borderRadius: 18, background: "rgba(59,130,246,.08)", color: "#60a5fa", fontSize: 15, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 10 }} onClick={() => setPasswordStage("change")}>
+                  <button className="btn-save-elite btn-profile-58" style={{ marginTop: 14 }} onClick={saveSecuritySettings}>Enregistrer les changements</button>
+                  <button className="btn-profile-58" style={{ width: "100%", border: "1px solid rgba(59,130,246,.2)", background: "rgba(59,130,246,.08)", color: "#60a5fa", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 10 }} onClick={() => setPasswordStage("change")}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
                     Modifier le mot de passe
                   </button>
@@ -8243,10 +8243,10 @@ function App() {
                   </div>
 
                   <button
-                    className="bc-btn-full"
+                    className="bc-btn-full btn-profile-58"
                     onClick={handleChangePassword}
                     disabled={!changePwOld.trim() || !changePwNew.trim() || !changePwConfirm.trim() || changePwNew.length < 8 || changePwNew !== changePwConfirm || changePwLoading}
-                    style={!changePwOld.trim() || !changePwNew.trim() || !changePwConfirm.trim() || changePwNew.length < 8 || changePwNew !== changePwConfirm || changePwLoading ? { opacity: .4, height: 58, borderRadius: 18 } : { height: 58, borderRadius: 18 }}
+                    style={!changePwOld.trim() || !changePwNew.trim() || !changePwConfirm.trim() || changePwNew.length < 8 || changePwNew !== changePwConfirm || changePwLoading ? { opacity: .4 } : {}}
                   >
                     {changePwLoading ? <div className="btn-loader" /> : "Mettre à jour le mot de passe"}
                   </button>
@@ -8315,7 +8315,7 @@ function App() {
                       </div>
                     </div>
                   ))}
-                  <button className="bc-btn-full" style={{ height: 58, borderRadius: 18 }} onClick={disconnectOtherDevices}>Déconnecter tous les autres appareils</button>
+                  <button className="bc-btn-full btn-profile-58" onClick={disconnectOtherDevices}>Déconnecter tous les autres appareils</button>
                 </div>
               )}
 

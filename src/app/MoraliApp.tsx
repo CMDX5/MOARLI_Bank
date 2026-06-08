@@ -1428,7 +1428,7 @@ function App() {
           const d = secSnap.data();
           setSecuritySettings((prev) => ({
             // biometrics removed — only faceId used now
-            faceId: d.faceId !== undefined ? d.faceId : prev.faceId,
+            faceId: typeof d.faceId === 'boolean' ? d.faceId : prev.faceId,
             deviceAlerts: d.deviceAlerts !== undefined ? d.deviceAlerts : prev.deviceAlerts,
             transactionValidation: d.transactionValidation !== undefined ? d.transactionValidation : prev.transactionValidation,
           }));
@@ -4316,9 +4316,9 @@ function App() {
     return true;
   };
 
-  const openTransactionChoice = () => {
+  const openTransactionChoice = async () => {
     if (!validateTransactionFields()) return;
-    openTransactionPinDirect();
+    await openTransactionPinDirect();
   };
 
   const closeTransactionChoice = () => {
@@ -4330,13 +4330,21 @@ function App() {
     if (securitySettings.faceId && platformAuthSupported) {
       const ok = await promptBiometric();
       if (ok) {
-        setTransactionPinOpen(true);
-        setTransactionPin("OK_BIOMETRIC");
-        setTransactionProcessing(false);
-        setTransactionSuccess(false);
-        setTransactionPinVerifying(false);
-        // Auto-submit after short delay
-        setTimeout(() => executeTransaction(), 300);
+        // Biométrie réussie — exécuter directement sans ouvrir le modal PIN
+        setTransactionProcessing(true);
+        if (pendingPinAction) {
+          const action = pendingPinAction;
+          setPendingPinAction(null);
+          if (action.type === "merchant") {
+            executeServiceDebit(action.amount, "Paiement Marchand", "qr");
+          } else if (action.type === "savings_deposit") {
+            executeSavingsTransfer("deposit");
+          } else if (action.type === "savings_withdraw") {
+            executeSavingsTransfer("withdraw");
+          }
+        } else {
+          await executeTransaction();
+        }
         return;
       }
       // Si biométrie échoue, fallback sur PIN
@@ -4373,9 +4381,9 @@ function App() {
   }, [transactionPinOpen, transactionProcessing, transactionSuccess]);
 
   // Destination is always "cash" (airtime/credit d'appel removed)
-  const openTransactionPinDirect = () => {
+  const openTransactionPinDirect = async () => {
     setTransactionChoiceOpen(false);
-    openTransactionPin();
+    await openTransactionPin();
   };
 
   const executeTransaction = async () => {
@@ -4949,7 +4957,7 @@ function App() {
                     </div>
                   )}
 
-                  <button className="hub-cta" style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)', boxShadow: '0 8px 24px rgba(34,197,94,.25)' }} onClick={() => { const amt = Number(merchantAmount || 0); if (amt <= 0) { showToast("Entrez un montant"); return; } setPendingPinAction({ type: "merchant", amount: amt }); openTransactionPin(); }}>
+                  <button className="hub-cta" style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)', boxShadow: '0 8px 24px rgba(34,197,94,.25)' }} onClick={() => { const amt = Number(merchantAmount || 0); if (amt <= 0) { showToast("Entrez un montant"); return; } setPendingPinAction({ type: "merchant", amount: amt }); openTransactionPin().catch(console.error); }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                       Confirmer le paiement
@@ -5054,8 +5062,8 @@ function App() {
                   </div>
 
                   <div className="savings-actions">
-                    <button className="savings-btn" onClick={() => { const amt = Number(savingsCustomAmount || 0); if (amt <= 0) { showToast("Entrez un montant"); return; } setPendingPinAction({ type: "savings_withdraw", amount: amt }); openTransactionPin(); }}>Retirer</button>
-                    <button className="savings-btn primary" onClick={() => { const amt = Number(savingsCustomAmount || 0); if (amt <= 0) { showToast("Entrez un montant"); return; } setPendingPinAction({ type: "savings_deposit", amount: amt }); openTransactionPin(); }}>Déposer +</button>
+                    <button className="savings-btn" onClick={() => { const amt = Number(savingsCustomAmount || 0); if (amt <= 0) { showToast("Entrez un montant"); return; } setPendingPinAction({ type: "savings_withdraw", amount: amt }); openTransactionPin().catch(console.error); }}>Retirer</button>
+                    <button className="savings-btn primary" onClick={() => { const amt = Number(savingsCustomAmount || 0); if (amt <= 0) { showToast("Entrez un montant"); return; } setPendingPinAction({ type: "savings_deposit", amount: amt }); openTransactionPin().catch(console.error); }}>Déposer +</button>
                   </div>
 
                   {/* Savings tips */}

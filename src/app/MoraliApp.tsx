@@ -8315,9 +8315,10 @@ function App() {
                       </div>
                     </div>
                   ))}
-                  <button className="bc-btn-full btn-profile-58" onClick={disconnectOtherDevices}>Déconnecter tous les autres appareils</button>
                 </div>
               )}
+
+              <button className="bc-btn-full btn-profile-58" style={{ marginTop: 16 }} onClick={disconnectOtherDevices}>Déconnecter tous les autres appareils</button>
 
               <button className={`btn-save-elite ${privacySaveState === "saving" ? "saving ripple" : privacySaveState === "saved" ? "saved" : ""}`} onClick={savePrivacySettings} disabled={privacySaveState !== "idle"}>
                 {privacySaveState === "saving" ? "Enregistrement..." : privacySaveState === "saved" ? "Enregistré" : "Enregistrer la confidentialité"}

@@ -879,7 +879,7 @@ export default function TransactionsView({
               <div>
                 <strong style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>{formatCurrency(total)} XAF</strong>
                 <small style={{ display: 'block', fontSize: 11, fontWeight: 600, color: type === 'depot' ? '#22c55e' : '#94a3b8', marginTop: 2 }}>
-                  {type === 'depot' ? 'Gratuit' : `${formatCurrency(fees)} XAF`}
+                  {type === 'depot' ? 'Gratuit' : `Frais: ${formatCurrency(fees)} XAF`}
                 </small>
               </div>
               <div style={{ textAlign: 'right' }}>

@@ -869,12 +869,15 @@ export default function TransactionsView({
           <div style={{
             position: 'fixed',
             bottom: 'calc(180px + env(safe-area-inset-bottom, 0px))',
-            left: 0,
-            right: 0,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '100%',
+            maxWidth: 430,
             zIndex: 9999,
             padding: '10px 16px 12px',
             background: 'linear-gradient(180deg,rgba(13,18,29,0.97),rgba(13,18,29,1))',
             borderTop: '1px solid rgba(255,255,255,0.07)',
+            pointerEvents: 'auto',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, padding: '0 4px' }}>
               <div>

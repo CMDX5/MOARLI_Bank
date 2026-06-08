@@ -11,7 +11,7 @@ export const viewport: Viewport = {
   // visually impaired users from enlarging content. The app layout
   // handles its own overflow/scroll — user zoom is safe to allow.
   viewportFit: "cover",
-  interactiveWidget: "resizes-content",
+  interactiveWidget: "resizes-visual",
 };
 
 export const metadata: Metadata = {

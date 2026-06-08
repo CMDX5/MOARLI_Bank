@@ -7219,12 +7219,12 @@ function App() {
             </div>
 
             {kycFirestoreStatus === "rejected" ? (
-              <button className="btn-save-elite" onClick={openKycModal}>Ressoumettre mes documents</button>
+              <button className="btn-save-elite" style={{ marginTop: 14, height: 58, fontSize: 17, fontWeight: 800 }} onClick={openKycModal}>Ressoumettre mes documents</button>
             ) : kycFirestoreStatus !== "approved" && kycFirestoreStatus !== "submitted" && kycFirestoreStatus !== "under_review" ? (
-              <button className="btn-save-elite" onClick={openKycModal}>Vérifier mon identité</button>
+              <button className="btn-save-elite" style={{ marginTop: 14, height: 58, fontSize: 17, fontWeight: 800 }} onClick={openKycModal}>Vérifier mon identité</button>
             ) : null}
 
-            <button className="btn-save-elite" onClick={saveProfileInfos}>Mettre à jour le profil</button>
+            <button className="btn-save-elite" style={{ marginTop: 14, height: 58, fontSize: 17, fontWeight: 800 }} onClick={saveProfileInfos}>Mettre à jour le profil</button>
           </div>
         </div>
 
@@ -8201,8 +8201,8 @@ function App() {
 
               {passwordStage === "menu" ? (
                 <>
-                  <button style={{ width: "100%", height: 48, border: "none", borderRadius: 16, background: "linear-gradient(135deg, #3b82f6, #2563eb)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, boxShadow: "0 10px 24px rgba(59,130,246,.28)", marginTop: 4 }} onClick={saveSecuritySettings}>Enregistrer les changements</button>
-                  <button style={{ width: "100%", height: 48, border: "1px solid rgba(59,130,246,.2)", borderRadius: 16, background: "rgba(59,130,246,.08)", color: "#60a5fa", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }} onClick={() => setPasswordStage("change")}>
+                  <button className="btn-save-elite" style={{ marginTop: 14 }} onClick={saveSecuritySettings}>Enregistrer les changements</button>
+                  <button style={{ width: "100%", height: 58, border: "1px solid rgba(59,130,246,.2)", borderRadius: 18, background: "rgba(59,130,246,.08)", color: "#60a5fa", fontSize: 17, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 10 }} onClick={() => setPasswordStage("change")}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
                     Modifier le mot de passe
                   </button>

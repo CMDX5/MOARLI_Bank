@@ -4417,8 +4417,8 @@ function App() {
           transactionType === "depot" ? "credit" : "debit",
           `${transactionType === "depot" ? "Dépôt" : "Retrait"} ${destLabel} ${opLabel}`,
           formatCurrency(transactionNumericAmount),
-          transactionType === "depot" ? "wallet" : "receive",
-          transactionType === "depot" ? "#4ade80" : "#60a5fa"
+          transactionType === "depot" ? "wallet" : "send",
+          transactionType === "depot" ? "#4ade80" : "#ef4444"
         );
       }, 1500);
     } catch (err: unknown) {

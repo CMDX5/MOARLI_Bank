@@ -960,6 +960,31 @@ function App() {
 
           setScreen("dashboard");
           setNavActive("Accueil");
+
+          // ── Vérification session token (détection "autres appareils déconnectés") ──
+          try {
+            const localToken = typeof localStorage !== "undefined" ? localStorage.getItem("morali_session_token") : null;
+            if (localToken) {
+              const sessionSnap = await getDoc(doc(firebaseDb, "users", user.uid, "meta", "sessionToken"));
+              if (sessionSnap.exists()) {
+                const serverToken = sessionSnap.data()?.token;
+                if (serverToken && serverToken !== localToken) {
+                  // Le token a changé → on a été déconnecté depuis un autre appareil
+                  signOut(firebaseAuth).catch(() => {});
+                  showToast("Votre session a été invalidée depuis un autre appareil");
+                  return;
+                }
+              }
+            } else {
+              // Pas de token local → en créer un au premier démarrage
+              const newToken = crypto.randomUUID();
+              if (typeof localStorage !== "undefined") localStorage.setItem("morali_session_token", newToken);
+              setDoc(doc(firebaseDb, "users", user.uid, "meta", "sessionToken"), {
+                token: newToken,
+                updatedAt: new Date(),
+              }).catch(() => {});
+            }
+          } catch { /* silent — session check non bloquant */ }
           const onboardingDone = typeof localStorage !== 'undefined' && localStorage.getItem("morali-onboarding-done");
           if (!onboardingDone) {
             setScreen("onboarding");
@@ -2961,17 +2986,24 @@ function App() {
     setPrivacyAccessLogOpen((current) => !current);
   };
 
-  const disconnectOtherDevices = () => {
+  const disconnectOtherDevices = async () => {
     setPrivacyAccessLogOpen(false);
-    // Revoke session server-side and sign out
-    fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
-    signOut(firebaseAuth).then(() => {
-      setScreen("auth");
-      setNavActive("Accueil");
-      showToast("Toutes les sessions ont été déconnectées");
-    }).catch(() => {
+    try {
+      const res = await fetch("/api/auth/disconnect-others", {
+        method: "POST",
+        headers: await getAuthHeaders(),
+      });
+      if (res.ok) {
+        const { sessionToken } = await res.json();
+        // Sauvegarder le nouveau token côté client
+        localStorage.setItem("morali_session_token", sessionToken);
+        showToast("Tous les autres appareils ont été déconnectés");
+      } else {
+        showToast("Erreur lors de la déconnexion des autres appareils");
+      }
+    } catch {
       showToast("Erreur lors de la déconnexion");
-    });
+    }
   };
 
   const openReceiptsModal = () => {

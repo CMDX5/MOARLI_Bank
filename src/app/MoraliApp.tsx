@@ -7631,7 +7631,7 @@ function App() {
                   </div>
                 ))}
               </div>
-              <button className="bc-btn-full" onClick={closeReceiptsModal}>Fermer</button>
+              <button className="bc-btn-full" style={{ height: 58, borderRadius: 18 }} onClick={closeReceiptsModal}>Fermer</button>
             </div>
           </div>
         )}

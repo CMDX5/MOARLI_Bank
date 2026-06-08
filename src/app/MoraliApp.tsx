@@ -8211,7 +8211,7 @@ function App() {
         )}
 
         {transactionPinOpen && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 2400, background: 'rgba(3,8,16,0.78)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '80px 20px 20px', overflowY: 'auto', animation: 'fadeIn .3s ease' }} onClick={transactionProcessing ? undefined : closeTransactionPin}>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 2400, background: 'rgba(3,8,16,0.78)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '60px 20px 20px', overflow: 'hidden', animation: 'fadeIn .3s ease' }} onClick={transactionProcessing ? undefined : closeTransactionPin}>
             <div style={{ width: '100%', maxWidth: 360, background: 'linear-gradient(180deg, #101a30 0%, #080f1e 100%)', border: '1px solid rgba(59,130,246,0.22)', borderRadius: 28, boxShadow: '0 30px 80px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.05)', padding: '26px 22px 22px', display: 'flex', flexDirection: 'column', gap: 18, animation: 'panelSpringUp .3s cubic-bezier(.34,1.2,.64,1) forwards' }} onClick={(event) => event.stopPropagation()}>
               <div className="transaction-flow-head">
                 <div>

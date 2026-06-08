@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { type TransactionType } from '@/types/morali';
 import { formatCurrency } from '@/lib/helpers';
 
@@ -30,15 +31,15 @@ function ConfirmationModal({
   const operatorName = method === 'mtn' ? 'MTN MoMo' : 'Airtel Money';
   const operatorColor = method === 'mtn' ? '#ffcc00' : '#ff0000';
 
-  return (
+  return createPortal(
     <div
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 2500,
-        background: 'rgba(3,8,16,0.78)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
+        zIndex: 99999,
+        background: 'rgba(3,8,16,0.85)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -199,7 +200,7 @@ function ConfirmationModal({
         </div>
       </div>
     </div>
-  );
+  , document.body);
 }
 
 function ConfirmationRow({

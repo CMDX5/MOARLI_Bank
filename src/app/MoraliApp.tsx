@@ -8520,7 +8520,7 @@ function App() {
                 <div style={{fontSize: 18, fontWeight: 800, color: "#fff", textAlign: "center", marginBottom: 8}}>Se déconnecter ?</div>
                 <p style={{fontSize: 13, color: "#94a3b8", textAlign: "center", lineHeight: 1.5, marginBottom: 24}}>Voulez-vous vraiment vous déconnecter de votre compte Morali ?</p>
                 <div style={{display: "flex", gap: 10}}>
-                  <button onClick={() => setLogoutModalOpen(false)} style={{flex: 1, height: 58, borderRadius: 18, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.06)", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer"}}>
+                  <button onClick={() => setLogoutModalOpen(false)} style={{flex: 1, height: 48, borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.06)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer"}}>
                     Annuler
                   </button>
                   <button onClick={() => {
@@ -8539,7 +8539,7 @@ function App() {
                         showToast("Erreur lors de la déconnexion");
                       });
                     }
-                  }} style={{flex: 1, height: 58, borderRadius: 18, border: "none", background: "rgba(239,68,68,0.15)", color: "#ef4444", fontSize: 15, fontWeight: 700, cursor: "pointer"}}>
+                  }} style={{flex: 1, height: 48, borderRadius: 14, border: "none", background: "rgba(239,68,68,0.15)", color: "#ef4444", fontSize: 14, fontWeight: 700, cursor: "pointer"}}>
                     Se déconnecter
                   </button>
                 </div>
@@ -8565,7 +8565,7 @@ function App() {
                   </div>
                 </div>
                 <div style={{display: "flex", gap: 10}}>
-                  <button onClick={() => setTontineDistConfirm(null)} style={{flex: 1, height: 58, borderRadius: 18, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.06)", color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer"}}>
+                  <button onClick={() => setTontineDistConfirm(null)} style={{flex: 1, height: 48, borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.06)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer"}}>
                     Annuler
                   </button>
                   <button onClick={async () => {
@@ -8590,7 +8590,7 @@ function App() {
                       icon: "coins", bg: "rgba(212,164,55,0.12)", read: false,
                     }).catch((err: unknown) => { console.error("Erreur notification tontine:", err); });
                     showToast(`Distribution effectuée ! Vous recevez ${formatCurrency(sharePerMember)} F`);
-                  }} style={{flex: 1, height: 58, borderRadius: 18, border: "none", background: "linear-gradient(135deg, rgba(212,164,55,0.2), rgba(212,164,55,0.1))", color: "#fbbf24", fontSize: 15, fontWeight: 700, cursor: "pointer"}}>
+                  }} style={{flex: 1, height: 48, borderRadius: 14, border: "none", background: "linear-gradient(135deg, rgba(212,164,55,0.2), rgba(212,164,55,0.1))", color: "#fbbf24", fontSize: 14, fontWeight: 700, cursor: "pointer"}}>
                     Distribuer
                   </button>
                 </div>

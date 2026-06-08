@@ -2662,6 +2662,38 @@ function App() {
     }
   };
 
+  // ── Face ID toggle handler ──
+  const handleFaceIdToggle = async () => {
+    if (!platformAuthSupported) return;
+    if (securitySettings.faceId) {
+      // Désactiver directement
+      const updated = { ...securitySettings, faceId: false };
+      setSecuritySettings(updated);
+      if (authUid) {
+        try {
+          await setDoc(doc(firebaseDb, "users", authUid, "meta", "securitySettings"), { ...updated, updatedAt: serverTimestamp() }, { merge: true });
+        } catch { localStorage.setItem("morali_security_settings", JSON.stringify(updated)); }
+      }
+      showToast("Face ID désactivé");
+    } else {
+      // Activer — demander l'authentification d'abord
+      showToast("Authentification en cours…");
+      const ok = await promptBiometric();
+      if (ok) {
+        const updated = { ...securitySettings, faceId: true };
+        setSecuritySettings(updated);
+        if (authUid) {
+          try {
+            await setDoc(doc(firebaseDb, "users", authUid, "meta", "securitySettings"), { ...updated, updatedAt: serverTimestamp() }, { merge: true });
+          } catch { localStorage.setItem("morali_security_settings", JSON.stringify(updated)); }
+        }
+        showToast("Face ID activé ✓");
+      } else {
+        showToast("Authentification échouée ou annulée");
+      }
+    }
+  };
+
   // ── Device fingerprint check on login ──
   const checkNewDevice = useCallback(async () => {
     if (!authUid || !firebaseDb) return;
@@ -4293,7 +4325,22 @@ function App() {
     setTransactionChoiceOpen(false);
   };
 
-  const openTransactionPin = () => {
+  const openTransactionPin = async () => {
+    // Si Face ID activé, tenter biométrie d'abord
+    if (securitySettings.faceId && platformAuthSupported) {
+      const ok = await promptBiometric();
+      if (ok) {
+        setTransactionPinOpen(true);
+        setTransactionPin("OK_BIOMETRIC");
+        setTransactionProcessing(false);
+        setTransactionSuccess(false);
+        setTransactionPinVerifying(false);
+        // Auto-submit after short delay
+        setTimeout(() => executeTransaction(), 300);
+        return;
+      }
+      // Si biométrie échoue, fallback sur PIN
+    }
     setTransactionPinOpen(true);
     setTransactionPin("");
     setTransactionProcessing(false);
@@ -8033,8 +8080,8 @@ function App() {
                     aria-checked={securitySettings.faceId}
                     tabIndex={0}
                     style={!platformAuthSupported ? { pointerEvents: "none" } : {}}
-                    onClick={() => platformAuthSupported && setSecuritySettings((c) => ({ ...c, faceId: !c.faceId }))}
-                    onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && platformAuthSupported) { e.preventDefault(); setSecuritySettings((c) => ({ ...c, faceId: !c.faceId })); } }}
+                    onClick={handleFaceIdToggle}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleFaceIdToggle(); } }}
                   />
                 </div>
                 <div className="security-feature">

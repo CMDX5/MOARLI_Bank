@@ -8246,7 +8246,7 @@ function App() {
                     className="bc-btn-full"
                     onClick={handleChangePassword}
                     disabled={!changePwOld.trim() || !changePwNew.trim() || !changePwConfirm.trim() || changePwNew.length < 8 || changePwNew !== changePwConfirm || changePwLoading}
-                    style={!changePwOld.trim() || !changePwNew.trim() || !changePwConfirm.trim() || changePwNew.length < 8 || changePwNew !== changePwConfirm || changePwLoading ? { opacity: .4 } : {}}
+                    style={!changePwOld.trim() || !changePwNew.trim() || !changePwConfirm.trim() || changePwNew.length < 8 || changePwNew !== changePwConfirm || changePwLoading ? { opacity: .4, height: 58, borderRadius: 18 } : { height: 58, borderRadius: 18 }}
                   >
                     {changePwLoading ? <div className="btn-loader" /> : "Mettre à jour le mot de passe"}
                   </button>
@@ -8315,7 +8315,7 @@ function App() {
                       </div>
                     </div>
                   ))}
-                  <button className="bc-btn-full" onClick={disconnectOtherDevices}>Déconnecter tous les autres appareils</button>
+                  <button className="bc-btn-full" style={{ height: 58, borderRadius: 18 }} onClick={disconnectOtherDevices}>Déconnecter tous les autres appareils</button>
                 </div>
               )}
 

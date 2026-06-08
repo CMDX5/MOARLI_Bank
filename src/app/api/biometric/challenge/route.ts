@@ -11,7 +11,7 @@ import { FieldValue } from "firebase-admin/firestore";
  */
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
-  if (!auth.ok) return auth.response;
+  if (auth.error) return auth.error;
   const uid = auth.uid;
 
   try {

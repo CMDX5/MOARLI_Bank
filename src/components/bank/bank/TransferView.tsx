@@ -1036,7 +1036,7 @@ export default function TransferView({
 .confirm-sheet-title{font-family:'Montserrat',sans-serif;font-size:18px;font-weight:800;color:#fff;margin-bottom:8px}
 .confirm-sheet-copy{font-size:13px;line-height:1.6;color:#94a3b8;margin-bottom:18px}
 .confirm-sheet-actions{display:flex;gap:10px}
-.confirm-sheet-actions button{flex:1;min-height:48px;border-radius:16px;border:none;font-weight:700;font-size:14px;cursor:pointer}
+.confirm-sheet-actions button{flex:1;height:58px;border-radius:18px;border:none;font-weight:700;font-size:15px;cursor:pointer}
 .confirm-sheet-actions .secondary{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);color:#cbd5e1}
 .confirm-sheet-actions .danger{background:linear-gradient(135deg,#3b82f6 0%,#2563eb 100%);color:#fff;box-shadow:0 10px 24px rgba(59,130,246,.28)}
 @keyframes panelSpringUp{0%{opacity:0;transform:translateY(100%)}100%{opacity:1;transform:translateY(0)}}

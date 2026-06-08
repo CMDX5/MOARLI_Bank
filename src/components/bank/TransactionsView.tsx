@@ -246,7 +246,12 @@ function ConfirmationDivider() {
 /* ─────────────────────────────────────────────
    PROCESSING OVERLAY
    ───────────────────────────────────────────── */
-function ProcessingOverlay() {
+function ProcessingOverlay({ type }: { type: 'depot' | 'retrait' }) {
+  const isRetrait = type === 'retrait';
+  const spinnerColor = isRetrait ? '#ef4444' : '#22c55e';
+  const spinnerBorder = isRetrait ? 'rgba(239,68,68,0.18)' : 'rgba(34,197,94,0.18)';
+  const dotColor = isRetrait ? '#f87171' : '#4ade80';
+
   return (
     <div
       style={{
@@ -269,8 +274,8 @@ function ProcessingOverlay() {
           width: 52,
           height: 52,
           borderRadius: '50%',
-          border: '3px solid rgba(59,130,246,0.18)',
-          borderTopColor: '#3b82f6',
+          border: `3px solid ${spinnerBorder}`,
+          borderTopColor: spinnerColor,
           animation: 'spin 0.8s linear infinite',
         }}
       />
@@ -300,7 +305,7 @@ function ProcessingOverlay() {
                 width: 6,
                 height: 6,
                 borderRadius: '50%',
-                background: '#60a5fa',
+                background: dotColor,
                 opacity: 0.3,
                 animation: `dotPulse 1.2s ease-in-out ${i * 0.2}s infinite`,
               }}
@@ -685,7 +690,7 @@ export default function TransactionsView({
       <div className="content-scrollable service-scrollable transaction-safe">
         <div className="transaction-screen">
           {/* Processing overlay */}
-          {processing && <ProcessingOverlay />}
+          {processing && <ProcessingOverlay type={type} />}
 
           <div className="transaction-header">
             <div className="transaction-topbar">

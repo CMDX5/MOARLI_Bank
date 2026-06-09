@@ -80,8 +80,8 @@ export default function ProfileView({
             </div>
             <div style={{ textAlign: "center" }}>
               <div className="profile-name">{holder}</div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
-                <span className="profile-id">ID: {bankingId}</span>
+              <div className="profile-id" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                ID: {bankingId}
                 <button
                   onClick={handleCopyId}
                   aria-label="Copier ID"

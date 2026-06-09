@@ -2086,9 +2086,11 @@ function App() {
     setRequestQrOpen(false);
   };
 
-  // ── openTransferModal: simplified — TransferView handles internal reset ──
+  // ── openTransferModal: navigate to payments screen first, then open modal ──
   const openTransferModal = () => {
     transferInitialQueryRef.current = undefined;
+    setScreen("payments");
+    setNavActive("Transferts" as NavItem);
     setTransferOpen(true);
   };
 

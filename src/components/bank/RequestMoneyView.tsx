@@ -261,7 +261,7 @@ export default function RequestMoneyView({
                 autoComplete="off"
                 autoCorrect="off"
                 spellCheck={false}
-                placeholder="MORALI54321 ou @pseudo"
+                placeholder="ID ou RIB du compte"
                 value={recipientQuery}
                 onChange={(e) => handleQueryChange(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); searchRecipient(); } }}
@@ -300,7 +300,7 @@ export default function RequestMoneyView({
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "18px 16px", borderRadius: 18, background: "rgba(239,68,68,.06)", border: "1px solid rgba(239,68,68,.15)", textAlign: "center" }}>
                 <span style={{ fontSize: 24 }}>🔍</span>
                 <span style={{ fontSize: 13, fontWeight: 800, color: "#f87171" }}>Aucun compte trouvé</span>
-                <span style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", lineHeight: 1.4 }}>Vérifiez l'ID Morali ou le @pseudo et réessayez.</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", lineHeight: 1.4 }}>Vérifiez l'ID ou le RIB Morali et réessayez.</span>
               </div>
             )}
 

@@ -6670,7 +6670,7 @@ function App() {
                       <div className="contact-modal-head">
                         <div>
                           <div className="contact-modal-title">Nouveau contact</div>
-                          <div className="contact-modal-sub">Recherchez un client Morali par pseudo ou identifiant pour l’ajouter à vos bénéficiaires.</div>
+                          <div className="contact-modal-sub">Recherchez un client Morali par ID ou RIB du compte pour l’ajouter à vos bénéficiaires.</div>
                         </div>
                         <button className="contact-modal-close" onClick={closeContactModal} aria-label="Fermer">
                           <span style={{ fontSize: 20, lineHeight: 1 }}>×</span>
@@ -6683,7 +6683,7 @@ function App() {
                           <input
                             className="contact-modal-input"
                             type="text"
-                            placeholder="@pseudo ou numéro de compte..."
+                            placeholder="ID ou RIB du compte..."
                             value={contactQuery}
                             onChange={(e) => setContactQuery(e.target.value)}
                           />
@@ -6706,7 +6706,7 @@ function App() {
                           <div className="contact-modal-avatar">?</div>
                           <div>
                             <div className="contact-modal-preview-name">Aucun compte trouvé</div>
-                            <div className="contact-modal-preview-meta">Essayez @sarah, @prince ou un identifiant Morali</div>
+                            <div className="contact-modal-preview-meta">Essayez un ID ou RIB Morali (ex: MORALI54321)</div>
                           </div>
                         </div>
                       )}

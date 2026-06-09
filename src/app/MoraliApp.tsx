@@ -2252,21 +2252,31 @@ function App() {
     const normalizedMoraliId = source.toUpperCase().replace(/[^A-Z0-9]/g, "");
     const normalizedPseudo = source.toLowerCase().replace(/^@/, "").replace(/[^a-z0-9]/g, "");
 
+    // Self-detection shortcut: if searching for own moraliId, return immediately
+    if (bankingIdentity.id && normalizedMoraliId === bankingIdentity.id.toUpperCase().replace(/[^A-Z0-9]/g, "")) {
+      console.log("[findMoraliUser] Self-detection via bankingIdentity.id:", bankingIdentity.id);
+      return {
+        user: buildMoraliUser({ uid: authUid || undefined, fullName: dashboardName, pseudo: "", moraliId: bankingIdentity.id || undefined }),
+        isSelf: true,
+      };
+    }
+
     // Method 1: Search via API (uses Firebase Admin SDK)
     try {
       const res = await fetch(`/api/directory/search?q=${encodeURIComponent(source)}`, { headers: await getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         if (data.found) {
+          console.log("[findMoraliUser] Method 1 (API): found", data);
           const self = !!data.isSelf;
           if (data.uid) {
             return { user: buildMoraliUser({ uid: data.uid, fullName: data.name, pseudo: data.pseudo, moraliId: data.account }), isSelf: self };
           }
-          // API found user but no uid (shouldn't happen with auth) — fall through to Method 2
         }
       }
-    } catch {
-      /* API lookup failed — try direct Firestore */
+      console.log("[findMoraliUser] Method 1 (API): not found, status", res.status);
+    } catch (apiErr) {
+      console.warn("[findMoraliUser] Method 1 (API) failed:", apiErr);
     }
 
     // Method 2: Search directly in Firestore — directoryLookup (O(1) lookup)
@@ -2275,14 +2285,17 @@ function App() {
         const lookupDoc = await getDoc(doc(firebaseDb, "directoryLookup", `morali_${normalizedMoraliId}`));
         if (lookupDoc.exists()) {
           const d = lookupDoc.data()!;
+          console.log("[findMoraliUser] Method 2 (directoryLookup morali): found", d.uid);
           return { user: buildMoraliUser(d), isSelf: d.uid === authUid };
         }
+        console.log("[findMoraliUser] Method 2 (directoryLookup morali): doc not found for", normalizedMoraliId);
       }
 
       if (normalizedPseudo.length >= 2) {
         const lookupDoc = await getDoc(doc(firebaseDb, "directoryLookup", `pseudo_${normalizedPseudo}`));
         if (lookupDoc.exists()) {
           const d = lookupDoc.data()!;
+          console.log("[findMoraliUser] Method 2 (directoryLookup pseudo): found", d.uid);
           return { user: buildMoraliUser(d), isSelf: d.uid === authUid };
         }
 
@@ -2295,11 +2308,13 @@ function App() {
         ));
         for (const snapDoc of prefixSnap.docs) {
           const d = snapDoc.data()!;
+          console.log("[findMoraliUser] Method 2 (prefix search): found", d.uid);
           return { user: buildMoraliUser(d), isSelf: d.uid === authUid };
         }
+        console.log("[findMoraliUser] Method 2 (pseudo/prefix): not found for", normalizedPseudo);
       }
     } catch (firestoreErr) {
-      console.error("[directory] directoryLookup search failed:", firestoreErr);
+      console.error("[findMoraliUser] Method 2 (directoryLookup) failed:", firestoreErr);
     }
 
     // Method 3: Fallback — search moraliUsers collection directly
@@ -2311,6 +2326,7 @@ function App() {
           where("moraliId", "==", normalizedMoraliId),
           limit(1),
         ));
+        console.log("[findMoraliUser] Method 3 (moraliUsers): query returned", snap.size, "docs for", normalizedMoraliId);
         for (const snapDoc of snap.docs) {
           const d = snapDoc.data()!;
           // Backfill directoryLookup so next search is O(1)
@@ -2319,9 +2335,25 @@ function App() {
         }
       }
     } catch (err) {
-      console.error("[directory] moraliUsers fallback search failed:", err);
+      console.error("[findMoraliUser] Method 3 (moraliUsers) failed:", err);
     }
 
+    // Method 4: Last resort — try reading own Firestore doc directly to force directory sync
+    try {
+      if (authUid && normalizedMoraliId === bankingIdentity.id.toUpperCase().replace(/[^A-Z0-9]/g, "")) {
+        const selfDoc = await getDoc(doc(firebaseDb, "moraliUsers", authUid));
+        if (selfDoc.exists()) {
+          const d = selfDoc.data()!;
+          console.log("[findMoraliUser] Method 4 (self-doc): found own document, forcing directory sync");
+          publishDirectoryEntry(authUid, { fullName: d.fullName || "", firstName: d.firstName || "", lastName: d.lastName || "", pseudo: d.pseudo || "", moraliId: d.moraliId || bankingIdentity.id }).catch(() => {});
+          return { user: buildMoraliUser({ uid: authUid, fullName: d.fullName, pseudo: d.pseudo, moraliId: d.moraliId || bankingIdentity.id }), isSelf: true };
+        }
+      }
+    } catch (err) {
+      console.error("[findMoraliUser] Method 4 (self-doc) failed:", err);
+    }
+
+    console.log("[findMoraliUser] All methods exhausted — not found for:", source);
     return { user: null, isSelf: false };
   };
 
@@ -3818,6 +3850,10 @@ function App() {
     setContactSelfMatch(false);
     setContactSearchLoading(false);
     setContactModalOpen(true);
+    // Force directory sync so the current user is findable
+    if (bankingIdentity.id && dashboardName) {
+      publishDirectoryEntry(authUid || "", { fullName: dashboardName, firstName: "", lastName: "", pseudo: "", moraliId: bankingIdentity.id || "" }).catch(() => {});
+    }
   };
 
   const closeContactModal = () => {

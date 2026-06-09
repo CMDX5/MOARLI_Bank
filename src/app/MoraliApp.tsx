@@ -539,6 +539,7 @@ function App() {
   const [contactQuery, setContactQuery] = useState("");
   const [contactSearchLoading, setContactSearchLoading] = useState(false);
   const [verifiedMoraliUser, setVerifiedMoraliUser] = useState<MoraliUser | null>(null);
+  const [contactSelfMatch, setContactSelfMatch] = useState(false);
   const [paymentContacts, setPaymentContacts] = useState<PaymentContact[]>(initialPaymentContacts);
   const [requestQrOpen, setRequestQrOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
@@ -1251,6 +1252,7 @@ function App() {
 
       if (!cancelled) {
         setVerifiedMoraliUser(found.user);
+        setContactSelfMatch(found.isSelf);
         setContactSearchLoading(false);
       }
     }, 450);
@@ -2256,11 +2258,9 @@ function App() {
       if (res.ok) {
         const data = await res.json();
         if (data.found) {
-          if (data.isSelf) {
-            return { user: null, isSelf: true };
-          }
+          const self = !!data.isSelf;
           if (data.uid) {
-            return { user: buildMoraliUser({ uid: data.uid, fullName: data.name, pseudo: data.pseudo, moraliId: data.account }), isSelf: false };
+            return { user: buildMoraliUser({ uid: data.uid, fullName: data.name, pseudo: data.pseudo, moraliId: data.account }), isSelf: self };
           }
           // API found user but no uid (shouldn't happen with auth) — fall through to Method 2
         }
@@ -3815,6 +3815,7 @@ function App() {
   const addNewContact = () => {
     setContactQuery("");
     setVerifiedMoraliUser(null);
+    setContactSelfMatch(false);
     setContactSearchLoading(false);
     setContactModalOpen(true);
   };
@@ -3823,6 +3824,7 @@ function App() {
     setContactModalOpen(false);
     setContactQuery("");
     setVerifiedMoraliUser(null);
+    setContactSelfMatch(false);
     setContactSearchLoading(false);
   };
 
@@ -6703,7 +6705,17 @@ function App() {
                         </div>
                       )}
 
-                      {!contactSearchLoading && contactQuery.trim().length > 2 && !verifiedMoraliUser && (
+                      {contactSelfMatch && !contactSearchLoading && (
+                        <div className="contact-modal-preview" style={{ borderColor: "rgba(251,191,36,.3)" }}>
+                          <div className="contact-modal-avatar" style={{ background: "rgba(251,191,36,.15)" }}>👤</div>
+                          <div>
+                            <div className="contact-modal-preview-name" style={{ color: "#fbbf24" }}>C'est votre propre compte</div>
+                            <div className="contact-modal-preview-meta">Vous ne pouvez pas vous ajouter à vos favoris.</div>
+                          </div>
+                        </div>
+                      )}
+
+                      {!contactSearchLoading && contactQuery.trim().length > 2 && !verifiedMoraliUser && !contactSelfMatch && (
                         <div className="contact-modal-preview">
                           <div className="contact-modal-avatar">?</div>
                           <div>

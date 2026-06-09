@@ -7005,7 +7005,6 @@ function App() {
 
                       {/* Boutons */}
                       <div className="contact-modal-actions" style={{ gap: 10, marginTop: 22 }}>
-                        <button className="contact-modal-btn secondary" onClick={closeContactInfo} style={{ flex: 1 }}>Fermer</button>
                         <button
                           className="contact-modal-btn secondary"
                           onClick={() => removePaymentContact(selectedContactInfo.name)}
@@ -7013,6 +7012,7 @@ function App() {
                         >
                           Retirer
                         </button>
+                        <button className="contact-modal-btn secondary" onClick={closeContactInfo} style={{ flex: 1 }}>Fermer</button>
                       </div>
                     </div>
                   </div>

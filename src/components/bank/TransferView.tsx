@@ -89,6 +89,7 @@ export default function TransferView({
   const transferHandleRef = useRef<HTMLDivElement | null>(null);
   const transferInputRef = useRef<HTMLInputElement | null>(null);
   const transferAmountRef = useRef<HTMLInputElement | null>(null);
+  const transferPinInputRef = useRef<HTMLInputElement | null>(null);
   const transferDragRef = useRef({ active: false, startX: 0, startProgress: 0 });
   const transferSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -399,24 +400,19 @@ export default function TransferView({
     }
   };
 
-  const handleTransferPinKey = async (value: string) => {
-    if (!transferPinOpen || transferProcessing || transferSuccess || pinVerifying) return;
-    if (value === "back") {
-      setTransferPin((current) => current.slice(0, -1));
-      return;
-    }
-    if (transferPin.length >= 4) return;
-    const next = `${transferPin}${value}`.slice(0, 4);
-    setTransferPin(next);
-    if (next.length === 4) {
-      // ── SERVER-SIDE PIN VERIFICATION ──
+  // PIN input via system keyboard (same as depot/retrait)
+  const handleTransferPinInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (transferProcessing || transferSuccess || pinVerifying) return;
+    const raw = e.target.value.replace(/\D/g, "").slice(0, 4);
+    setTransferPin(raw);
+    if (raw.length === 4) {
       setPinVerifying(true);
       try {
         const res = await fetch("/api/verify-pin", {
           method: "POST",
           headers: await getAuthHeaders(),
           body: JSON.stringify({
-            pin: next,
+            pin: raw,
             uid: authUid || "",
           }),
         });
@@ -438,10 +434,8 @@ export default function TransferView({
           setPinVerifying(false);
           return;
         }
-        // PIN verified — transition to animated processing stage
         setTransferStage("processing");
         setPinVerifying(false);
-        // Small delay for visual transition, then execute
         setTimeout(() => executeTransfer(), 400);
       } catch {
         showToast("Erreur de connexion");
@@ -452,6 +446,14 @@ export default function TransferView({
       }
     }
   };
+
+  // Auto-focus PIN input when stage changes to pin
+  useEffect(() => {
+    if (transferStage === "pin") {
+      const timer = window.setTimeout(() => transferPinInputRef.current?.focus(), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [transferStage]);
 
   const startTransferPin = async () => {
     if (!transferRecipient) {
@@ -624,7 +626,7 @@ export default function TransferView({
                   <div className="transaction-flow-title">
                     {transferStage === "search" && "Nouveau virement"}
                     {transferStage === "amount" && "Montant"}
-                    {transferStage === "pin" && "Confirmer"}
+                    {transferStage === "pin" && "Code PIN"}
                     {transferStage === "processing" && "Traitement..."}
                     {transferStage === "success" && "Virement envoyé"}
                     {transferStage === "error" && "Échec"}
@@ -632,7 +634,7 @@ export default function TransferView({
                   <div className="transaction-flow-sub">
                     {transferStage === "search" && "Entrez un Pseudo, ID ou RIB Morali pour commencer le virement."}
                     {transferStage === "amount" && `Vers ${transferRecipient?.name || ""}`}
-                    {transferStage === "pin" && "Saisissez votre code PIN pour valider."}
+                    {transferStage === "pin" && "Saisissez votre code secret à 4 chiffres pour sécuriser l'opération."}
                     {transferStage === "processing" && "Virement en cours de traitement..."}
                     {transferStage === "success" && "Fonds transférés avec succès"}
                     {transferStage === "error" && "Le virement n'a pas pu aboutir"}
@@ -794,31 +796,62 @@ export default function TransferView({
               </>
             )}
 
-            {/* ====== ÉTAPE 3 : PIN ====== */}
+            {/* ====== ÉTAPE 3 : PIN (same style as depot/retrait) ====== */}
             {transferStage === "pin" && (
               <>
-                <div className="pin-dots">
-                  {[0, 1, 2, 3].map((index) => (
-                    <div key={index} className={`pin-dot ${index < transferPin.length ? (pinVerifying ? "verifying" : "filled") : ""}`} />
-                  ))}
+                {/* Summary section */}
+                <div className="pin-summary">
+                  <div>
+                    <span>Opération</span>
+                    <strong>Virement</strong>
+                  </div>
+                  <div>
+                    <span>Destinataire</span>
+                    <strong>{transferRecipient?.name || ""}</strong>
+                  </div>
+                  <div>
+                    <small>Montant</small>
+                    <strong>FCFA {formatCurrency(Number(transferAmountInput || 0))}</strong>
+                  </div>
                 </div>
-                {pinVerifying && (
-                  <div className="transaction-success-wrap">
-                    <div className="pin-loader" />
-                    <div className="transaction-success-copy">Vérification du code PIN…</div>
-                  </div>
-                )}
-                {!pinVerifying && (
-                  <div className="transfer-pin-keypad" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, width: '100%' }}>
-                    {["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "back"].map((key, index) => (
-                      key ? (
-                        <button key={key + index} className="transfer-pin-key" style={{ width: '100%', minHeight: 58, fontSize: 24 }} onClick={() => handleTransferPinKey(key)}>
-                          {key === "back" ? "⌫" : key}
-                        </button>
-                      ) : <div key={`empty-${index}`} className="transfer-pin-empty" style={{ minHeight: 58 }} />
-                    ))}
-                  </div>
-                )}
+
+                {/* PIN input */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                  <input
+                    ref={transferPinInputRef}
+                    type="password"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={4}
+                    value={transferPin}
+                    onChange={handleTransferPinInput}
+                    placeholder="••••"
+                    style={{
+                      width: '100%',
+                      maxWidth: 200,
+                      height: 56,
+                      padding: '0 16px',
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1.5px solid rgba(59,130,246,0.35)',
+                      borderRadius: 16,
+                      color: '#fff',
+                      fontSize: 24,
+                      fontWeight: 900,
+                      textAlign: 'center',
+                      letterSpacing: '0.35em',
+                      outline: 'none',
+                      fontFamily: "'Montserrat', sans-serif",
+                      transition: 'all .2s',
+                      WebkitAppearance: 'none',
+                      MozAppearance: 'textfield',
+                    }}
+                  />
+                  {pinVerifying ? (
+                    <div className="pin-helper" style={{ color: "#60a5fa" }}>Vérification du code PIN…</div>
+                  ) : (
+                    <div className="pin-helper">La vérification démarre automatiquement.</div>
+                  )}
+                </div>
               </>
             )}
 

@@ -436,7 +436,7 @@ export default function TransferView({
         }
         setTransferStage("processing");
         setPinVerifying(false);
-        executeTransfer();
+        window.setTimeout(() => executeTransfer(), 150);
       } catch {
         showToast("Erreur de connexion");
         setTransferPin("");

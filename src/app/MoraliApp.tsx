@@ -4700,18 +4700,20 @@ function App() {
           trackBankRevenue("withdrawal_fee", fees, `Frais retrait ${transactionMethod === "mtn" ? "MTN" : "Airtel"} — ${formatCurrency(transactionNumericAmount)} FCFA`);
         }
       }
-      // Success — show popup immediately
-      setTransactionProcessing(false);
-      setTransactionSuccess(true);
-      const destLabel = "Mobile Money";
-      const opLabel = transactionMethod === "mtn" ? "MTN" : "Airtel";
-      showQuickNotif(
-        transactionType === "depot" ? "credit" : "debit",
-        `${transactionType === "depot" ? "Dépôt" : "Retrait"} ${destLabel} ${opLabel}`,
-        formatCurrency(transactionNumericAmount),
-        transactionType === "depot" ? "wallet" : "send",
-        transactionType === "depot" ? "#4ade80" : "#ef4444"
-      );
+      // Success — show popup with a short delay so the processing animation renders first
+      window.setTimeout(() => {
+        setTransactionProcessing(false);
+        setTransactionSuccess(true);
+        const destLabel = "Mobile Money";
+        const opLabel = transactionMethod === "mtn" ? "MTN" : "Airtel";
+        showQuickNotif(
+          transactionType === "depot" ? "credit" : "debit",
+          `${transactionType === "depot" ? "Dépôt" : "Retrait"} ${destLabel} ${opLabel}`,
+          formatCurrency(transactionNumericAmount),
+          transactionType === "depot" ? "wallet" : "send",
+          transactionType === "depot" ? "#4ade80" : "#ef4444"
+        );
+      }, 300);
     } catch (err: unknown) {
       setTransactionProcessing(false);
       console.error("[executeTransaction] ERROR:", err);
@@ -4767,17 +4769,19 @@ function App() {
         if (pendingPinAction) {
           const action = pendingPinAction;
           setPendingPinAction(null);
-          closeTransactionPin();
-          if (action.type === "merchant") {
-            executeServiceDebit(action.amount, "Paiement Marchand", "qr");
-          } else if (action.type === "savings_deposit") {
-            executeSavingsTransfer("deposit");
-          } else if (action.type === "savings_withdraw") {
-            executeSavingsTransfer("withdraw");
-          }
+          window.setTimeout(() => {
+            closeTransactionPin();
+            if (action.type === "merchant") {
+              executeServiceDebit(action.amount, "Paiement Marchand", "qr");
+            } else if (action.type === "savings_deposit") {
+              executeSavingsTransfer("deposit");
+            } else if (action.type === "savings_withdraw") {
+              executeSavingsTransfer("withdraw");
+            }
+          }, 150);
           return;
         }
-        executeTransaction();
+        window.setTimeout(() => executeTransaction(), 150);
       } catch {
         showToast("Erreur de vérification PIN");
         setTransactionPin("");
@@ -4796,7 +4800,7 @@ function App() {
     if (raw.length === 4) {
       // ── SERVER-SIDE PIN VERIFICATION ──
       if (!cardPinExistsRef.current) {
-        executeTransaction();
+        window.setTimeout(() => executeTransaction(), 150);
         return;
       }
       setTransactionPinVerifying(true);
@@ -4823,17 +4827,19 @@ function App() {
         if (pendingPinAction) {
           const action = pendingPinAction;
           setPendingPinAction(null);
-          closeTransactionPin();
-          if (action.type === "merchant") {
-            executeServiceDebit(action.amount, "Paiement Marchand", "qr");
-          } else if (action.type === "savings_deposit") {
-            executeSavingsTransfer("deposit");
-          } else if (action.type === "savings_withdraw") {
-            executeSavingsTransfer("withdraw");
-          }
+          window.setTimeout(() => {
+            closeTransactionPin();
+            if (action.type === "merchant") {
+              executeServiceDebit(action.amount, "Paiement Marchand", "qr");
+            } else if (action.type === "savings_deposit") {
+              executeSavingsTransfer("deposit");
+            } else if (action.type === "savings_withdraw") {
+              executeSavingsTransfer("withdraw");
+            }
+          }, 150);
           return;
         }
-        executeTransaction();
+        window.setTimeout(() => executeTransaction(), 150);
       } catch {
         showToast("Erreur de vérification PIN");
         setTransactionPin("");

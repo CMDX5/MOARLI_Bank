@@ -173,6 +173,20 @@ const serviceTiles: Array<{ icon: IconName; name: string; desc: string; accent: 
 ];
 
 const initialPaymentContacts: PaymentContact[] = [];
+
+// Charger les contacts favoris depuis localStorage
+function loadSavedContacts(): PaymentContact[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const saved = localStorage.getItem("morali_payment_contacts");
+    return saved ? JSON.parse(saved) : [];
+  } catch { return []; }
+}
+
+function saveContactsToStorage(contacts: PaymentContact[]) {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem("morali_payment_contacts", JSON.stringify(contacts)); } catch {}
+}
 const cardActions = [
   { icon: "snowflake" as IconName, label: "Geler la carte", sub: "Geler / Dégeler" },
   { icon: "pin" as IconName, label: "Code PIN", sub: "Carte confidentielle" },
@@ -544,10 +558,14 @@ function App() {
   const [contactInfoOpen, setContactInfoOpen] = useState(false);
   const [selectedContactInfo, setSelectedContactInfo] = useState<PaymentContact | null>(null);
   const contactLongPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [paymentContacts, setPaymentContacts] = useState<PaymentContact[]>(initialPaymentContacts);
+  const [paymentContacts, setPaymentContacts] = useState<PaymentContact[]>(() => loadSavedContacts());
 
   const removePaymentContact = (name: string) => {
-    setPaymentContacts((prev) => prev.filter((c) => c.name !== name));
+    setPaymentContacts((prev) => {
+      const updated = prev.filter((c) => c.name !== name);
+      saveContactsToStorage(updated);
+      return updated;
+    });
     setContactInfoOpen(false);
     setSelectedContactInfo(null);
     showToast("Contact retiré");
@@ -3923,7 +3941,9 @@ function App() {
     setPaymentContacts((current) => {
       const exists = current.some((contact) => contact.name.toLowerCase() === verifiedMoraliUser.name.toLowerCase());
       if (exists) return current;
-      return [{ name: verifiedMoraliUser.name, tone: verifiedMoraliUser.tone, account: verifiedMoraliUser.account, pseudo: verifiedMoraliUser.pseudo, firstName: verifiedMoraliUser.firstName || "", photo: verifiedMoraliUser.photo || "" }, ...current];
+      const updated = [{ name: verifiedMoraliUser.name, tone: verifiedMoraliUser.tone, account: verifiedMoraliUser.account, pseudo: verifiedMoraliUser.pseudo, firstName: verifiedMoraliUser.firstName || "", photo: verifiedMoraliUser.photo || "" }, ...current];
+      saveContactsToStorage(updated);
+      return updated;
     });
     showToast(`${verifiedMoraliUser.name} ajouté aux favoris`);
     closeContactModal();

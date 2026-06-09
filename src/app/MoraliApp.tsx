@@ -2204,14 +2204,17 @@ function App() {
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9]+/g, "")
-      .slice(0, 18) || "morali";
+      .slice(0, 14) || "morali";
+    // Rendre unique : ajouter les 4 derniers chiffres du moraliId
+    const moraliSuffix = preservedMoraliId.replace(/[^0-9]/g, "").slice(-4);
+    const pseudoFull = `${pseudoBase}${moraliSuffix}`;
 
     const payload: FirestoreMoraliUser = {
       uid,
       fullName,
       firstName,
       lastName,
-      pseudo: existingData?.pseudo || `@${pseudoBase}`.toLowerCase(),
+      pseudo: existingData?.pseudo || `@${pseudoFull}`.toLowerCase(),
       moraliId: preservedMoraliId,
       moraliIdNormalized: preservedMoraliId.toUpperCase().replace(/[^A-Z0-9]/g, ""),
       rib: preservedRib,
@@ -4138,8 +4141,10 @@ function App() {
       const parts = displayName.split(/\s+/).filter(Boolean);
       const firstName = parts[0] || "Utilisateur";
       const lastName = parts.slice(1).join(" ") || "Morali";
-      const pseudoBase = displayName.toLowerCase().replace(/[^a-z0-9]+/g, "") || user.uid.slice(0, 8).toLowerCase();
+      const pseudoBase = displayName.toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 14) || user.uid.slice(0, 8).toLowerCase();
       const identity = generateMoraliIdentity(getIdentitySeed(user.email, user.uid));
+      const moraliSuffix = identity.id.replace(/[^0-9]/g, "").slice(-4);
+      const pseudoFull = `${pseudoBase}${moraliSuffix}`;
       const phone = profileForm.phone.trim() || `${registerData.prefix || "+242"}${registerData.tel || ""}`;
 
       await setDoc(
@@ -4149,7 +4154,7 @@ function App() {
           fullName: displayName,
           firstName,
           lastName,
-          pseudo: pseudoBase,
+          pseudo: `@${pseudoFull}`.toLowerCase(),
           moraliId: identity.id,
           moraliIdNormalized: identity.id.replace(/[^A-Z0-9]/g, ""),
           rib: identity.rib,
@@ -4162,7 +4167,7 @@ function App() {
       );
 
       // Publish directory entry for Google login users
-      await publishDirectoryEntry(user.uid, { fullName: displayName, firstName, lastName, pseudo: `@${pseudoBase}`, moraliId: identity.id });
+      await publishDirectoryEntry(user.uid, { fullName: displayName, firstName, lastName, pseudo: `@${pseudoFull}`.toLowerCase(), moraliId: identity.id });
 
       cacheIdentityForUid(user.uid, identity);
       setBankingIdentity(identity);

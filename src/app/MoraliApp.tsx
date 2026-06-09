@@ -4563,34 +4563,40 @@ function App() {
   };
 
   const openTransactionPin = async () => {
-    // Si Face ID activé, tenter biométrie d'abord
-    if (securitySettings.faceId && platformAuthSupported) {
-      const ok = await promptBiometric();
-      if (ok) {
-        // Biométrie réussie — exécuter directement sans ouvrir le modal PIN
-        setTransactionProcessing(true);
-        if (pendingPinAction) {
-          const action = pendingPinAction;
-          setPendingPinAction(null);
-          if (action.type === "merchant") {
-            executeServiceDebit(action.amount, "Paiement Marchand", "qr");
-          } else if (action.type === "savings_deposit") {
-            executeSavingsTransfer("deposit");
-          } else if (action.type === "savings_withdraw") {
-            executeSavingsTransfer("withdraw");
-          }
-        } else {
-          await executeTransaction();
-        }
-        return;
-      }
-      // Si biométrie échoue, fallback sur PIN
-    }
+    // Toujours ouvrir le modal PIN pour afficher le traitement/succès
     setTransactionPinOpen(true);
     setTransactionPin("");
     setTransactionProcessing(false);
     setTransactionSuccess(false);
     setTransactionPinVerifying(false);
+
+    // Si Face ID activé, tenter biométrie d'abord
+    if (securitySettings.faceId && platformAuthSupported) {
+      const ok = await promptBiometric();
+      if (ok) {
+        // Biométrie réussie — exécuter directement (le modal est déjà ouvert pour le feedback)
+        setTransactionProcessing(true);
+        if (pendingPinAction) {
+          const action = pendingPinAction;
+          setPendingPinAction(null);
+          window.setTimeout(() => {
+            closeTransactionPin();
+            if (action.type === "merchant") {
+              executeServiceDebit(action.amount, "Paiement Marchand", "qr");
+            } else if (action.type === "savings_deposit") {
+              executeSavingsTransfer("deposit");
+            } else if (action.type === "savings_withdraw") {
+              executeSavingsTransfer("withdraw");
+            }
+          }, 150);
+        } else {
+          await executeTransaction();
+        }
+        return;
+      }
+      // Si biométrie échoue, le modal PIN reste ouvert pour la saisie manuelle
+      showToast("Face ID non reconnu — saisissez votre PIN");
+    }
   };
 
   const closeTransactionPin = () => {

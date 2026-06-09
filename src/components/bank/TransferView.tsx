@@ -470,8 +470,10 @@ export default function TransferView({
 
   // Helper: go directly to processing (after successful Face ID)
   const goToProcessing = () => {
+    setTransferPinOpen(true);
     setTransferStage("processing");
-    executeTransfer();
+    // Use setTimeout to let React render the processing stage first
+    window.setTimeout(() => executeTransfer(), 150);
   };
 
   const startTransferAuth = async () => {

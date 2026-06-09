@@ -723,11 +723,37 @@ function App() {
       console.error("Erreur tracking device:", err);
     }
   }, [authUid]);
-  const [securitySettings, setSecuritySettings] = useState({
-    faceId: false,
-    deviceAlerts: true,
-    transactionValidation: true,
-  });
+  // Initialize security settings from localStorage (instant restore before Firestore loads)
+  const getInitialSecuritySettings = () => {
+    try {
+      const saved = window.localStorage.getItem("morali_security_settings");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          faceId: typeof parsed.faceId === 'boolean' ? parsed.faceId : false,
+          deviceAlerts: typeof parsed.deviceAlerts === 'boolean' ? parsed.deviceAlerts : true,
+          transactionValidation: typeof parsed.transactionValidation === 'boolean' ? parsed.transactionValidation : true,
+        };
+      }
+    } catch { /* ignore */ }
+    return { faceId: false, deviceAlerts: true, transactionValidation: true };
+  };
+  const [securitySettings, setSecuritySettings] = useState(getInitialSecuritySettings);
+
+  // Auto-persist security settings to localStorage + Firestore
+  const persistSecuritySettings = useCallback(async (settings: { faceId: boolean; deviceAlerts: boolean; transactionValidation: boolean }) => {
+    // Always save to localStorage immediately (survives reload)
+    window.localStorage.setItem("morali_security_settings", JSON.stringify(settings));
+    // Also save to Firestore if available
+    if (authUid && firebaseDb) {
+      try {
+        await setDoc(doc(firebaseDb, "users", authUid, "meta", "securitySettings"), {
+          ...settings,
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+      } catch { /* Firestore save failed, localStorage is the fallback */ }
+    }
+  }, [authUid, firebaseDb]);
   // Dynamic security level for profile badge
   const secLevelCount = Object.values(securitySettings).filter(Boolean).length;
   const [privacySettings, setPrivacySettings] = useState({
@@ -2879,14 +2905,18 @@ function App() {
           headers: await getAuthHeaders(),
         });
       } catch { /* silent */ }
-      setSecuritySettings((c) => ({ ...c, faceId: false }));
+      const updated = { ...securitySettings, faceId: false };
+      setSecuritySettings(updated);
+      await persistSecuritySettings(updated);
       showToast("Face ID désactivé");
     } else {
       // Activer — enregistrer le vrai credential biométrique
       showToast("Scannez votre visage pour activer…");
       const ok = await registerBiometric();
       if (ok) {
-        setSecuritySettings((c) => ({ ...c, faceId: true }));
+        const updated = { ...securitySettings, faceId: true };
+        setSecuritySettings(updated);
+        await persistSecuritySettings(updated);
         showToast("Face ID activé ✓ Votre visage a été enregistré");
       } else {
         showToast("Enregistrement annulé ou échoué");
@@ -3007,18 +3037,7 @@ function App() {
   };
 
   const saveSecuritySettings = async () => {
-    if (authUid) {
-      try {
-        await setDoc(doc(firebaseDb, "users", authUid, "meta", "securitySettings"), {
-          ...securitySettings,
-          updatedAt: serverTimestamp(),
-        }, { merge: true });
-      } catch {
-        window.localStorage.setItem("morali_security_settings", JSON.stringify(securitySettings));
-      }
-    } else {
-      window.localStorage.setItem("morali_security_settings", JSON.stringify(securitySettings));
-    }
+    await persistSecuritySettings(securitySettings);
     setSecurityModalOpen(false);
     showToast("Paramètres de sécurité mis à jour");
   };
@@ -8467,7 +8486,7 @@ function App() {
                     </div>
                     <div className="security-feature-copy">Notification instantanée si votre compte est accédé depuis un nouvel appareil.</div>
                   </div>
-                  <div className={`mini-switch ${securitySettings.deviceAlerts ? "active" : ""}`} role="switch" aria-checked={securitySettings.deviceAlerts} tabIndex={0} onClick={() => setSecuritySettings((c) => ({ ...c, deviceAlerts: !c.deviceAlerts }))} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSecuritySettings((c) => ({ ...c, deviceAlerts: !c.deviceAlerts })); } }} />
+                  <div className={`mini-switch ${securitySettings.deviceAlerts ? "active" : ""}`} role="switch" aria-checked={securitySettings.deviceAlerts} tabIndex={0} onClick={async () => { const updated = { ...securitySettings, deviceAlerts: !securitySettings.deviceAlerts }; setSecuritySettings(updated); await persistSecuritySettings(updated); }} onKeyDown={async (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); const updated = { ...securitySettings, deviceAlerts: !securitySettings.deviceAlerts }; setSecuritySettings(updated); await persistSecuritySettings(updated); } }} />
                 </div>
                 <div className="security-feature">
                   <div style={{ flex: 1 }}>
@@ -8477,7 +8496,7 @@ function App() {
                     </div>
                     <div className="security-feature-copy">Confirmation supplémentaire pour tous les transferts à partir de 50 000 FCFA.</div>
                   </div>
-                  <div className={`mini-switch ${securitySettings.transactionValidation ? "active" : ""}`} role="switch" aria-checked={securitySettings.transactionValidation} tabIndex={0} onClick={() => setSecuritySettings((c) => ({ ...c, transactionValidation: !c.transactionValidation }))} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSecuritySettings((c) => ({ ...c, transactionValidation: !c.transactionValidation })); } }} />
+                  <div className={`mini-switch ${securitySettings.transactionValidation ? "active" : ""}`} role="switch" aria-checked={securitySettings.transactionValidation} tabIndex={0} onClick={async () => { const updated = { ...securitySettings, transactionValidation: !securitySettings.transactionValidation }; setSecuritySettings(updated); await persistSecuritySettings(updated); }} onKeyDown={async (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); const updated = { ...securitySettings, transactionValidation: !securitySettings.transactionValidation }; setSecuritySettings(updated); await persistSecuritySettings(updated); } }} />
                 </div>
               </div>
 

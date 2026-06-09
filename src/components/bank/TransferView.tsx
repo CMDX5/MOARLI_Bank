@@ -436,7 +436,7 @@ export default function TransferView({
         }
         setTransferStage("processing");
         setPinVerifying(false);
-        setTimeout(() => executeTransfer(), 400);
+        executeTransfer();
       } catch {
         showToast("Erreur de connexion");
         setTransferPin("");
@@ -455,6 +455,25 @@ export default function TransferView({
     }
   }, [transferStage]);
 
+  // Helper: transition to PIN stage with slide animation
+  const goToPinStage = () => {
+    setTransferSliding(true);
+    setTransferSlideProgress(100);
+    if (navigator.vibrate) navigator.vibrate(12);
+    setTimeout(() => {
+      setTransferSliding(false);
+      setTransferSlideProgress(0);
+      setTransferPinOpen(true);
+      setTransferStage("pin");
+    }, 320);
+  };
+
+  // Helper: go directly to processing (after successful Face ID)
+  const goToProcessing = () => {
+    setTransferStage("processing");
+    executeTransfer();
+  };
+
   const startTransferAuth = async () => {
     if (!transferRecipient) {
       showToast("Entrez un Pseudo, ID ou RIB Morali valide");
@@ -472,42 +491,40 @@ export default function TransferView({
       return;
     }
 
-    // ── Authentication: Face ID OR PIN, not both ──
+    // ── Authentication: Face ID first, then PIN fallback ──
     if (securitySettings.faceId) {
-      // Face ID only — no PIN needed
       const faceOk = await promptBiometric();
-      if (!faceOk) {
-        showToast("Authentification Face ID annulée");
-        return;
+      if (faceOk) {
+        // Face ID succeeded → go directly to processing
+        goToProcessing();
+      } else {
+        // Face ID failed/cancelled/unrecognised → fall back to PIN
+        showToast("Face ID non reconnu — saisissez votre PIN");
+        goToPinStage();
       }
-      // Go directly to processing
-      setTransferStage("processing");
-      setTimeout(() => executeTransfer(), 400);
     } else {
-      // PIN only
-      setTransferSliding(true);
-      setTransferSlideProgress(100);
-      if (navigator.vibrate) navigator.vibrate(12);
-      setTimeout(() => {
-        setTransferSliding(false);
-        setTransferSlideProgress(0);
-        setTransferPinOpen(true);
-        setTransferStage("pin");
-      }, 320);
+      // No Face ID → PIN directly
+      goToPinStage();
     }
   };
 
-  const confirmTransferAndProceed = () => {
+  const confirmTransferAndProceed = async () => {
     setTransferConfirmOpen(false);
-    setTransferSliding(true);
-    setTransferSlideProgress(100);
-    if (navigator.vibrate) navigator.vibrate(12);
-    setTimeout(() => {
-      setTransferSliding(false);
-      setTransferSlideProgress(0);
-      setTransferPinOpen(true);
-      setTransferStage("pin");
-    }, 320);
+
+    // ── Authentication: Face ID first, then PIN fallback ──
+    if (securitySettings.faceId) {
+      const faceOk = await promptBiometric();
+      if (faceOk) {
+        // Face ID succeeded → go directly to processing
+        goToProcessing();
+        return;
+      }
+      // Face ID failed → fall back to PIN
+      showToast("Face ID non reconnu — saisissez votre PIN");
+    }
+
+    // Go to PIN (either Face ID disabled or failed)
+    goToPinStage();
   };
 
   const updateTransferDrag = (clientX: number) => {
@@ -640,7 +657,7 @@ export default function TransferView({
                   <div className="transaction-flow-sub">
                     {transferStage === "search" && "Entrez un Pseudo, ID ou RIB Morali pour commencer le virement."}
                     {transferStage === "amount" && `Vers ${transferRecipient?.name || ""}`}
-                    {transferStage === "pin" && "Saisissez votre code secret à 4 chiffres pour sécuriser l'opération."}
+                    {transferStage === "pin" && (securitySettings.faceId ? "Face ID non reconnu. Saisissez votre code PIN pour confirmer." : "Saisissez votre code secret à 4 chiffres pour sécuriser l'opération.")}
                     {transferStage === "processing" && "Virement en cours de traitement..."}
                     {transferStage === "success" && "Fonds transférés avec succès"}
                     {transferStage === "error" && "Le virement n'a pas pu aboutir"}

@@ -928,6 +928,18 @@ function App() {
           // Charger le pseudo de l'utilisateur
           if (data.pseudo) setUserPseudo(data.pseudo);
 
+          // Auto-réparation : ajouter le suffixe unique si le pseudo est ancien (sans 4 chiffres du moraliId)
+          if (data.pseudo && data.moraliId) {
+            const moraliDigits = data.moraliId.replace(/[^0-9]/g, "").slice(-4);
+            const nameBase = (data.fullName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "").slice(0, 14);
+            const expectedPseudo = nameBase && moraliDigits ? `@${nameBase}${moraliDigits}`.toLowerCase() : null;
+            if (expectedPseudo && data.pseudo !== expectedPseudo) {
+              console.log("[Auto-repair] Mise à jour pseudo:", data.pseudo, "→", expectedPseudo);
+              setUserPseudo(expectedPseudo);
+              updateDoc(doc(firebaseDb, "moraliUsers", user.uid), { pseudo: expectedPseudo }).catch(() => {});
+            }
+          }
+
           const firestoreName = data.fullName || `${data.firstName} ${data.lastName}`.trim() || "";
           // Fallback: Firebase Auth displayName, then email-based name
           const firebaseName = user.displayName || "";

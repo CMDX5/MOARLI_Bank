@@ -469,6 +469,7 @@ function App() {
   const [revealAttempts, setRevealAttempts] = useState(0);
   const [revealLockedUntil, setRevealLockedUntil] = useState(0);
   const [dashboardName, setDashboardName] = useState("Utilisateur");
+  const [userPseudo, setUserPseudo] = useState("");
   const [cardTransform, setCardTransform] = useState("rotateX(4deg) rotateY(-3deg)");
   const [cardLocked, setCardLocked] = useState(false);
   const [cardNumberRevealed, setCardNumberRevealed] = useState(false);
@@ -924,6 +925,9 @@ function App() {
           setAccountSuspended(false);
           setSuspensionMessage("");
 
+          // Charger le pseudo de l'utilisateur
+          if (data.pseudo) setUserPseudo(data.pseudo);
+
           const firestoreName = data.fullName || `${data.firstName} ${data.lastName}`.trim() || "";
           // Fallback: Firebase Auth displayName, then email-based name
           const firebaseName = user.displayName || "";
@@ -959,6 +963,13 @@ function App() {
             cacheIdentityForUid(user.uid, immediateIdentity);
             const repairedIdentity = await persistMoraliProfile(user.uid);
             setBankingIdentity(repairedIdentity || immediateIdentity);
+            // Générer et stocker le pseudo si pas encore
+            if (!data.pseudo) {
+              const moraliIdForPseudo = repairedIdentity?.id || immediateIdentity.id || "";
+              const pBase = (fullName || "morali").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "").slice(0, 14);
+              const pSuffix = moraliIdForPseudo.replace(/[^0-9]/g, "").slice(-4);
+              setUserPseudo(`@${pBase}${pSuffix}`.toLowerCase());
+            }
           } else {
             const loadedIdentity = { id: data.moraliId, rib: data.rib };
             cacheIdentityForUid(user.uid, loadedIdentity);
@@ -2242,6 +2253,9 @@ function App() {
     // Publish directory entry in transactions collection (public read for search)
     await publishDirectoryEntry(uid, { fullName, firstName, lastName, pseudo: payload.pseudo, moraliId: preservedMoraliId });
 
+    // Mettre à jour le pseudo dans le state
+    setUserPseudo(payload.pseudo);
+
     return { id: preservedMoraliId, rib: preservedRib };
   };
 
@@ -2281,7 +2295,7 @@ function App() {
     if (bankingIdentity.id && normalizedMoraliId === bankingIdentity.id.toUpperCase().replace(/[^A-Z0-9]/g, "")) {
       console.log("[findMoraliUser] Self-detection via bankingIdentity.id:", bankingIdentity.id);
       return {
-        user: buildMoraliUser({ uid: authUid || undefined, fullName: dashboardName, pseudo: "", moraliId: bankingIdentity.id || undefined }),
+        user: buildMoraliUser({ uid: authUid || undefined, fullName: dashboardName, pseudo: userPseudo, moraliId: bankingIdentity.id || undefined }),
         isSelf: true,
       };
     }
@@ -3877,7 +3891,7 @@ function App() {
     setContactModalOpen(true);
     // Force directory sync so the current user is findable
     if (bankingIdentity.id && dashboardName) {
-      publishDirectoryEntry(authUid || "", { fullName: dashboardName, firstName: "", lastName: "", pseudo: "", moraliId: bankingIdentity.id || "" }).catch(() => {});
+      publishDirectoryEntry(authUid || "", { fullName: dashboardName, firstName: "", lastName: "", pseudo: userPseudo, moraliId: bankingIdentity.id || "" }).catch(() => {});
     }
   };
 
@@ -4172,6 +4186,7 @@ function App() {
       cacheIdentityForUid(user.uid, identity);
       setBankingIdentity(identity);
       setDashboardName(displayName);
+      setUserPseudo(`@${pseudoFull}`.toLowerCase());
       setProfileForm((prev) => ({
         ...prev,
         fullName: displayName,
@@ -7194,6 +7209,7 @@ function App() {
             <ProfileView
               holder={dashboardData.holder}
               bankingId={bankingIdentity.id}
+              userPseudo={userPseudo}
               kycConfig={kycConfig}
               kycLevel={kycLevel}
               secLevelCount={secLevelCount}

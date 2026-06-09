@@ -25,6 +25,7 @@ export interface ProfileGroup {
 export interface ProfileViewProps {
   holder: string;
   bankingId: string;
+  userPseudo?: string;
   kycConfig: KycConfig;
   kycLevel: number;
   secLevelCount: number;
@@ -36,6 +37,7 @@ export interface ProfileViewProps {
 export default function ProfileView({
   holder,
   bankingId,
+  userPseudo,
   kycConfig,
   kycLevel,
   secLevelCount,
@@ -44,25 +46,29 @@ export default function ProfileView({
   onLogout,
 }: ProfileViewProps) {
   const [copiedId, setCopiedId] = useState(false);
+  const [copiedPseudo, setCopiedPseudo] = useState(false);
 
-  const handleCopyId = async () => {
+  const copyToClipboard = async (text: string, setCopied: (v: boolean) => void) => {
     try {
-      await navigator.clipboard.writeText(bankingId);
-      setCopiedId(true);
-      setTimeout(() => setCopiedId(false), 1500);
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
     } catch {
       const ta = document.createElement("textarea");
-      ta.value = bankingId;
+      ta.value = text;
       ta.style.position = "fixed";
       ta.style.opacity = "0";
       document.body.appendChild(ta);
       ta.select();
       document.execCommand("copy");
       document.body.removeChild(ta);
-      setCopiedId(true);
-      setTimeout(() => setCopiedId(false), 1500);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
     }
   };
+
+  const handleCopyId = () => copyToClipboard(bankingId, setCopiedId);
+  const handleCopyPseudo = () => copyToClipboard(userPseudo || "", setCopiedPseudo);
 
   return (
     <div className="app-screen active">
@@ -97,6 +103,26 @@ export default function ProfileView({
                   )}
                 </button>
               </div>
+              {userPseudo && (
+                <div className="profile-id" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, marginTop: 2 }}>
+                  {userPseudo}
+                  <button
+                    onClick={handleCopyPseudo}
+                    aria-label="Copier pseudo"
+                    style={{
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      width: 20, height: 20, borderRadius: 5, border: "none", padding: 0,
+                      background: "rgba(255,255,255,.08)", cursor: "pointer", flexShrink: 0,
+                    }}
+                  >
+                    {copiedPseudo ? (
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                    ) : (
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                    )}
+                  </button>
+                </div>
+              )}
               <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 6, padding: "4px 12px", borderRadius: 999, background: kycConfig.bg, border: `1px solid ${kycConfig.border}` }}>
                 <div style={{ width: 6, height: 6, borderRadius: "50%", background: kycConfig.color }} />
                 <span style={{ fontSize: 10, fontWeight: 800, color: kycConfig.color, letterSpacing: ".5px" }}>{kycConfig.text}</span>

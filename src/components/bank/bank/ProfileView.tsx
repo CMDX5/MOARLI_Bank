@@ -25,6 +25,7 @@ export interface ProfileGroup {
 export interface ProfileViewProps {
   holder: string;
   bankingId: string;
+  userPseudo?: string;
   kycConfig: KycConfig;
   kycLevel: number;
   secLevelCount: number;
@@ -36,6 +37,7 @@ export interface ProfileViewProps {
 export default function ProfileView({
   holder,
   bankingId,
+  userPseudo,
   kycConfig,
   kycLevel,
   secLevelCount,
@@ -44,26 +46,29 @@ export default function ProfileView({
   onLogout,
 }: ProfileViewProps) {
   const [copiedId, setCopiedId] = useState(false);
+  const [copiedPseudo, setCopiedPseudo] = useState(false);
 
-  const handleCopyId = async () => {
+  const copyToClipboard = async (text: string, setCopied: (v: boolean) => void) => {
     try {
-      await navigator.clipboard.writeText(bankingId);
-      setCopiedId(true);
-      setTimeout(() => setCopiedId(false), 1500);
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
     } catch {
-      // Fallback: select and copy
       const ta = document.createElement("textarea");
-      ta.value = bankingId;
+      ta.value = text;
       ta.style.position = "fixed";
       ta.style.opacity = "0";
       document.body.appendChild(ta);
       ta.select();
       document.execCommand("copy");
       document.body.removeChild(ta);
-      setCopiedId(true);
-      setTimeout(() => setCopiedId(false), 1500);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
     }
   };
+
+  const handleCopyId = () => copyToClipboard(bankingId, setCopiedId);
+  const handleCopyPseudo = () => copyToClipboard(userPseudo || "", setCopiedPseudo);
 
   return (
     <div className="app-screen active">
@@ -98,6 +103,26 @@ export default function ProfileView({
                   )}
                 </button>
               </div>
+              {userPseudo && (
+                <div className="profile-id" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, marginTop: 2 }}>
+                  {userPseudo}
+                  <button
+                    onClick={handleCopyPseudo}
+                    aria-label="Copier pseudo"
+                    style={{
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      width: 20, height: 20, borderRadius: 5, border: "none", padding: 0,
+                      background: "rgba(255,255,255,.08)", cursor: "pointer", flexShrink: 0,
+                    }}
+                  >
+                    {copiedPseudo ? (
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                    ) : (
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                    )}
+                  </button>
+                </div>
+              )}
               <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 6, padding: "4px 12px", borderRadius: 999, background: kycConfig.bg, border: `1px solid ${kycConfig.border}` }}>
                 <div style={{ width: 6, height: 6, borderRadius: "50%", background: kycConfig.color }} />
                 <span style={{ fontSize: 10, fontWeight: 800, color: kycConfig.color, letterSpacing: ".5px" }}>{kycConfig.text}</span>
@@ -111,15 +136,40 @@ export default function ProfileView({
               {group.items.map((item) => (
                 <button key={item.label} className="profile-item" onClick={() => onAction(item.label)}>
                   <div className="profile-item-left">
-                    <div className="tab-card-icon" style={{ background: "rgba(255,255,255,.03)", color: "#cbd5e1" }}>
-                      <AppIcon name={item.icon} size={18} stroke={item.icon === "shield" ? "#60a5fa" : "#cbd5e1"} />
+                    <div className="tab-card-icon" style={{
+                      background: item.icon === "shield" ? "rgba(96,165,250,.12)" :
+                        item.icon === "user" ? "rgba(59,130,246,.12)" :
+                        item.icon === "lock" ? "rgba(212,164,55,.12)" :
+                        item.icon === "receipt" ? "rgba(34,197,94,.12)" :
+                        item.icon === "headset" ? "rgba(168,85,247,.12)" :
+                        item.icon === "eye-off" ? "rgba(129,140,248,.12)" :
+                        "rgba(255,255,255,.05)",
+                      borderColor: item.icon === "shield" ? "rgba(96,165,250,.2)" :
+                        item.icon === "user" ? "rgba(59,130,246,.2)" :
+                        item.icon === "lock" ? "rgba(212,164,55,.2)" :
+                        item.icon === "receipt" ? "rgba(34,197,94,.2)" :
+                        item.icon === "headset" ? "rgba(168,85,247,.2)" :
+                        item.icon === "document" ? "rgba(251,191,36,.2)" :
+                        item.icon === "eye-off" ? "rgba(129,140,248,.2)" :
+                        "rgba(255,255,255,.06)",
+                    }}>
+                      <AppIcon name={item.icon} size={20} stroke={
+                        item.icon === "shield" ? "#60a5fa" :
+                        item.icon === "user" ? "#3b82f6" :
+                        item.icon === "lock" ? "#D4A437" :
+                        item.icon === "receipt" ? "#22c55e" :
+                        item.icon === "headset" ? "#a855f7" :
+                        item.icon === "document" ? "#fbbf24" :
+                        item.icon === "eye-off" ? "#818cf8" :
+                        "#cbd5e1"
+                      } />
                     </div>
                     <div style={{ textAlign: "left" }}>
                       <div className="profile-item-label">{item.label}</div>
                       {item.sub && <div className="profile-item-sub">{item.sub}</div>}
                     </div>
                   </div>
-                  {item.label === "Sécurité & Biométrie" ? (
+                  {item.label === "Sécurité & Face ID" ? (
                     <span className="profile-badge" style={{ background: secLevelCount >= 3 ? "rgba(34,197,94,.12)" : secLevelCount >= 2 ? "rgba(234,179,8,.12)" : "rgba(239,68,68,.12)", color: secLevelCount >= 3 ? "#22c55e" : secLevelCount >= 2 ? "#eab308" : "#ef4444" }}>{secLevelCount >= 3 ? "Sécurisé" : secLevelCount >= 2 ? "Moyen" : "Faible"}</span>
                   ) : item.badge ? (
                     <span className="profile-badge">{item.badge}</span>

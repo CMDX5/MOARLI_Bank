@@ -71,6 +71,8 @@ export type PaymentContact = {
   tone: "grad-blue" | "grad-purple" | "grad-amber" | "grad-rose";
   account?: string;
   pseudo?: string;
+  firstName?: string;
+  photo?: string;
 };
 
 export type SearchServiceItem = {
@@ -90,6 +92,8 @@ export type MoraliUser = {
   account: string;
   uid: string;
   tone: PaymentContact["tone"];
+  firstName?: string;
+  photo?: string;
 };
 
 export type FirestoreMoraliUser = {

@@ -2242,12 +2242,14 @@ function App() {
     return { id: preservedMoraliId, rib: preservedRib };
   };
 
-  const buildMoraliUser = (d: { uid?: string; fullName?: string; pseudo?: string; moraliId?: string; [key: string]: unknown }): MoraliUser => ({
+  const buildMoraliUser = (d: { uid?: string; fullName?: string; firstName?: string; pseudo?: string; moraliId?: string; photo?: string; [key: string]: unknown }): MoraliUser => ({
     name: d.fullName || "Utilisateur",
     pseudo: d.pseudo?.startsWith("@") ? d.pseudo : `@${d.pseudo || ""}`,
     account: d.moraliId || "MORALI00000",
     uid: d.uid || "",
     tone: "grad-blue",
+    firstName: d.firstName || "",
+    photo: d.photo || "",
   });
 
   // Ensure directoryLookup entry exists for the current user (self-repair)
@@ -3892,7 +3894,7 @@ function App() {
     setPaymentContacts((current) => {
       const exists = current.some((contact) => contact.name.toLowerCase() === verifiedMoraliUser.name.toLowerCase());
       if (exists) return current;
-      return [{ name: verifiedMoraliUser.name, tone: verifiedMoraliUser.tone, account: verifiedMoraliUser.account, pseudo: verifiedMoraliUser.pseudo }, ...current];
+      return [{ name: verifiedMoraliUser.name, tone: verifiedMoraliUser.tone, account: verifiedMoraliUser.account, pseudo: verifiedMoraliUser.pseudo, firstName: verifiedMoraliUser.firstName || "", photo: verifiedMoraliUser.photo || "" }, ...current];
     });
     showToast(`${verifiedMoraliUser.name} ajouté aux favoris`);
     closeContactModal();
@@ -6872,7 +6874,7 @@ function App() {
                 {/* ── Contact Info Modal (long press on saved contact) ── */}
                 {contactInfoOpen && selectedContactInfo && (
                   <div className="contact-modal-overlay" onClick={closeContactInfo}>
-                    <div className="contact-modal" onClick={(event) => event.stopPropagation()} style={{ maxWidth: 360, margin: "0 auto" }}>
+                    <div className="contact-modal" onClick={(event) => event.stopPropagation()} style={{ maxWidth: 380, margin: "0 auto" }}>
                       <div className="contact-modal-head">
                         <div>
                           <div className="contact-modal-title">Informations du contact</div>
@@ -6883,26 +6885,74 @@ function App() {
                         </button>
                       </div>
 
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "12px 0 20px" }}>
-                        <div className={`contact-circle ${selectedContactInfo.tone}`} style={{ width: 64, height: 64, fontSize: 24 }}>
-                          {selectedContactInfo.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div style={{ textAlign: "center" }}>
-                          <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{selectedContactInfo.name}</div>
-                          {selectedContactInfo.account && (
-                            <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginTop: 4, fontFamily: "'Courier New', monospace" }}>
-                              {selectedContactInfo.account}
-                            </div>
-                          )}
-                          {selectedContactInfo.pseudo && (
-                            <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", marginTop: 2 }}>
-                              {selectedContactInfo.pseudo}
-                            </div>
-                          )}
-                        </div>
+                      {/* Avatar */}
+                      <div style={{ display: "flex", justifyContent: "center", padding: "16px 0 20px" }}>
+                        {selectedContactInfo.photo ? (
+                          <div style={{ width: 72, height: 72, borderRadius: 999, overflow: "hidden", border: "2px solid rgba(255,255,255,.15)", boxShadow: "0 8px 24px rgba(0,0,0,.4)" }}>
+                            <img src={selectedContactInfo.photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          </div>
+                        ) : (
+                          <div className={`contact-circle ${selectedContactInfo.tone}`} style={{ width: 72, height: 72, fontSize: 28 }}>
+                            {selectedContactInfo.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
                       </div>
 
-                      <div className="contact-modal-actions" style={{ gap: 10 }}>
+                      {/* Champs d'info */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        {/* Nom */}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderRadius: 16, background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.07)" }}>
+                          <div>
+                            <div style={{ fontSize: 9, fontWeight: 800, color: "#64748b", letterSpacing: ".12em", textTransform: "uppercase", marginBottom: 3 }}>Nom</div>
+                            <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>{selectedContactInfo.name}</div>
+                          </div>
+                        </div>
+
+                        {/* Prénom */}
+                        {selectedContactInfo.firstName && selectedContactInfo.firstName !== selectedContactInfo.name && (
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderRadius: 16, background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.07)" }}>
+                            <div>
+                              <div style={{ fontSize: 9, fontWeight: 800, color: "#64748b", letterSpacing: ".12em", textTransform: "uppercase", marginBottom: 3 }}>Prénom</div>
+                              <div style={{ fontSize: 15, fontWeight: 700, color: "#fff" }}>{selectedContactInfo.firstName}</div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ID Morali + copier */}
+                        {selectedContactInfo.account && (
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderRadius: 16, background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.07)" }}>
+                            <div>
+                              <div style={{ fontSize: 9, fontWeight: 800, color: "#64748b", letterSpacing: ".12em", textTransform: "uppercase", marginBottom: 3 }}>ID Morali</div>
+                              <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: "'Courier New', monospace", letterSpacing: ".05em" }}>{selectedContactInfo.account}</div>
+                            </div>
+                            <button
+                              onClick={() => { navigator.clipboard.writeText(selectedContactInfo.account || "").then(() => showToast("ID copié !")).catch(() => {}); }}
+                              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 10, border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.06)", cursor: "pointer", flexShrink: 0 }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Pseudo + copier */}
+                        {selectedContactInfo.pseudo && (
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderRadius: 16, background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.07)" }}>
+                            <div>
+                              <div style={{ fontSize: 9, fontWeight: 800, color: "#64748b", letterSpacing: ".12em", textTransform: "uppercase", marginBottom: 3 }}>Pseudo</div>
+                              <div style={{ fontSize: 14, fontWeight: 700, color: "#cbd5e1" }}>{selectedContactInfo.pseudo}</div>
+                            </div>
+                            <button
+                              onClick={() => { navigator.clipboard.writeText(selectedContactInfo.pseudo || "").then(() => showToast("Pseudo copié !")).catch(() => {}); }}
+                              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 10, border: "1px solid rgba(255,255,255,.1)", background: "rgba(255,255,255,.06)", cursor: "pointer", flexShrink: 0 }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Boutons */}
+                      <div className="contact-modal-actions" style={{ gap: 10, marginTop: 22 }}>
                         <button className="contact-modal-btn secondary" onClick={closeContactInfo} style={{ flex: 1 }}>Fermer</button>
                         <button
                           className="contact-modal-btn primary"

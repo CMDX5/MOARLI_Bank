@@ -7447,7 +7447,7 @@ function App() {
               <div className="banking-identity-card" onClick={() => copyToClipboard("rib", bankingIdentity.rib)}>
                 <div className="banking-identity-copy">
                   <span className="banking-identity-label">VOTRE RIB MOKG</span>
-                  <span className="banking-identity-value">{bankingIdentity.rib || "MOKG-…"}</span>
+                  <span className="banking-identity-value master">{bankingIdentity.rib || "MOKG-…"}</span>
                 </div>
                 <div className={`banking-copy-indicator ${copiedIdentityField === "rib" ? "success" : ""}`}>
                   {copiedIdentityField === "rib" ? "✓" : "⧉"}

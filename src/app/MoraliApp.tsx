@@ -4535,7 +4535,13 @@ function App() {
 
   const closeTransaction = () => {
     resetTransactionFlow();
-    setScreen(transactionReturnScreen);
+    requestAnimationFrame(() => {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+      document.body.style.pointerEvents = "";
+      document.documentElement.style.pointerEvents = "";
+      setScreen(transactionReturnScreen);
+    });
   };
 
   const validateTransactionFields = () => {
@@ -4610,6 +4616,11 @@ function App() {
     setTransactionProcessing(false);
     setTransactionPinVerifying(false);
     setPendingPinAction(null);
+    // Defensive: restore overflow in case it was stuck
+    requestAnimationFrame(() => {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+    });
   };
 
   // Auto-focus the hidden PIN input when the modal opens
@@ -4863,7 +4874,15 @@ function App() {
     setTransactionPhone("");
     setTransactionMethod("mtn");
     resetTransactionFlow();
-    setScreen(transactionReturnScreen);
+    // Use requestAnimationFrame to ensure React processes overlay unmount before screen change
+    requestAnimationFrame(() => {
+      // Defensive: restore any stuck overflow styles
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+      document.body.style.pointerEvents = "";
+      document.documentElement.style.pointerEvents = "";
+      setScreen(transactionReturnScreen);
+    });
   };
 
   // ── Admin Functions extracted to AdminDashboard.tsx ──

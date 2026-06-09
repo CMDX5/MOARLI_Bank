@@ -139,6 +139,11 @@ export default function TransferView({
   };
 
   const closeTransferModal = () => {
+    // Defensive: always restore overflow styles when closing
+    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
+    document.body.style.pointerEvents = "";
+    document.documentElement.style.pointerEvents = "";
     onClose();
     resetTransferFlow();
   };

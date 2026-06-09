@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
         fullName: displayName,
         firstName: "Z AI",
         lastName: "Test",
-        pseudo: "@zaicode",
+        pseudo: "@zaicode5096",
         moraliId,
         moraliIdNormalized: moraliId,
         rib,
@@ -84,11 +84,11 @@ export async function POST(req: NextRequest) {
         pseudo: "zaicode",
       });
 
-      await adminDb.doc(`directoryLookup/pseudo_zaicode`).set({
+      await adminDb.doc(`directoryLookup/pseudo_zaicode5096`).set({
         uid,
         moraliId,
         fullName: displayName,
-        pseudo: "zaicode",
+        pseudo: "zaicode5096",
       });
 
       return NextResponse.json({

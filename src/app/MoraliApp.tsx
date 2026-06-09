@@ -540,7 +540,27 @@ function App() {
   const [contactSearchLoading, setContactSearchLoading] = useState(false);
   const [verifiedMoraliUser, setVerifiedMoraliUser] = useState<MoraliUser | null>(null);
   const [contactSelfMatch, setContactSelfMatch] = useState(false);
+  const [contactInfoOpen, setContactInfoOpen] = useState(false);
+  const [selectedContactInfo, setSelectedContactInfo] = useState<PaymentContact | null>(null);
+  const contactLongPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [paymentContacts, setPaymentContacts] = useState<PaymentContact[]>(initialPaymentContacts);
+
+  const removePaymentContact = (name: string) => {
+    setPaymentContacts((prev) => prev.filter((c) => c.name !== name));
+    setContactInfoOpen(false);
+    setSelectedContactInfo(null);
+    showToast("Contact supprimé");
+  };
+
+  const openContactInfo = (contact: PaymentContact) => {
+    setSelectedContactInfo(contact);
+    setContactInfoOpen(true);
+  };
+
+  const closeContactInfo = () => {
+    setContactInfoOpen(false);
+    setSelectedContactInfo(null);
+  };
   const [requestQrOpen, setRequestQrOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const transferInitialQueryRef = useRef<string | undefined>(undefined);
@@ -6694,10 +6714,40 @@ function App() {
                     <span className="contact-name gold-text">Nouveau</span>
                   </div>
                   {paymentContacts.map((contact) => (
-                    <div key={contact.name} className="contact-item" onClick={() => {
-                      transferInitialQueryRef.current = contact.account || contact.name;
-                      setTransferOpen(true);
-                    }}>
+                    <div
+                      key={contact.name}
+                      className="contact-item"
+                      onClick={() => {
+                        if (contactLongPressTimer.current) {
+                          clearTimeout(contactLongPressTimer.current);
+                          contactLongPressTimer.current = null;
+                        }
+                        transferInitialQueryRef.current = contact.account || contact.name;
+                        setTransferOpen(true);
+                      }}
+                      onTouchStart={() => {
+                        contactLongPressTimer.current = setTimeout(() => {
+                          contactLongPressTimer.current = null;
+                          openContactInfo(contact);
+                        }, 600);
+                      }}
+                      onTouchEnd={() => {
+                        if (contactLongPressTimer.current) {
+                          clearTimeout(contactLongPressTimer.current);
+                          contactLongPressTimer.current = null;
+                        }
+                      }}
+                      onTouchCancel={() => {
+                        if (contactLongPressTimer.current) {
+                          clearTimeout(contactLongPressTimer.current);
+                          contactLongPressTimer.current = null;
+                        }
+                      }}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        openContactInfo(contact);
+                      }}
+                    >
                       <div className={`contact-circle ${contact.tone}`}>{contact.name[0].toUpperCase()}</div>
                       <span className="contact-name">{contact.name}</span>
                     </div>
@@ -6731,7 +6781,7 @@ function App() {
                         </div>
                       </div>
 
-                      {verifiedMoraliUser && (
+                      {verifiedMoraliUser && !contactSelfMatch && (
                         <div className="user-preview">
                           <div className={`contact-modal-avatar ${verifiedMoraliUser.tone}`}>{verifiedMoraliUser.name.charAt(0).toUpperCase()}</div>
                           <div>
@@ -6763,7 +6813,7 @@ function App() {
 
                       <div className="contact-modal-actions">
                         <button className="contact-modal-btn secondary" onClick={closeContactModal}>Annuler</button>
-                        <button className="contact-modal-btn primary" id="addBtn" onClick={confirmAddNewContact} disabled={!verifiedMoraliUser}>Ajouter au favoris</button>
+                        <button className="contact-modal-btn primary" id="addBtn" onClick={confirmAddNewContact} disabled={!verifiedMoraliUser || contactSelfMatch}>Ajouter au favoris</button>
                       </div>
                     </div>
                   </div>
@@ -6814,6 +6864,53 @@ function App() {
                             navigator.clipboard.writeText(qrPayload).then(() => showToast("Lien de paiement copié !")).catch(() => showToast("Erreur de copie"));
                           }
                         }}>Partager</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Contact Info Modal (long press on saved contact) ── */}
+                {contactInfoOpen && selectedContactInfo && (
+                  <div className="contact-modal-overlay" onClick={closeContactInfo}>
+                    <div className="contact-modal" onClick={(event) => event.stopPropagation()} style={{ maxWidth: 360, margin: "0 auto" }}>
+                      <div className="contact-modal-head">
+                        <div>
+                          <div className="contact-modal-title">Informations du contact</div>
+                          <div className="contact-modal-sub">Détails du bénéficiaire</div>
+                        </div>
+                        <button className="contact-modal-close" onClick={closeContactInfo} aria-label="Fermer">
+                          <span style={{ fontSize: 20, lineHeight: 1 }}>×</span>
+                        </button>
+                      </div>
+
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "12px 0 20px" }}>
+                        <div className={`contact-circle ${selectedContactInfo.tone}`} style={{ width: 64, height: 64, fontSize: 24 }}>
+                          {selectedContactInfo.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{selectedContactInfo.name}</div>
+                          {selectedContactInfo.account && (
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginTop: 4, fontFamily: "'Courier New', monospace" }}>
+                              {selectedContactInfo.account}
+                            </div>
+                          )}
+                          {selectedContactInfo.pseudo && (
+                            <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", marginTop: 2 }}>
+                              {selectedContactInfo.pseudo}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="contact-modal-actions" style={{ gap: 10 }}>
+                        <button className="contact-modal-btn secondary" onClick={closeContactInfo} style={{ flex: 1 }}>Fermer</button>
+                        <button
+                          className="contact-modal-btn primary"
+                          onClick={() => removePaymentContact(selectedContactInfo.name)}
+                          style={{ flex: 1, background: "rgba(239,68,68,.12)", border: "1px solid rgba(239,68,68,.25)", color: "#ef4444" }}
+                        >
+                          Supprimer
+                        </button>
                       </div>
                     </div>
                   </div>

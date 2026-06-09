@@ -6782,7 +6782,7 @@ function App() {
                       <div className="contact-modal-head">
                         <div>
                           <div className="contact-modal-title">Nouveau contact</div>
-                          <div className="contact-modal-sub">Recherchez un client Morali par ID ou RIB du compte pour l’ajouter à vos bénéficiaires.</div>
+                          <div className="contact-modal-sub">Recherchez un client Morali par Pseudo, ID ou RIB du compte pour l’ajouter à vos bénéficiaires.</div>
                         </div>
                         <button className="contact-modal-close" onClick={closeContactModal} aria-label="Fermer">
                           <span style={{ fontSize: 20, lineHeight: 1 }}>×</span>
@@ -6795,7 +6795,7 @@ function App() {
                           <input
                             className="contact-modal-input"
                             type="text"
-                            placeholder="ID ou RIB du compte..."
+                            placeholder="Pseudo, ID ou RIB du compte..."
                             value={contactQuery}
                             onChange={(e) => setContactQuery(e.target.value)}
                           />
@@ -6828,7 +6828,7 @@ function App() {
                           <div className="contact-modal-avatar">?</div>
                           <div>
                             <div className="contact-modal-preview-name">Aucun compte trouvé</div>
-                            <div className="contact-modal-preview-meta">Essayez un ID ou RIB Morali (ex: MORALI54321)</div>
+                            <div className="contact-modal-preview-meta">Essayez un Pseudo, ID ou RIB Morali (ex: @pseudo ou MORALI54321)</div>
                           </div>
                         </div>
                       )}
@@ -7392,6 +7392,17 @@ function App() {
               <button className="btn-close-circle" onClick={closeInfoDrawer} aria-label="Fermer">×</button>
             </div>
             <section className="banking-identity">
+              {userPseudo && (
+                <div className="banking-identity-card" onClick={() => copyToClipboard("id", userPseudo)}>
+                  <div className="banking-identity-copy">
+                    <span className="banking-identity-label">PSEUDO</span>
+                    <span className="banking-identity-value master">{userPseudo}</span>
+                  </div>
+                  <div className={`banking-copy-indicator ${copiedIdentityField === "id" ? "success" : ""}`}>
+                    {copiedIdentityField === "id" ? "✓" : "⧉"}
+                  </div>
+                </div>
+              )}
               <div className="banking-identity-card" onClick={() => copyToClipboard("id", bankingIdentity.id)}>
                 <div className="banking-identity-copy">
                   <span className="banking-identity-label">ID MORALI</span>

@@ -456,7 +456,7 @@ export default function TransferView({
 
   const startTransferPin = async () => {
     if (!transferRecipient) {
-      showToast("Entrez un ID ou RIB Morali valide");
+      showToast("Entrez un Pseudo, ID ou RIB Morali valide");
       return;
     }
     if (!transferAmountInput || Number(transferAmountInput) <= 0) {
@@ -631,7 +631,7 @@ export default function TransferView({
                     {transferStage === "error" && "Échec"}
                   </div>
                   <div className="transaction-flow-sub">
-                    {transferStage === "search" && "Entrez un ID ou RIB Morali pour commencer le virement."}
+                    {transferStage === "search" && "Entrez un Pseudo, ID ou RIB Morali pour commencer le virement."}
                     {transferStage === "amount" && `Vers ${transferRecipient?.name || ""}`}
                     {transferStage === "pin" && "Saisissez votre code PIN pour valider."}
                     {transferStage === "processing" && "Virement en cours de traitement..."}
@@ -664,7 +664,7 @@ export default function TransferView({
                     autoComplete="off"
                     autoCorrect="off"
                     spellCheck={false}
-                    placeholder="ID ou RIB du compte"
+                    placeholder="Pseudo, ID ou RIB du compte"
                     value={transferRecipientQuery}
                     onChange={(e) => handleTransferRecipientQuery(e.target.value)}
                     onKeyDown={(e) => {

@@ -550,7 +550,7 @@ function App() {
     setPaymentContacts((prev) => prev.filter((c) => c.name !== name));
     setContactInfoOpen(false);
     setSelectedContactInfo(null);
-    showToast("Contact supprimé");
+    showToast("Contact retiré");
   };
 
   const openContactInfo = (contact: PaymentContact) => {
@@ -6987,11 +6987,11 @@ function App() {
                       <div className="contact-modal-actions" style={{ gap: 10, marginTop: 22 }}>
                         <button className="contact-modal-btn secondary" onClick={closeContactInfo} style={{ flex: 1 }}>Fermer</button>
                         <button
-                          className="contact-modal-btn primary"
+                          className="contact-modal-btn secondary"
                           onClick={() => removePaymentContact(selectedContactInfo.name)}
-                          style={{ flex: 1, background: "rgba(239,68,68,.12)", border: "1px solid rgba(239,68,68,.25)", color: "#ef4444" }}
+                          style={{ flex: 1, background: "rgba(239,68,68,.1)", border: "1px solid rgba(239,68,68,.2)", color: "#ef4444" }}
                         >
-                          Supprimer
+                          Retirer
                         </button>
                       </div>
                     </div>

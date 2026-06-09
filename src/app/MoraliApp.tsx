@@ -3832,7 +3832,7 @@ function App() {
     setPaymentContacts((current) => {
       const exists = current.some((contact) => contact.name.toLowerCase() === verifiedMoraliUser.name.toLowerCase());
       if (exists) return current;
-      return [{ name: verifiedMoraliUser.name, tone: verifiedMoraliUser.tone }, ...current];
+      return [{ name: verifiedMoraliUser.name, tone: verifiedMoraliUser.tone, account: verifiedMoraliUser.account, pseudo: verifiedMoraliUser.pseudo }, ...current];
     });
     showToast(`${verifiedMoraliUser.name} ajouté aux favoris`);
     closeContactModal();
@@ -6655,7 +6655,7 @@ function App() {
                   </div>
                   {paymentContacts.map((contact) => (
                     <div key={contact.name} className="contact-item" onClick={() => {
-                      transferInitialQueryRef.current = contact.name;
+                      transferInitialQueryRef.current = contact.account || contact.name;
                       setTransferOpen(true);
                     }}>
                       <div className={`contact-circle ${contact.tone}`}>{contact.name[0].toUpperCase()}</div>

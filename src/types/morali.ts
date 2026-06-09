@@ -69,6 +69,8 @@ export type NotificationItem = {
 export type PaymentContact = {
   name: string;
   tone: "grad-blue" | "grad-purple" | "grad-amber" | "grad-rose";
+  account?: string;
+  pseudo?: string;
 };
 
 export type SearchServiceItem = {

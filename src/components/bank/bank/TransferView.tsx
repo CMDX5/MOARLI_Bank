@@ -92,11 +92,15 @@ export default function TransferView({
   const transferDragRef = useRef({ active: false, startX: 0, startProgress: 0 });
   const transferSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /* ── Sync initialRecipientQuery from QR scanner ── */
+  /* ── Sync initialRecipientQuery from QR scanner / saved contacts ── */
   useEffect(() => {
     if (open && initialRecipientQuery) {
       setTransferRecipientQuery(initialRecipientQuery);
+      // Auto-search for the recipient (saved contacts provide moraliId)
+      const timer = setTimeout(() => searchMoraliRecipient(initialRecipientQuery), 150);
+      return () => clearTimeout(timer);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialRecipientQuery]);
 
   /* ── Focus input when opening ── */

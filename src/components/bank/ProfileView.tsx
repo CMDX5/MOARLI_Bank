@@ -1,5 +1,5 @@
 'use client';
-import React from "react";
+import React, { useState } from "react";
 import { AppIcon } from "@/components/bank/Icons";
 import type { IconName } from "@/types/morali";
 
@@ -43,6 +43,27 @@ export default function ProfileView({
   onAction,
   onLogout,
 }: ProfileViewProps) {
+  const [copiedId, setCopiedId] = useState(false);
+
+  const handleCopyId = async () => {
+    try {
+      await navigator.clipboard.writeText(bankingId);
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 1500);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = bankingId;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 1500);
+    }
+  };
+
   return (
     <div className="app-screen active">
       <div className="content-scrollable nav-safe">
@@ -58,7 +79,25 @@ export default function ProfileView({
             </div>
             <div style={{ textAlign: "center" }}>
               <div className="profile-name">{holder}</div>
-              <div className="profile-id">ID: {bankingId}</div>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <div className="profile-id">ID: {bankingId}</div>
+                <button
+                  onClick={handleCopyId}
+                  aria-label="Copier ID"
+                  style={{
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    width: 24, height: 24, borderRadius: 6, border: "none",
+                    background: copiedId ? "rgba(34,197,94,.15)" : "rgba(255,255,255,.06)",
+                    cursor: "pointer", transition: "background .2s",
+                  }}
+                >
+                  {copiedId ? (
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                  ) : (
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                  )}
+                </button>
+              </div>
               <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 6, padding: "4px 12px", borderRadius: 999, background: kycConfig.bg, border: `1px solid ${kycConfig.border}` }}>
                 <div style={{ width: 6, height: 6, borderRadius: "50%", background: kycConfig.color }} />
                 <span style={{ fontSize: 10, fontWeight: 800, color: kycConfig.color, letterSpacing: ".5px" }}>{kycConfig.text}</span>

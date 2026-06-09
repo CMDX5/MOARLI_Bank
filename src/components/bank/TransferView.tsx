@@ -455,7 +455,7 @@ export default function TransferView({
     }
   }, [transferStage]);
 
-  const startTransferPin = async () => {
+  const startTransferAuth = async () => {
     if (!transferRecipient) {
       showToast("Entrez un Pseudo, ID ou RIB Morali valide");
       return;
@@ -464,31 +464,37 @@ export default function TransferView({
       showToast("Saisissez un montant");
       return;
     }
-    // Face ID check if enabled
-    if (securitySettings.faceId) {
-      const faceOk = await promptBiometric();
-      if (!faceOk) {
-        showToast("Authentification Face ID annulée");
-        return;
-      }
-    }
 
-    // ── Transaction validation for large amounts ──
+    // ── Transaction validation for large amounts (confirmation screen) ──
     const amount = Number(transferAmountInput || 0);
     if (securitySettings.transactionValidation && amount >= 50000) {
       setTransferConfirmOpen(true);
       return;
     }
 
-    setTransferSliding(true);
-    setTransferSlideProgress(100);
-    if (navigator.vibrate) navigator.vibrate(12);
-    setTimeout(() => {
-      setTransferSliding(false);
-      setTransferSlideProgress(0);
-      setTransferPinOpen(true);
-      setTransferStage("pin");
-    }, 320);
+    // ── Authentication: Face ID OR PIN, not both ──
+    if (securitySettings.faceId) {
+      // Face ID only — no PIN needed
+      const faceOk = await promptBiometric();
+      if (!faceOk) {
+        showToast("Authentification Face ID annulée");
+        return;
+      }
+      // Go directly to processing
+      setTransferStage("processing");
+      setTimeout(() => executeTransfer(), 400);
+    } else {
+      // PIN only
+      setTransferSliding(true);
+      setTransferSlideProgress(100);
+      if (navigator.vibrate) navigator.vibrate(12);
+      setTimeout(() => {
+        setTransferSliding(false);
+        setTransferSlideProgress(0);
+        setTransferPinOpen(true);
+        setTransferStage("pin");
+      }, 320);
+    }
   };
 
   const confirmTransferAndProceed = () => {
@@ -520,7 +526,7 @@ export default function TransferView({
     if (!transferDragRef.current.active) return;
     transferDragRef.current.active = false;
     if (transferSlideProgress >= 90) {
-      startTransferPin();
+      startTransferAuth();
     } else {
       setTransferSliding(false);
       setTransferSlideProgress(0);

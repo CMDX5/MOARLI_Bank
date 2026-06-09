@@ -15,7 +15,7 @@ const PRIVACY_SECTIONS = [
   },
   {
     title: "Article 2 — Données personnelles collectées",
-    content: `Morali Pay collecte les catégories de données suivantes :\n\n2.1 Données d'identification :\n— Nom, prénom(s), date de naissance\n— Numéro de téléphone (incluant le préfixe international +242)\n— Adresse email\n— Adresse de résidence\n— Pièce d'identité nationale ou passeport (dans le cadre du KYC)\n— Photographie (selfie biométrique)\n\n2.2 Données financières :\n— Solde du compte et historique des transactions\n— Données de carte bancaire (numéro masqué, date d'expiration)\n— Relevés d'épargne et opérations de crédit\n\n2.3 Données techniques et de connexion :\n— Adresse IP\n— Identifiants de session et tokens d'authentification\n— Type et modèle de l'appareil\n— Système d'exploitation et version de l'application\n— Localisation géographique approximative\n\n2.4 Données biométriques :\n— Empreinte digitale (si activée par l'Utilisateur)\n— Reconnaissance faciale (si activée par l'Utilisateur)\n\nLes données biométriques sont stockées exclusivement sur l'appareil de l'Utilisateur et ne sont jamais transmises aux serveurs de Morali Pay.`,
+    content: `Morali Pay collecte les catégories de données suivantes :\n\n2.1 Données d'identification :\n— Nom, prénom(s), date de naissance\n— Numéro de téléphone (incluant le préfixe international +242)\n— Adresse email\n— Adresse de résidence\n— Pièce d'identité nationale ou passeport (dans le cadre du KYC)\n— Photographie (selfie biométrique)\n\n2.2 Données financières :\n— Solde du compte et historique des transactions\n— Données de carte bancaire (numéro masqué, date d'expiration)\n— Relevés d'épargne et opérations de crédit\n\n2.3 Données techniques et de connexion :\n— Adresse IP\n— Identifiants de session et tokens d'authentification\n— Type et modèle de l'appareil\n— Système d'exploitation et version de l'application\n— Localisation géographique approximative\n\n2.4 Données biométriques :\n— Empreinte digitale (si activée par l'Utilisateur)\n— Reconnaissance faciale (si activée par l'Utilisateur)\n\nLes données biométriques sont stockées exclusivement sur l'appareil de l'Utilisateur sous forme de credentials cryptographiques WebAuthn et ne sont jamais transmises aux serveurs de Morali Pay.`,
   },
   {
     title: "Article 3 — Finalités du traitement",
@@ -23,7 +23,7 @@ const PRIVACY_SECTIONS = [
   },
   {
     title: "Article 4 — Base légale du traitement",
-    content: `Le traitement des données repose sur les bases légales suivantes, conformément à la Loi n° 34-2018 relative à la protection des données personnelles en République du Congo :\n\n— Exécution du contrat de services financiers (art. 5)\n— Obligation légale (KYC/AML, déclarations réglementaires) (art. 6)\n— Consentement explicite de l'Utilisateur pour les traitements optionnels (art. 7)\n— Intérêt légitime de Morali Pay, sous réserve de ne pas porter atteinte aux droits de l'Utilisateur (art. 8)\n\nPour les traitements reposant sur le consentement, l'Utilisateur peut retirer son consentement à tout moment via les paramètres de confidentialité de l'application.`,
+    content: `Le traitement des données repose sur les bases légales suivantes, conformément à la Loi n° 29-2019 du 10 octobre 2019 portant protection des données à caractère personnel en République du Congo :\n\n— Exécution du contrat de services financiers (art. 5)\n— Obligation légale (KYC/AML, déclarations réglementaires) (art. 6)\n— Consentement explicite de l'Utilisateur pour les traitements optionnels (art. 7)\n— Intérêt légitime de Morali Pay, sous réserve de ne pas porter atteinte aux droits de l'Utilisateur (art. 8)\n\nPour les traitements reposant sur le consentement, l'Utilisateur peut retirer son consentement à tout moment via les paramètres de confidentialité de l'application.`,
   },
   {
     title: "Article 5 — Durée de conservation",
@@ -31,7 +31,7 @@ const PRIVACY_SECTIONS = [
   },
   {
     title: "Article 6 — Sécurité des données",
-    content: `Morali Pay met en œuvre des mesures de sécurité techniques et organisationnelles appropriées pour protéger les données personnelles contre la destruction accidentelle ou illicite, la perte, l'altération, la divulgation ou l'accès non autorisé :\n\n6.1 Mesures techniques :\n— Chiffrement AES-256 au repos et TLS 1.3 en transit\n— Tokenisation des données de paiement\n— Authentification multi-facteurs (MFA)\n— Isolation des bases de données par environnement\n— Monitoring continu des accès et alertes en temps réel\n— Tests de pénétration réguliers par des tiers certifiés\n\n6.2 Mesures organisationnelles :\n— Formation obligatoire du personnel à la protection des données\n— Contrôle d'accès basé sur le principe du moindre privilège\n— Procédure de gestion des incidents de sécurité\n— Plan de continuité d'activité\n\n6.3 Hébergement :\nLes données sont hébergées sur des serveurs situés en Afrique Centrale, dans le respect de la souveraineté numérique de la République du Congo et des recommandations de l'ANSSI Congo.`,
+    content: `Morali Pay met en œuvre des mesures de sécurité techniques et organisationnelles appropriées pour protéger les données personnelles contre la destruction accidentelle ou illicite, la perte, l'altération, la divulgation ou l'accès non autorisé :\n\n6.1 Mesures techniques :\n— Chiffrement AES-256 au repos et TLS 1.3 en transit\n— Tokenisation des données de paiement\n— Authentification multi-facteurs (MFA)\n— Isolation des bases de données par environnement\n— Monitoring continu des accès et alertes en temps réel\n— Tests de pénétration réguliers par des tiers certifiés\n\n6.2 Mesures organisationnelles :\n— Formation obligatoire du personnel à la protection des données\n— Contrôle d'accès basé sur le principe du moindre privilège\n— Procédure de gestion des incidents de sécurité\n— Plan de continuité d'activité\n\n6.3 Hébergement :\nLes données sont traitées dans le respect de la souveraineté numérique de la République du Congo et des recommandations de la Commission Nationale pour la Protection des Données à Caractère Personnel (CNPDCP).`,
   },
   {
     title: "Article 7 — Partage et transfert des données",
@@ -39,7 +39,7 @@ const PRIVACY_SECTIONS = [
   },
   {
     title: "Article 8 — Droits de l'Utilisateur",
-    content: `Conformément à la Loi n° 34-2018, l'Utilisateur dispose des droits suivants :\n\n8.1 Droit d'accès : obtenir la confirmation du traitement et une copie de ses données personnelles.\n\n8.2 Droit de rectification : demander la correction des données inexactes ou incomplètes.\n\n8.3 Droit à l'effacement : demander la suppression de ses données dans les conditions prévues par la loi (sauf obligation légale de conservation).\n\n8.4 Droit à la limitation : demander la limitation du traitement en cas de contestation de l'exactitude des données.\n\n8.5 Droit à la portabilité : recevoir ses données dans un format structuré et courant, ou demander leur transfert à un tiers.\n\n8.6 Droit d'opposition : s'opposer au traitement pour des raisons légitimes, y compris la prospection commerciale.\n\n8.7 Droit de retirer le consentement : à tout moment, sans que cela ne compromette la licéité du traitement antérieur.\n\n8.8 Exercice des droits :\nL'Utilisateur peut exercer ses droits via :\n— Les paramètres de confidentialité dans l'application\n— Le service client Morali Pay\n— Le Délégué à la Protection des Données (DPO)\nMorali Pay s'engage à répondre dans un délai de 30 jours calendaires.`,
+    content: `Conformément à la Loi n° 29-2019, l'Utilisateur dispose des droits suivants :\n\n8.1 Droit d'accès : obtenir la confirmation du traitement et une copie de ses données personnelles.\n\n8.2 Droit de rectification : demander la correction des données inexactes ou incomplètes.\n\n8.3 Droit à l'effacement : demander la suppression de ses données dans les conditions prévues par la loi (sauf obligation légale de conservation).\n\n8.4 Droit à la limitation : demander la limitation du traitement en cas de contestation de l'exactitude des données.\n\n8.5 Droit à la portabilité : recevoir ses données dans un format structuré et courant, ou demander leur transfert à un tiers.\n\n8.6 Droit d'opposition : s'opposer au traitement pour des raisons légitimes, y compris la prospection commerciale.\n\n8.7 Droit de retirer le consentement : à tout moment, sans que cela ne compromette la licéité du traitement antérieur.\n\n8.8 Exercice des droits :\nL'Utilisateur peut exercer ses droits via :\n— Les paramètres de confidentialité dans l'application\n— Le service client Morali Pay\n— Le Délégué à la Protection des Données (DPO)\nMorali Pay s'engage à répondre dans un délai de 30 jours calendaires.`,
   },
   {
     title: "Article 9 — Cookies et technologies de suivi",
@@ -51,7 +51,7 @@ const PRIVACY_SECTIONS = [
   },
   {
     title: "Article 11 — Notification en cas de violation de données",
-    content: `11.1 En cas de violation de données à caractère personnel susceptible d'engendrer un risque pour les droits et libertés de l'Utilisateur, Morali Pay s'engage à :\n\n— Notifier l'ANSSI Congo dans les 72 heures suivant la constatation de la violation\n— Informer l'Utilisateur sans retard injustifié par notification push dans l'application et/ou par email\n— Documenter les circonstances, la nature des données concernées, les effets prévisibles et les mesures correctives prises\n\n11.2 L'évaluation de la gravité de la violation est réalisée conformément aux recommandations de l'ANSSI Congo et prend en compte :\n— Le nombre et la catégorie des personnes concernées\n— La nature et la sensibilité des données compromises\n— La probabilité et la gravité des conséquences pour les personnes concernées\n\n11.3 La notification à l'Utilisateur inclut obligatoirement :\n— La description claire de la nature de la violation\n— Le nom et les coordonnées du DPO\n— Les conséquences probables de la violation\n— Les mesures prises ou proposées pour remédier à la violation\n\n11.4 Morali Pay conserve un registre des violations de données, indiquant les faits, les effets et les mesures correctives, conformément aux obligations de la Loi n° 34-2018.`,
+    content: `11.1 En cas de violation de données à caractère personnel susceptible d'engendrer un risque pour les droits et libertés de l'Utilisateur, Morali Pay s'engage à :\n\n— Notifier la CNPDCP dans les 72 heures suivant la constatation de la violation\n— Informer l'Utilisateur sans retard injustifié par notification push dans l'application et/ou par email\n— Documenter les circonstances, la nature des données concernées, les effets prévisibles et les mesures correctives prises\n\n11.2 L'évaluation de la gravité de la violation est réalisée conformément aux recommandations de la CNPDCP et prend en compte :\n— Le nombre et la catégorie des personnes concernées\n— La nature et la sensibilité des données compromises\n— La probabilité et la gravité des conséquences pour les personnes concernées\n\n11.3 La notification à l'Utilisateur inclut obligatoirement :\n— La description claire de la nature de la violation\n— Le nom et les coordonnées du DPO\n— Les conséquences probables de la violation\n— Les mesures prises ou proposées pour remédier à la violation\n\n11.4 Morali Pay conserve un registre des violations de données, indiquant les faits, les effets et les mesures correctives, conformément aux obligations de la Loi n° 29-2019.`,
   },
   {
     title: "Article 12 — Modifications de la politique",
@@ -59,7 +59,7 @@ const PRIVACY_SECTIONS = [
   },
   {
     title: "Article 13 — Contact",
-    content: `13.1 Pour toute question relative à la protection des données personnelles ou pour exercer vos droits, l'Utilisateur peut contacter :\n\n— Le formulaire Support intégré dans l'application Morali Pay\n— Le Délégué à la Protection des Données (DPO) via le menu Confidentialité\n\n13.2 Autorités de contrôle compétentes :\n— ANSSI Congo — Agence Nationale de Sécurité des Systèmes d'Information\n— Commission Nationale de l'Informatique et des Libertés\n\n13.3 Morali Pay s'engage à répondre à toute demande dans un délai de 30 jours calendaires conformément à la Loi n° 34-2018.\n\nDernière mise à jour : Janvier 2025\nVersion : 2.0 — Conforme Loi n° 34-2018 (Congo) et standards CEMAC`,
+    content: `13.1 Pour toute question relative à la protection des données personnelles ou pour exercer vos droits, l'Utilisateur peut contacter :\n\n— Le formulaire Support intégré dans l'application Morali Pay\n— Le Délégué à la Protection des Données (DPO) via le menu Confidentialité\n\n13.2 Autorités de contrôle compétentes :\n— CNPDCP — Commission Nationale pour la Protection des Données à Caractère Personnel\n— ARPTIC — Autorité de Régulation des Postes, des Télécommunications et des Technologies de l'Information et de la Communication\n\n13.3 Morali Pay s'engage à répondre à toute demande dans un délai de 30 jours calendaires conformément à la Loi n° 29-2019.\n\nDernière mise à jour : Juillet 2025\nVersion : 3.0 — Conforme Loi n° 29-2019 (Congo) et standards CEMAC`,
   },
 ];
 
@@ -78,7 +78,7 @@ export default function PrivacyPolicy({ onAccept, onClose, mode = "modal" }: Pri
         <p className="legal-doc-subtitle">
           Morali Pay — Gestion des données personnelles
           <br />
-          Conforme Loi n° 34-2018 • ANSSI Congo • Recommandations CEMAC
+          Conforme Loi n° 29-2019 • CNPDCP • Recommandations CEMAC
         </p>
         <div className="legal-doc-line" />
       </div>
@@ -128,10 +128,10 @@ export default function PrivacyPolicy({ onAccept, onClose, mode = "modal" }: Pri
         <p className="legal-doc-gov">
           Morali Pay — Protection des Données Personnelles
           <br />
-          Loi n° 34-2018 • ANSSI Congo • Standards CEMAC
+          Loi n° 29-2019 • CNPDCP • Standards CEMAC
           <br />
           <span style={{ opacity: 0.5, fontSize: "10px" }}>
-            République du Congo — Hébergement : Afrique Centrale — Chiffrement AES-256
+            République du Congo — Chiffrement AES-256
           </span>
         </p>
         {mode === "modal" && onAccept && (

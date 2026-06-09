@@ -23,7 +23,7 @@ const LEGAL_SECTIONS = [
   },
   {
     title: "Article 4 — Sécurité et authentification",
-    content: `4.1 L'Utilisateur est seul responsable de la confidentialité de ses identifiants de connexion, mot de passe, code PIN et de toutes les informations d'authentification biométrique.\n\n4.2 Morali Pay met en œuvre des mesures de sécurité techniques et organisationnelles conformes aux standards internationaux (authentification multi-facteurs, chiffrement AES-256, tokenisation des données de carte).\n\n4.3 En cas de perte, vol ou soupçon de compromission de ses identifiants, l'Utilisateur s'engage à :\n— Modifier immédiatement son mot de passe\n— Activer le verrouillage de ses cartes\n— Notifier Morali Pay via le support client dans les plus brefs délais\n\n4.4 Toute opération validée avec les identifiants de l'Utilisateur (mot de passe, PIN, biométrie) est réputée initiée par celui-ci et lui est imputable, conformément aux dispositions de l'article 10 de la Loi n° 33-2018 relative à la protection du consommateur en République du Congo.`,
+    content: `4.1 L'Utilisateur est seul responsable de la confidentialité de ses identifiants de connexion, mot de passe, code PIN et de toutes les informations d'authentification biométrique.\n\n4.2 Morali Pay met en œuvre des mesures de sécurité techniques et organisationnelles conformes aux standards internationaux (authentification multi-facteurs, chiffrement AES-256, tokenisation des données de carte).\n\n4.3 En cas de perte, vol ou soupçon de compromission de ses identifiants, l'Utilisateur s'engage à :\n— Modifier immédiatement son mot de passe\n— Activer le verrouillage de ses cartes\n— Notifier Morali Pay via le support client dans les plus brefs délais\n\n4.4 Toute opération validée avec les identifiants de l'Utilisateur (mot de passe, PIN, biométrie) est réputée initiée par celui-ci et lui est imputable, conformément aux dispositions de la Loi n° 36-2024 du 11 octobre 2024 portant protection du consommateur en République du Congo.`,
   },
   {
     title: "Article 5 — Opérations et transactions",
@@ -39,7 +39,7 @@ const LEGAL_SECTIONS = [
   },
   {
     title: "Article 8 — Protection contre le blanchiment et le financement du terrorisme",
-    content: `8.1 Morali Pay est tenu de respecter la réglementation relative à la lutte contre le blanchiment d'argent et le financement du terrorisme (LAB/FT), conformément à :\n— La Loi n° 33-2018 portant lutte contre le blanchiment en République du Congo\n— Les directives du Groupe d'Action contre le Blanchiment en Afrique Centrale (GABAC)\n— La réglementation de la BEAC relative aux devoirs de vigilance\n\n8.2 Morali Pay se réserve le droit de :\n— Demander des informations complémentaires sur l'origine ou la destination des fonds\n— Signaler toute transaction suspecte aux autorités compétentes (ANR, BEAC)\n— Geler temporairement les fonds en attente d'investigation\n\n8.3 Le refus de coopérer aux demandes de renseignement légitimes entraînera la suspension du compte.`,
+    content: `8.1 Morali Pay est tenu de respecter la réglementation relative à la lutte contre le blanchiment d'argent et le financement du terrorisme (LAB/FT), conformément à :\n— La Loi du 27 novembre 2022 portant lutte contre le blanchiment de capitaux et le financement du terrorisme en République du Congo\n— Les directives du Groupe d'Action contre le Blanchiment en Afrique Centrale (GABAC)\n— La réglementation de la BEAC relative aux devoirs de vigilance\n\n8.2 Morali Pay se réserve le droit de :\n— Demander des informations complémentaires sur l'origine ou la destination des fonds\n— Signaler toute transaction suspecte aux autorités compétentes (ANR, BEAC, GABAC)\n— Geler temporairement les fonds en attente d'investigation\n\n8.3 Le refus de coopérer aux demandes de renseignement légitimes entraînera la suspension du compte.`,
   },
   {
     title: "Article 9 — Responsabilité",
@@ -47,7 +47,7 @@ const LEGAL_SECTIONS = [
   },
   {
     title: "Article 10 — Données personnelles et vie privée",
-    content: `Le traitement des données personnelles est régi par la Politique de Confidentialité de Morali Pay, accessible via l'application. Morali Pay s'engage à respecter :\n— La Loi n° 34-2018 relative à la protection des données personnelles en République du Congo\n— Les recommandations de l'ANSSI Congo (Agence Nationale de Sécurité des Systèmes d'Information)\n— Les principes de la Déclaration de l'Union Africaine sur la protection des données\n\nLes données sont hébergées sur des serveurs situés en Afrique Centrale, dans le respect de la souveraineté numérique de la République du Congo.`,
+    content: `Le traitement des données personnelles est régi par la Politique de Confidentialité de Morali Pay, accessible via l'application. Morali Pay s'engage à respecter :\n— La Loi n° 29-2019 du 10 octobre 2019 portant protection des données à caractère personnel en République du Congo\n— La Loi n° 36-2024 du 11 octobre 2024 portant protection du consommateur en République du Congo\n— Les recommandations de la Commission Nationale pour la Protection des Données à Caractère Personnel (CNPDCP)\n— Les principes de la Déclaration de l'Union Africaine sur la protection des données\n\nLes données sont traitées dans le respect de la souveraineté numérique de la République du Congo.`,
   },
   {
     title: "Article 11 — Réclamations et litiges",
@@ -63,7 +63,7 @@ const LEGAL_SECTIONS = [
   },
   {
     title: "Article 14 — Dispositions finales",
-    content: `14.1 Si l'une des clauses des présentes CGU venait à être déclarée nulle ou inapplicable, les autres clauses conserveraient leur pleine force et portée.\n\n14.2 Le fait pour Morali Pay de ne pas se prévaloir d'un droit ne constitue pas une renonciation à ce droit.\n\n14.3 Les présentes CGU, la Politique de Confidentialité et les conditions spécifiques aux services forment l'intégralité de l'accord entre Morali Pay et l'Utilisateur.\n\nDernière mise à jour : Janvier 2025\nVersion : 2.0 — En conformité avec les réglementations CEMAC, COBAC, BEAC et la législation de la République du Congo.`,
+    content: `14.1 Si l'une des clauses des présentes CGU venait à être déclarée nulle ou inapplicable, les autres clauses conserveraient leur pleine force et portée.\n\n14.2 Le fait pour Morali Pay de ne pas se prévaloir d'un droit ne constitue pas une renonciation à ce droit.\n\n14.3 Les présentes CGU, la Politique de Confidentialité et les conditions spécifiques aux services forment l'intégralité de l'accord entre Morali Pay et l'Utilisateur.\n\nDernière mise à jour : Juillet 2025\nVersion : 3.0 — En conformité avec les réglementations CEMAC, COBAC, BEAC, GABAC et la législation de la République du Congo.`,
   },
 ];
 
@@ -77,7 +77,7 @@ export default function LegalTerms({ onAccept, onClose, mode = "modal" }: LegalT
   return (
     <div className="legal-doc">
       <div className="legal-doc-header">
-        <div className="legal-doc-badge">VERSION 2.0 — JANVIER 2025</div>
+        <div className="legal-doc-badge">VERSION 3.0 — JUILLET 2025</div>
         <h2 className="legal-doc-title">Conditions Générales d'Utilisation</h2>
         <p className="legal-doc-subtitle">
           Morali Pay — Services Financiers Numériques
@@ -137,10 +137,10 @@ export default function LegalTerms({ onAccept, onClose, mode = "modal" }: LegalT
         <p className="legal-doc-gov">
           Morali Pay — Établissement de Services Financiers Numériques
           <br />
-          Conforme aux réglementations CEMAC • COBAC • BEAC • ANSSI Congo
+          Conforme aux réglementations CEMAC • COBAC • BEAC • GABAC • CNPDCP
           <br />
           <span style={{ opacity: 0.5, fontSize: "10px" }}>
-            République du Congo — Loi n° 33-2018 • Loi n° 34-2018
+            République du Congo — Loi n° 29-2019 • Loi n° 36-2024
           </span>
         </p>
         {mode === "modal" && onAccept && (

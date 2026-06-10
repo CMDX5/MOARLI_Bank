@@ -239,6 +239,11 @@ export default function TransferView({
   const executeTransfer = async () => {
     const amount = Number(transferAmountInput || 0);
     const TRANSFER_CAP = 1000000;
+    const safetyTimer = window.setTimeout(() => {
+      setTransferProcessing(false);
+      setTransferStage("error");
+      setTransferErrorMsg("Délai dépassé. Vérifiez votre connexion.");
+    }, 30000);
 
     if (amount <= 0) {
       showToast("Montant invalide");
@@ -405,6 +410,7 @@ export default function TransferView({
       }
       setTransferStage("error");
     } finally {
+      clearTimeout(safetyTimer);
       setTransferProcessing(false);
     }
   };

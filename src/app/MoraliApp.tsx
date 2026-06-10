@@ -2596,6 +2596,7 @@ function App() {
     if (mode === "withdraw" && amt > userSavings) { showToast("Solde épargne insuffisant"); return; }
     if (serviceProcessing) return;
     setServiceProcessing(true);
+    const safetyTimer = window.setTimeout(() => { setServiceProcessing(false); showToast("Délai dépassé. Réessayez."); }, 30000);
     try {
       const userRef = doc(firebaseDb, "moraliUsers", authUid);
       await runTransaction(firebaseDb, async (tx) => {
@@ -2643,7 +2644,7 @@ function App() {
       if (msg === "INSUFFICIENT_BALANCE") showToast("Solde insuffisant");
       else if (msg === "INSUFFICIENT_SAVINGS") showToast("Solde épargne insuffisant");
       else showToast("Opération échouée");
-    } finally { setServiceProcessing(false); }
+    } finally { clearTimeout(safetyTimer); setServiceProcessing(false); }
   };
 
   // Service transactions
@@ -4651,6 +4652,11 @@ function App() {
 
   const executeTransaction = async () => {
     setTransactionProcessing(true);
+    // Safety: force reset after 30s if still processing (network timeout)
+    const safetyTimer = window.setTimeout(() => {
+      setTransactionProcessing(false);
+      showToast("Délai dépassé. Vérifiez votre connexion et réessayez.");
+    }, 30000);
     try {
       const receiptId = `TX-${Date.now().toString().slice(-8)}`;
       if (authUid) {
@@ -4727,6 +4733,7 @@ function App() {
         }
       }
       // Success — show popup with a short delay so the processing animation renders first
+      clearTimeout(safetyTimer);
       window.setTimeout(() => {
         setTransactionProcessing(false);
         setTransactionSuccess(true);
@@ -4741,6 +4748,7 @@ function App() {
         );
       }, 300);
     } catch (err: unknown) {
+      clearTimeout(safetyTimer);
       setTransactionProcessing(false);
       console.error("[executeTransaction] ERROR:", err);
       const msg = err instanceof Error ? err.message : "";

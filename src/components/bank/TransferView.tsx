@@ -148,8 +148,11 @@ export default function TransferView({
     document.documentElement.style.overflow = "";
     document.body.style.pointerEvents = "";
     document.documentElement.style.pointerEvents = "";
-    onClose();
-    resetTransferFlow();
+    // Defer state cleanup to next tick to prevent UI freeze
+    window.setTimeout(() => {
+      onClose();
+      resetTransferFlow();
+    }, 0);
   };
 
   const searchMoraliRecipient = async (rawValue?: string) => {
@@ -372,20 +375,23 @@ export default function TransferView({
           badge: "Reçu", badgeClass: "nb-green", icon: "receive", bg: "rgba(34,197,94,0.12)", read: false,
         });
       }
-      // Calculate post-transfer balance (atomic API may have already set it)
-      if (!transferDone) {
-        setTransferPostBalance(balance - Number(transferAmountInput || 0));
-      }
-      setTransferReceiptId(receiptId);
-      setTransferSuccess(true);
-      setTransferStage("success");
-      showQuickNotif(
-        "debit",
-        `Virement vers ${transferRecipient?.name || "utilisateur"}`,
-        formatCurrency(Number(transferAmountInput || 0)),
-        "send",
-        "#D4A437"
-      );
+      // Defer success state updates to next tick so React can yield and the UI stays responsive
+      window.setTimeout(() => {
+        // Calculate post-transfer balance (atomic API may have already set it)
+        if (!transferDone) {
+          setTransferPostBalance(balance - Number(transferAmountInput || 0));
+        }
+        setTransferReceiptId(receiptId);
+        setTransferSuccess(true);
+        setTransferStage("success");
+        showQuickNotif(
+          "debit",
+          `Virement vers ${transferRecipient?.name || "utilisateur"}`,
+          formatCurrency(Number(transferAmountInput || 0)),
+          "send",
+          "#D4A437"
+        );
+      }, 50);
     } catch (err: unknown) {
       // Compensating transaction — refund sender if any phase after debit fails
       const msg = err instanceof Error ? err.message : "";
@@ -408,10 +414,16 @@ export default function TransferView({
       } else if (msg === "SENDER_NOT_FOUND") {
         setTransferErrorMsg("Compte introuvable. Veuillez vous reconnecter.");
       }
-      setTransferStage("error");
+      // Defer error state to next tick to prevent UI freeze
+      window.setTimeout(() => {
+        setTransferStage("error");
+      }, 50);
     } finally {
+      // Always clear safety timer and clear processing flag — wrap in setTimeout to yield
       clearTimeout(safetyTimer);
-      setTransferProcessing(false);
+      window.setTimeout(() => {
+        setTransferProcessing(false);
+      }, 0);
     }
   };
 

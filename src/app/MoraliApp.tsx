@@ -4748,8 +4748,11 @@ function App() {
         );
       }, 300);
     } catch (err: unknown) {
+      // Defer error state updates to next tick to prevent UI freeze
       clearTimeout(safetyTimer);
-      setTransactionProcessing(false);
+      window.setTimeout(() => {
+        setTransactionProcessing(false);
+      }, 0);
       console.error("[executeTransaction] ERROR:", err);
       const msg = err instanceof Error ? err.message : "";
       if (msg === "INSUFFICIENT_BALANCE") showToast("Solde insuffisant");
@@ -4887,19 +4890,22 @@ function App() {
     const destinationLabel = "Mobile Money";
     const actionLabel = transactionType === "depot" ? "Dépôt" : "Retrait";
     showToast(`${actionLabel} ${destinationLabel} ${operatorLabel} effectué`);
-    setTransactionAmount("");
-    setTransactionPhone("");
-    setTransactionMethod("mtn");
-    resetTransactionFlow();
-    // Use requestAnimationFrame to ensure React processes overlay unmount before screen change
-    requestAnimationFrame(() => {
-      // Defensive: restore any stuck overflow styles
-      document.body.style.overflow = "";
-      document.documentElement.style.overflow = "";
-      document.body.style.pointerEvents = "";
-      document.documentElement.style.pointerEvents = "";
-      setScreen(transactionReturnScreen);
-    });
+    // Defer cleanup to next tick so React can process the success render first
+    window.setTimeout(() => {
+      setTransactionAmount("");
+      setTransactionPhone("");
+      setTransactionMethod("mtn");
+      resetTransactionFlow();
+      // Use requestAnimationFrame to ensure React processes overlay unmount before screen change
+      requestAnimationFrame(() => {
+        // Defensive: restore any stuck overflow styles
+        document.body.style.overflow = "";
+        document.documentElement.style.overflow = "";
+        document.body.style.pointerEvents = "";
+        document.documentElement.style.pointerEvents = "";
+        setScreen(transactionReturnScreen);
+      });
+    }, 0);
   };
 
   // ── Admin Functions extracted to AdminDashboard.tsx ──

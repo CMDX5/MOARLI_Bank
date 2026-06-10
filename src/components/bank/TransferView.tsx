@@ -136,6 +136,10 @@ export default function TransferView({
     if (transferSearchDebounceRef.current) {
       clearTimeout(transferSearchDebounceRef.current);
     }
+    // Force cleanup any stuck pointer-events or scroll locks
+    document.body.style.pointerEvents = '';
+    document.body.style.overflow = '';
+    document.body.classList.remove('lock-scroll');
   };
 
   const closeTransferModal = () => {

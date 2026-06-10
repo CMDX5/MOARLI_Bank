@@ -581,6 +581,7 @@ function App() {
     setSelectedContactInfo(null);
   };
   const [requestQrOpen, setRequestQrOpen] = useState(false);
+  const [requestNonce, setRequestNonce] = useState('');
   const [transferOpen, setTransferOpen] = useState(false);
   const transferInitialQueryRef = useRef<string | undefined>(undefined);
 
@@ -2168,6 +2169,8 @@ function App() {
   };
 
   const openRequestQr = () => {
+    const nonce = Array.from(crypto.getRandomValues(new Uint8Array(12))).map(b => b.toString(16).padStart(2,'0')).join('');
+    setRequestNonce(nonce);
     setRequestQrOpen(true);
   };
 
@@ -4531,6 +4534,12 @@ function App() {
     setTransactionPin("");
     setTransactionProcessing(false);
     setTransactionSuccess(false);
+    setTransactionPinVerifying(false);
+    setPendingPinAction(null);
+    // Force remove any stuck overlays / pointer-event blocks
+    document.body.style.pointerEvents = '';
+    document.body.style.overflow = '';
+    document.body.classList.remove('lock-scroll');
   };
 
   const closeTransaction = () => {
@@ -6932,7 +6941,7 @@ function App() {
                         <div className="qr-main">
                           <div className="qr-frame">
                             <QRCodeSVG
-                              value={JSON.stringify({ app: "MoraliBank", userId: bankingIdentity.id || `@${firebaseAuth.currentUser?.email?.split("@")[0]}`, name: dashboardName, ts: Date.now(), token: crypto.randomUUID() })}
+                              value={JSON.stringify({ app: "MoraliBank", v: 2, userId: bankingIdentity.id || `@${firebaseAuth.currentUser?.email?.split("@")[0]}`, uid: firebaseAuth.currentUser?.uid, name: dashboardName, ts: requestNonce.slice(0,8), nonce: requestNonce })}
                               size={200}
                               bgColor="#ffffff"
                               fgColor="#0d1b3e"

@@ -4600,6 +4600,15 @@ function App() {
     setNavActive("Accueil");
   };
 
+  const forceChromePaint = () => {
+    // Chrome: éliminer le ghost layer backdrop-filter après fermeture modal
+    requestAnimationFrame(() => {
+      document.body.style.transform = 'translateZ(0)';
+      document.body.style.touchAction = '';
+      requestAnimationFrame(() => { document.body.style.transform = ''; });
+    });
+  };
+
   const resetTransactionFlow = () => {
     setTransactionChoiceOpen(false);
     setTransactionPinOpen(false);
@@ -4613,8 +4622,9 @@ function App() {
     document.body.style.overflow = '';
     document.documentElement.style.overflow = '';
     document.documentElement.style.pointerEvents = '';
-    document.body.classList.remove('lock-scroll');
-  };
+    document.body.classList.remove('lock-scroll')
+    forceChromePaint();
+  };;
 
   const closeTransaction = () => {
     // CRITICAL FIX: Immediate body cleanup + state reset in one tick, no rAF delay

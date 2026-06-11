@@ -2091,3 +2091,6 @@ html[style*="color-scheme: light"] .notif-swipe-btn.notif-swipe-pin {
 html[style*="color-scheme: light"] .notif-swipe-btn.notif-swipe-delete {
   background: #d64545;
 }
+
+/* ── Chrome backdrop-filter ghost layer fix ── */
+body > * { -webkit-backface-visibility: hidden; }

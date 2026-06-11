@@ -139,7 +139,13 @@ export default function TransferView({
     // Force cleanup any stuck pointer-events or scroll locks
     document.body.style.pointerEvents = '';
     document.body.style.overflow = '';
+    document.body.style.touchAction = '';
     document.body.classList.remove('lock-scroll');
+    // Chrome: force repaint pour éliminer le ghost layer backdrop-filter
+    requestAnimationFrame(() => {
+      document.body.style.transform = 'translateZ(0)';
+      requestAnimationFrame(() => { document.body.style.transform = ''; });
+    });
   };
 
   // Global body cleanup helper — removes ALL stuck styles

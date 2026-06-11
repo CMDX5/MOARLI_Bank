@@ -503,6 +503,10 @@ function App() {
   const [transactionPin, setTransactionPin] = useState("");
   const [transactionProcessing, setTransactionProcessing] = useState(false);
   const [transactionSuccess, setTransactionSuccess] = useState(false);
+  // Refs for onSnapshot to check without re-subscribing the listener
+  const transactionPinOpenRef = useRef(false);
+  const transactionProcessingRef = useRef(false);
+  const transactionSuccessRef = useRef(false);
   const [transactionPinVerifying, setTransactionPinVerifying] = useState(false);
   const [loanAmount, setLoanAmount] = useState(5000);
   const [personalLoanAmount, setPersonalLoanAmount] = useState(250000);
@@ -824,6 +828,11 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Sync transaction state to refs so onSnapshot can check without re-subscribing
+  useEffect(() => { transactionPinOpenRef.current = transactionPinOpen; }, [transactionPinOpen]);
+  useEffect(() => { transactionProcessingRef.current = transactionProcessing; }, [transactionProcessing]);
+  useEffect(() => { transactionSuccessRef.current = transactionSuccess; }, [transactionSuccess]);
+
   // Real-time listener on moraliUsers/{authUid} for balance
   useEffect(() => {
     if (!authUid || !firebaseDb) return;
@@ -833,7 +842,7 @@ function App() {
     const unsub = onSnapshot(userRef, (snap) => {
       // CRITICAL: Skip snapshot updates during active transaction flow to prevent
       // render storm that freezes the UI after deposit/withdrawal/transfer
-      if (transactionPinOpen || transactionProcessing || transactionSuccess) return;
+      if (transactionPinOpenRef.current || transactionProcessingRef.current || transactionSuccessRef.current) return;
       if (snapshotRafId) cancelAnimationFrame(snapshotRafId);
       snapshotRafId = requestAnimationFrame(() => {
         snapshotRafId = null;
@@ -893,7 +902,7 @@ function App() {
       });
     });
     return () => { unsub(); if (snapshotRafId) cancelAnimationFrame(snapshotRafId); };
-  }, [authUid, transactionPinOpen, transactionProcessing, transactionSuccess]);
+  }, [authUid]);
 
   // Auto-repair balance disabled — caused permission errors from composite Firestore queries
   // (kept as no-op for future reactivation with proper indexes)
@@ -910,26 +919,37 @@ function App() {
   }, []);
 
   // ── GLOBAL BODY CLEANUP SAFETY NET ──
-  // Periodically ensures no stuck overlay styles remain (catches edge cases after transactions)
+  // CRITICAL FIX: Always clean body styles unconditionally.
+  // Body-level pointer-events/overflow should NEVER be set — overlays manage their own interactivity via CSS.
+  // The old hasActiveOverlay guard could cause styles to get stuck when overlay state was stale.
   useEffect(() => {
     const cleanup = () => {
-      // Only run cleanup when NOT in a modal/pin state to avoid breaking intentional locks
-      const hasActiveOverlay = transactionPinOpen || transferOpen || contactModalOpen ||
-        notificationsOpen || historyModalOpen || securityModalOpen || privacyModalOpen ||
-        cardManageOpen || cardPinOpen || cameraScannerOpen || kycModalOpen || requestQrOpen;
-      if (!hasActiveOverlay) {
-        document.body.style.pointerEvents = '';
-        document.body.style.overflow = '';
-        document.documentElement.style.pointerEvents = '';
-        document.documentElement.style.overflow = '';
-        document.body.classList.remove('lock-scroll');
-      }
+      document.body.style.pointerEvents = '';
+      document.body.style.overflow = '';
+      document.documentElement.style.pointerEvents = '';
+      document.documentElement.style.overflow = '';
+      document.body.classList.remove('lock-scroll');
     };
-    // Run cleanup every 2 seconds as a safety net
-    const interval = setInterval(cleanup, 2000);
-    // Also run on every screen change
+    // Run cleanup every 1 second as a safety net
+    const interval = setInterval(cleanup, 1000);
+    // Also run on every screen/overlay state change
     cleanup();
-    return () => clearInterval(interval);
+    // CRITICAL: Also clean on every touch/click to catch frozen UI immediately
+    // Overlays manage their own interactivity via CSS/onClick — body styles should always be clean
+    const forceCleanup = () => {
+      document.body.style.pointerEvents = '';
+      document.body.style.overflow = '';
+      document.documentElement.style.pointerEvents = '';
+      document.documentElement.style.overflow = '';
+      document.body.classList.remove('lock-scroll');
+    };
+    document.addEventListener('touchstart', forceCleanup, { passive: true });
+    document.addEventListener('click', forceCleanup, { passive: true });
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('touchstart', forceCleanup);
+      document.removeEventListener('click', forceCleanup);
+    };
   }, [screen, transactionPinOpen, transferOpen, contactModalOpen, notificationsOpen,
     historyModalOpen, securityModalOpen, privacyModalOpen, cardManageOpen, cardPinOpen,
     cameraScannerOpen, kycModalOpen, requestQrOpen]);

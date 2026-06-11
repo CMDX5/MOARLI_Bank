@@ -686,7 +686,11 @@ export default function TransferView({
     <>
       {/* ── Transfer modal ── */}
       {open && (
-        <div className="transfer-overlay" onClick={closeTransferModal}>
+        <>
+        {/* CRITICAL FIX: Backdrop with blur SEPARATE from content — Chrome fix */}
+        <div className="transfer-overlay" onClick={closeTransferModal} />
+        {/* Content layer — NO backdrop-filter */}
+        <div className="transfer-overlay-content" onClick={closeTransferModal}>
           <div className="transfer-modal" onClick={(event) => event.stopPropagation()}>
 
             {/* ====== HEADER ====== */}
@@ -1062,6 +1066,7 @@ export default function TransferView({
             )}
           </div>
         </div>
+        </>
       )}
 
       {/* ── Transaction validation confirmation sheet (≥50K FCFA) ── */}
@@ -1103,7 +1108,9 @@ export default function TransferView({
 
       {/* ── Transfer-specific CSS ── */}
       <style>{`
-.transfer-overlay{position:fixed;inset:0;z-index:9999;background:rgba(3,8,16,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);display:flex;align-items:flex-start;justify-content:center;padding:60px 20px 20px;animation:fadeIn .3s ease;overflow:hidden}
+.transfer-overlay{position:fixed;inset:0;z-index:10029;background:rgba(3,8,16,.72);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);animation:fadeIn .3s ease}
+.transfer-overlay-content{position:fixed;inset:0;z-index:10030;display:flex;align-items:flex-start;justify-content:center;padding:60px 20px 20px;animation:fadeIn .3s ease;pointer-events:none}
+.transfer-overlay-content .transfer-modal{pointer-events:auto}
 .transfer-modal{position:relative;width:100%;max-width:100%;max-height:100%;overflow:hidden;margin:0;flex-shrink:0;background:linear-gradient(180deg,#101a30 0%,#080f1e 100%);border:1px solid rgba(59,130,246,.22);border-radius:28px;padding:22px 20px calc(4px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:18px;opacity:1}
 .transfer-modal::-webkit-scrollbar{width:4px}.transfer-modal::-webkit-scrollbar-track{background:transparent}.transfer-modal::-webkit-scrollbar-thumb{background:rgba(96,165,250,.45);border-radius:4px}
 @keyframes transferModalIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}

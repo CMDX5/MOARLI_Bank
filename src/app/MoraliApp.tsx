@@ -831,6 +831,9 @@ function App() {
     // Debounce rapid Firestore updates to prevent cascading re-renders
     let snapshotRafId: number | null = null;
     const unsub = onSnapshot(userRef, (snap) => {
+      // CRITICAL: Skip snapshot updates during active transaction flow to prevent
+      // render storm that freezes the UI after deposit/withdrawal/transfer
+      if (transactionPinOpen || transactionProcessing || transactionSuccess) return;
       if (snapshotRafId) cancelAnimationFrame(snapshotRafId);
       snapshotRafId = requestAnimationFrame(() => {
         snapshotRafId = null;
@@ -890,7 +893,7 @@ function App() {
       });
     });
     return () => { unsub(); if (snapshotRafId) cancelAnimationFrame(snapshotRafId); };
-  }, [authUid]);
+  }, [authUid, transactionPinOpen, transactionProcessing, transactionSuccess]);
 
   // Auto-repair balance disabled — caused permission errors from composite Firestore queries
   // (kept as no-op for future reactivation with proper indexes)
@@ -4594,15 +4597,14 @@ function App() {
   };
 
   const closeTransaction = () => {
+    // CRITICAL FIX: Immediate body cleanup + state reset in one tick, no rAF delay
+    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
+    document.body.style.pointerEvents = "";
+    document.documentElement.style.pointerEvents = "";
+    document.body.classList.remove('lock-scroll');
     resetTransactionFlow();
-    requestAnimationFrame(() => {
-      document.body.style.overflow = "";
-      document.documentElement.style.overflow = "";
-      document.body.style.pointerEvents = "";
-      document.documentElement.style.pointerEvents = "";
-      document.body.classList.remove('lock-scroll');
-      setScreen(transactionReturnScreen);
-    });
+    window.setTimeout(() => setScreen(transactionReturnScreen), 0);
   };
 
   const validateTransactionFields = () => {
@@ -4672,19 +4674,17 @@ function App() {
       finishTransactionFlow();
       return;
     }
+    // CRITICAL FIX: Immediate body cleanup, no rAF delay that can freeze UI
+    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
+    document.body.style.pointerEvents = "";
+    document.documentElement.style.pointerEvents = "";
+    document.body.classList.remove('lock-scroll');
     setTransactionPinOpen(false);
     setTransactionPin("");
     setTransactionProcessing(false);
     setTransactionPinVerifying(false);
     setPendingPinAction(null);
-    // Defensive: restore overflow in case it was stuck
-    requestAnimationFrame(() => {
-      document.body.style.overflow = "";
-      document.documentElement.style.overflow = "";
-      document.body.style.pointerEvents = "";
-      document.documentElement.style.pointerEvents = "";
-      document.body.classList.remove('lock-scroll');
-    });
   };
 
   // Auto-focus the hidden PIN input when the modal opens
@@ -4787,11 +4787,16 @@ function App() {
         }
       }
       // Success — show popup with a short delay so the processing animation renders first
-      // Use longer delay (500ms) to let onSnapshot callbacks settle before triggering another re-render
       clearTimeout(safetyTimer);
       window.setTimeout(() => {
         setTransactionProcessing(false);
         setTransactionSuccess(true);
+        // CRITICAL FIX: Clean body styles IMMEDIATELY in same tick — not 200ms later
+        document.body.style.pointerEvents = '';
+        document.body.style.overflow = '';
+        document.documentElement.style.pointerEvents = '';
+        document.documentElement.style.overflow = '';
+        document.body.classList.remove('lock-scroll');
         const destLabel = "Mobile Money";
         const opLabel = transactionMethod === "mtn" ? "MTN" : "Airtel";
         showQuickNotif(
@@ -4801,14 +4806,6 @@ function App() {
           transactionType === "depot" ? "wallet" : "send",
           transactionType === "depot" ? "#4ade80" : "#ef4444"
         );
-        // Force cleanup body styles after 200ms to catch any stuck overlay state
-        window.setTimeout(() => {
-          document.body.style.pointerEvents = '';
-          document.body.style.overflow = '';
-          document.documentElement.style.pointerEvents = '';
-          document.documentElement.style.overflow = '';
-          document.body.classList.remove('lock-scroll');
-        }, 200);
       }, 500);
     } catch (err: unknown) {
       // Defer error state updates to next tick to prevent UI freeze
@@ -4953,31 +4950,22 @@ function App() {
     const destinationLabel = "Mobile Money";
     const actionLabel = transactionType === "depot" ? "Dépôt" : "Retrait";
     showToast(`${actionLabel} ${destinationLabel} ${operatorLabel} effectué`);
-    // Defer cleanup to next tick so React can process the success render first
+    // CRITICAL FIX: Single setTimeout — no nested rAF/setTimeout chain that can leave UI frozen.
+    // All state updates batched in one tick, body cleanup immediate, then screen change.
     window.setTimeout(() => {
+      // 1) Immediate body cleanup FIRST (before any state changes trigger re-renders)
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+      document.body.style.pointerEvents = "";
+      document.documentElement.style.pointerEvents = "";
+      document.body.classList.remove('lock-scroll');
+      // 2) All state resets in one batch (React 18+ auto-batches)
       setTransactionAmount("");
       setTransactionPhone("");
       setTransactionMethod("mtn");
       resetTransactionFlow();
-      // Use requestAnimationFrame to ensure React processes overlay unmount before screen change
-      requestAnimationFrame(() => {
-        // Defensive: restore any stuck overflow styles
-        document.body.style.overflow = "";
-        document.documentElement.style.overflow = "";
-        document.body.style.pointerEvents = "";
-        document.documentElement.style.pointerEvents = "";
-        document.body.classList.remove('lock-scroll');
-        setScreen(transactionReturnScreen);
-        // Final safety cleanup 300ms later to catch any stale styles
-        window.setTimeout(() => {
-          document.body.style.overflow = "";
-          document.documentElement.style.overflow = "";
-          document.body.style.pointerEvents = "";
-          document.documentElement.style.pointerEvents = "";
-          document.body.classList.remove('lock-scroll');
-        }, 300);
-      });
-    }, 100);
+      setScreen(transactionReturnScreen);
+    }, 0);
   };
 
   // ── Admin Functions extracted to AdminDashboard.tsx ──

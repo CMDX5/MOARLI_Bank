@@ -828,62 +828,68 @@ function App() {
   useEffect(() => {
     if (!authUid || !firebaseDb) return;
     const userRef = doc(firebaseDb, "moraliUsers", authUid);
+    // Debounce rapid Firestore updates to prevent cascading re-renders
+    let snapshotRafId: number | null = null;
     const unsub = onSnapshot(userRef, (snap) => {
-      if (snap.exists()) {
-        const data = snap.data() as FirestoreMoraliUser;
-        if (typeof data.balance === "number") {
-          // Trust the Firestore value — it reflects real transactions
-          // Clamp to 0 minimum to prevent negative display
-          setFirestoreBalance(Math.max(0, data.balance));
-        } else {
-          // Initialize balance for existing users who don't have it yet
-          const initialBalance = 0;
-          updateDoc(userRef, { balance: initialBalance }).catch((err: unknown) => { console.error("Erreur initialisation solde:", err); });
-          setFirestoreBalance(initialBalance);
-        }
-        // Load savings balance from Firestore
-        if (typeof data.savingsBalance === "number") {
-          setSavingsAmount(data.savingsBalance);
-        }
-        // Load tontine groups from Firestore
-        if (Array.isArray(data.tontineGroups) && data.tontineGroups.length > 0) {
-          setTontineGroups(data.tontineGroups);
-        }
-        // Load forex wallets from Firestore
-        if (typeof data.eurWallet === "number") {
-          setEurWallet(data.eurWallet);
-        }
-        if (typeof data.usdWallet === "number") {
-          setUsdWallet(data.usdWallet);
-        }
+      if (snapshotRafId) cancelAnimationFrame(snapshotRafId);
+      snapshotRafId = requestAnimationFrame(() => {
+        snapshotRafId = null;
+        if (snap.exists()) {
+          const data = snap.data() as FirestoreMoraliUser;
+          if (typeof data.balance === "number") {
+            // Trust the Firestore value — it reflects real transactions
+            // Clamp to 0 minimum to prevent negative display
+            setFirestoreBalance(Math.max(0, data.balance));
+          } else {
+            // Initialize balance for existing users who don't have it yet
+            const initialBalance = 0;
+            updateDoc(userRef, { balance: initialBalance }).catch((err: unknown) => { console.error("Erreur initialisation solde:", err); });
+            setFirestoreBalance(initialBalance);
+          }
+          // Load savings balance from Firestore
+          if (typeof data.savingsBalance === "number") {
+            setSavingsAmount(data.savingsBalance);
+          }
+          // Load tontine groups from Firestore
+          if (Array.isArray(data.tontineGroups) && data.tontineGroups.length > 0) {
+            setTontineGroups(data.tontineGroups);
+          }
+          // Load forex wallets from Firestore
+          if (typeof data.eurWallet === "number") {
+            setEurWallet(data.eurWallet);
+          }
+          if (typeof data.usdWallet === "number") {
+            setUsdWallet(data.usdWallet);
+          }
 
-        // Auto-claim pending credits on first snapshot (fire-and-forget)
-        if (!pendingCreditsClaimedRef.current) {
-          pendingCreditsClaimedRef.current = true;
-          (async () => {
-            try {
-              const pendingRes = await fetch(`/api/directory/pending-credit?uid=${authUid}`, {
-                headers: await getAuthHeaders(),
-              });
-              const pendingData = await pendingRes.json().catch(() => ({ credits: [] }));
-              const pendingCredits = (pendingData.credits || []).filter(
-                (c: { status: string }) => c.status === "pending"
-              );
-              for (const credit of pendingCredits) {
-                await fetch("/api/directory/pending-credit", {
-                  method: "PUT",
+          // Auto-claim pending credits on first snapshot (fire-and-forget)
+          if (!pendingCreditsClaimedRef.current) {
+            pendingCreditsClaimedRef.current = true;
+            (async () => {
+              try {
+                const pendingRes = await fetch(`/api/directory/pending-credit?uid=${authUid}`, {
                   headers: await getAuthHeaders(),
-                  body: JSON.stringify({ pendingCreditId: credit.id }),
-                }).catch(() => {});
+                });
+                const pendingData = await pendingRes.json().catch(() => ({ credits: [] }));
+                const pendingCredits = (pendingData.credits || []).filter(
+                  (c: { status: string }) => c.status === "pending"
+                );
+                for (const credit of pendingCredits) {
+                  await fetch("/api/directory/pending-credit", {
+                    method: "PUT",
+                    headers: await getAuthHeaders(),
+                    body: JSON.stringify({ pendingCreditId: credit.id }),
+                  }).catch(() => {});
+                }
+              } catch {
+                // Silent — processPendingCredits via onSnapshot will retry
               }
-            } catch {
-              // Silent — processPendingCredits via onSnapshot will retry
-            }
-          })();
+            })();
+          }
         }
-      }
+      });
     });
-    return () => unsub();
+    return () => { unsub(); if (snapshotRafId) cancelAnimationFrame(snapshotRafId); };
   }, [authUid]);
 
   // Auto-repair balance disabled — caused permission errors from composite Firestore queries
@@ -899,6 +905,31 @@ function App() {
       }
     };
   }, []);
+
+  // ── GLOBAL BODY CLEANUP SAFETY NET ──
+  // Periodically ensures no stuck overlay styles remain (catches edge cases after transactions)
+  useEffect(() => {
+    const cleanup = () => {
+      // Only run cleanup when NOT in a modal/pin state to avoid breaking intentional locks
+      const hasActiveOverlay = transactionPinOpen || transferOpen || contactModalOpen ||
+        notificationsOpen || historyModalOpen || securityModalOpen || privacyModalOpen ||
+        cardManageOpen || cardPinOpen || cameraScannerOpen || kycModalOpen || requestQrOpen;
+      if (!hasActiveOverlay) {
+        document.body.style.pointerEvents = '';
+        document.body.style.overflow = '';
+        document.documentElement.style.pointerEvents = '';
+        document.documentElement.style.overflow = '';
+        document.body.classList.remove('lock-scroll');
+      }
+    };
+    // Run cleanup every 2 seconds as a safety net
+    const interval = setInterval(cleanup, 2000);
+    // Also run on every screen change
+    cleanup();
+    return () => clearInterval(interval);
+  }, [screen, transactionPinOpen, transferOpen, contactModalOpen, notificationsOpen,
+    historyModalOpen, securityModalOpen, privacyModalOpen, cardManageOpen, cardPinOpen,
+    cameraScannerOpen, kycModalOpen, requestQrOpen]);
 
   // ── Escape key closes modals ──
   useEffect(() => {
@@ -1180,6 +1211,10 @@ function App() {
     // Use refs to avoid race condition between two onSnapshot listeners
     let sentTxs: Transaction[] = [];
     let receivedTxs: Transaction[] = [];
+    // Debounce rAF IDs for snapshot callbacks — prevent cascading re-renders
+    let txRafId: number | null = null;
+    let notifRafId: number | null = null;
+    let serverNotifRafId: number | null = null;
 
     const mergeAndSet = () => {
       const merged = [...receivedTxs, ...sentTxs];
@@ -1197,32 +1232,38 @@ function App() {
 
     const unsubTxSent = onSnapshot(txSentQuery, (snap) => {
       sentTxs = snap.docs.map((d) => mapTxDoc(d, true)).filter(Boolean) as Transaction[];
-      mergeAndSet();
+      if (txRafId) cancelAnimationFrame(txRafId);
+      txRafId = requestAnimationFrame(() => { txRafId = null; mergeAndSet(); });
     });
 
     const unsubTxReceived = onSnapshot(txReceivedQuery, (snap) => {
       receivedTxs = snap.docs.map((d) => mapTxDoc(d, false)).filter(Boolean) as Transaction[];
-      mergeAndSet();
+      if (txRafId) cancelAnimationFrame(txRafId);
+      txRafId = requestAnimationFrame(() => { txRafId = null; mergeAndSet(); });
     });
 
     const unsubNotif = onSnapshot(notifQuery, (snap) => {
-      const next = snap.docs.map((docSnap) => {
-        const data = docSnap.data() as FirestoreNotification & { createdAt?: { seconds?: number } | string };
-        let time = data.time || "À l'instant";
-        let ts = 0;
-        const rawTs = data.createdAt;
-        if (rawTs && typeof rawTs === "object" && "seconds" in rawTs) {
-          ts = (rawTs as { seconds: number }).seconds * 1000;
-        } else if (typeof rawTs === "string") {
-          const parsed = Date.parse(rawTs);
-          if (!isNaN(parsed)) ts = parsed;
-        }
-        if (ts) time = timeAgo(ts);
-        return { id: docSnap.id, ...data, time, _ts: ts } as NotificationItem & { _ts: number };
+      if (notifRafId) cancelAnimationFrame(notifRafId);
+      notifRafId = requestAnimationFrame(() => {
+        notifRafId = null;
+        const next = snap.docs.map((docSnap) => {
+          const data = docSnap.data() as FirestoreNotification & { createdAt?: { seconds?: number } | string };
+          let time = data.time || "À l'instant";
+          let ts = 0;
+          const rawTs = data.createdAt;
+          if (rawTs && typeof rawTs === "object" && "seconds" in rawTs) {
+            ts = (rawTs as { seconds: number }).seconds * 1000;
+          } else if (typeof rawTs === "string") {
+            const parsed = Date.parse(rawTs);
+            if (!isNaN(parsed)) ts = parsed;
+          }
+          if (ts) time = timeAgo(ts);
+          return { id: docSnap.id, ...data, time, _ts: ts } as NotificationItem & { _ts: number };
+        });
+        // Sort newest first (highest timestamp at top)
+        next.sort((a, b) => (b._ts || 0) - (a._ts || 0));
+        if (next.length) setNotifications(next);
       });
-      // Sort newest first (highest timestamp at top)
-      next.sort((a, b) => (b._ts || 0) - (a._ts || 0));
-      if (next.length) setNotifications(next);
     });
 
     // Also listen to serverNotifications (fallback collection with open read/write rules)
@@ -1233,27 +1274,31 @@ function App() {
       limit(10)
     );
     const unsubServerNotif = onSnapshot(serverNotifQuery, (snap) => {
-      serverNotifs = snap.docs.map((docSnap) => {
-        const data = docSnap.data() as FirestoreNotification & { targetUid?: string; createdAt?: { seconds?: number } | string };
-        let time = data.time || "À l'instant";
-        let ts = 0;
-        const rawTs = data.createdAt;
-        if (rawTs && typeof rawTs === "object" && "seconds" in rawTs) {
-          ts = (rawTs as { seconds: number }).seconds * 1000;
-        } else if (typeof rawTs === "string") {
-          const parsed = Date.parse(rawTs);
-          if (!isNaN(parsed)) ts = parsed;
-        }
-        if (ts) time = timeAgo(ts);
-        return { id: docSnap.id, ...data, time, _ts: ts } as NotificationItem & { _ts: number; targetUid?: string };
-      });
-      // Merge with subcollection notifications (dedupe by title+time)
-      setNotifications((prev) => {
-        const existingKeys = new Set(prev.map((n) => `${n.title}-${n.time}`));
-        const newNotifs = serverNotifs.filter((n) => !existingKeys.has(`${n.title}-${n.time}`));
-        const merged = [...newNotifs, ...prev];
-        merged.sort((a, b) => ((a as NotificationItem & { _ts?: number })._ts || 0) - ((b as NotificationItem & { _ts?: number })._ts || 0));
-        return merged;
+      if (serverNotifRafId) cancelAnimationFrame(serverNotifRafId);
+      serverNotifRafId = requestAnimationFrame(() => {
+        serverNotifRafId = null;
+        serverNotifs = snap.docs.map((docSnap) => {
+          const data = docSnap.data() as FirestoreNotification & { targetUid?: string; createdAt?: { seconds?: number } | string };
+          let time = data.time || "À l'instant";
+          let ts = 0;
+          const rawTs = data.createdAt;
+          if (rawTs && typeof rawTs === "object" && "seconds" in rawTs) {
+            ts = (rawTs as { seconds: number }).seconds * 1000;
+          } else if (typeof rawTs === "string") {
+            const parsed = Date.parse(rawTs);
+            if (!isNaN(parsed)) ts = parsed;
+          }
+          if (ts) time = timeAgo(ts);
+          return { id: docSnap.id, ...data, time, _ts: ts } as NotificationItem & { _ts: number; targetUid?: string };
+        });
+        // Merge with subcollection notifications (dedupe by title+time)
+        setNotifications((prev) => {
+          const existingKeys = new Set(prev.map((n) => `${n.title}-${n.time}`));
+          const newNotifs = serverNotifs.filter((n) => !existingKeys.has(`${n.title}-${n.time}`));
+          const merged = [...newNotifs, ...prev];
+          merged.sort((a, b) => ((a as NotificationItem & { _ts?: number })._ts || 0) - ((b as NotificationItem & { _ts?: number })._ts || 0));
+          return merged;
+        });
       });
     });
 
@@ -1272,6 +1317,9 @@ function App() {
       unsubNotif();
       unsubServerNotif();
       unsubSupport();
+      if (txRafId) cancelAnimationFrame(txRafId);
+      if (notifRafId) cancelAnimationFrame(notifRafId);
+      if (serverNotifRafId) cancelAnimationFrame(serverNotifRafId);
     };
   }, [authUid]);
 
@@ -4739,6 +4787,7 @@ function App() {
         }
       }
       // Success — show popup with a short delay so the processing animation renders first
+      // Use longer delay (500ms) to let onSnapshot callbacks settle before triggering another re-render
       clearTimeout(safetyTimer);
       window.setTimeout(() => {
         setTransactionProcessing(false);
@@ -4752,7 +4801,15 @@ function App() {
           transactionType === "depot" ? "wallet" : "send",
           transactionType === "depot" ? "#4ade80" : "#ef4444"
         );
-      }, 300);
+        // Force cleanup body styles after 200ms to catch any stuck overlay state
+        window.setTimeout(() => {
+          document.body.style.pointerEvents = '';
+          document.body.style.overflow = '';
+          document.documentElement.style.pointerEvents = '';
+          document.documentElement.style.overflow = '';
+          document.body.classList.remove('lock-scroll');
+        }, 200);
+      }, 500);
     } catch (err: unknown) {
       // Defer error state updates to next tick to prevent UI freeze
       clearTimeout(safetyTimer);
@@ -4783,8 +4840,8 @@ function App() {
       // ── SERVER-SIDE PIN VERIFICATION ──
       // Prevents PIN bypass via browser DevTools (same pattern as transfer flow)
       if (!cardPinExistsRef.current) {
-        // No PIN set — proceed directly (same behavior as transfer flow)
-        executeTransaction();
+        // No PIN set — proceed directly with a small delay to yield to browser
+        window.setTimeout(() => executeTransaction(), 150);
         return;
       }
       setTransactionPinVerifying(true);
@@ -4821,10 +4878,10 @@ function App() {
             } else if (action.type === "savings_withdraw") {
               executeSavingsTransfer("withdraw");
             }
-          }, 150);
+          }, 200);
           return;
         }
-        window.setTimeout(() => executeTransaction(), 150);
+        window.setTimeout(() => executeTransaction(), 200);
       } catch {
         showToast("Erreur de vérification PIN");
         setTransactionPin("");
@@ -4843,7 +4900,7 @@ function App() {
     if (raw.length === 4) {
       // ── SERVER-SIDE PIN VERIFICATION ──
       if (!cardPinExistsRef.current) {
-        window.setTimeout(() => executeTransaction(), 150);
+        window.setTimeout(() => executeTransaction(), 200);
         return;
       }
       setTransactionPinVerifying(true);
@@ -4879,10 +4936,10 @@ function App() {
             } else if (action.type === "savings_withdraw") {
               executeSavingsTransfer("withdraw");
             }
-          }, 150);
+          }, 200);
           return;
         }
-        window.setTimeout(() => executeTransaction(), 150);
+        window.setTimeout(() => executeTransaction(), 200);
       } catch {
         showToast("Erreur de vérification PIN");
         setTransactionPin("");
@@ -4920,7 +4977,7 @@ function App() {
           document.body.classList.remove('lock-scroll');
         }, 300);
       });
-    }, 50);
+    }, 100);
   };
 
   // ── Admin Functions extracted to AdminDashboard.tsx ──

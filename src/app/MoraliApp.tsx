@@ -4540,6 +4540,8 @@ function App() {
     // Force remove any stuck overlays / pointer-event blocks
     document.body.style.pointerEvents = '';
     document.body.style.overflow = '';
+    document.documentElement.style.overflow = '';
+    document.documentElement.style.pointerEvents = '';
     document.body.classList.remove('lock-scroll');
   };
 
@@ -4550,6 +4552,7 @@ function App() {
       document.documentElement.style.overflow = "";
       document.body.style.pointerEvents = "";
       document.documentElement.style.pointerEvents = "";
+      document.body.classList.remove('lock-scroll');
       setScreen(transactionReturnScreen);
     });
   };
@@ -4630,6 +4633,9 @@ function App() {
     requestAnimationFrame(() => {
       document.body.style.overflow = "";
       document.documentElement.style.overflow = "";
+      document.body.style.pointerEvents = "";
+      document.documentElement.style.pointerEvents = "";
+      document.body.classList.remove('lock-scroll');
     });
   };
 
@@ -4903,9 +4909,18 @@ function App() {
         document.documentElement.style.overflow = "";
         document.body.style.pointerEvents = "";
         document.documentElement.style.pointerEvents = "";
+        document.body.classList.remove('lock-scroll');
         setScreen(transactionReturnScreen);
+        // Final safety cleanup 300ms later to catch any stale styles
+        window.setTimeout(() => {
+          document.body.style.overflow = "";
+          document.documentElement.style.overflow = "";
+          document.body.style.pointerEvents = "";
+          document.documentElement.style.pointerEvents = "";
+          document.body.classList.remove('lock-scroll');
+        }, 300);
       });
-    }, 0);
+    }, 50);
   };
 
   // ── Admin Functions extracted to AdminDashboard.tsx ──

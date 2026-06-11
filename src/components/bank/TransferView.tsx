@@ -142,16 +142,31 @@ export default function TransferView({
     document.body.classList.remove('lock-scroll');
   };
 
-  const closeTransferModal = () => {
-    // Defensive: always restore overflow styles when closing
+  // Global body cleanup helper — removes ALL stuck styles
+  const forceCleanupBody = () => {
     document.body.style.overflow = "";
     document.documentElement.style.overflow = "";
     document.body.style.pointerEvents = "";
     document.documentElement.style.pointerEvents = "";
+    document.body.classList.remove('lock-scroll');
+    // Also remove any stuck scroll listeners
+    if (scrollLockFnRef.current) {
+      window.removeEventListener("scroll", scrollLockFnRef.current);
+      if (window.visualViewport) window.visualViewport.removeEventListener("resize", scrollLockFnRef.current);
+      if (window.visualViewport) window.visualViewport.removeEventListener("scroll", scrollLockFnRef.current);
+      scrollLockFnRef.current = null;
+    }
+  };
+
+  const closeTransferModal = () => {
+    // Immediately restore body styles
+    forceCleanupBody();
     // Defer state cleanup to next tick to prevent UI freeze
     window.setTimeout(() => {
       onClose();
       resetTransferFlow();
+      // Double-check cleanup after React re-renders
+      window.setTimeout(() => forceCleanupBody(), 100);
     }, 0);
   };
 
@@ -632,20 +647,26 @@ export default function TransferView({
   }, [open, transferSlideProgress]);
 
   // Scroll lock when open
+  // Keep ref to the lock function so we can clean it up from closeTransferModal too
+  const scrollLockFnRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     if (!open) return;
     const lock = () => { window.scrollTo(0, 0); document.documentElement.scrollTop = 0; document.body.scrollTop = 0; };
-    window.addEventListener("scroll", lock, { passive: false });
+    scrollLockFnRef.current = lock;
+    window.addEventListener("scroll", lock, { passive: true });
     if (window.visualViewport) window.visualViewport.addEventListener("resize", lock);
     if (window.visualViewport) window.visualViewport.addEventListener("scroll", lock);
     document.body.style.overflow = "hidden";
     document.documentElement.style.overflow = "hidden";
     return () => {
+      scrollLockFnRef.current = null;
       window.removeEventListener("scroll", lock);
       if (window.visualViewport) window.visualViewport.removeEventListener("resize", lock);
       if (window.visualViewport) window.visualViewport.removeEventListener("scroll", lock);
       document.body.style.overflow = "";
       document.documentElement.style.overflow = "";
+      document.body.style.pointerEvents = "";
+      document.documentElement.style.pointerEvents = "";
     };
   }, [open]);
 

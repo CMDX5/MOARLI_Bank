@@ -127,52 +127,57 @@ export default function TransferView({
   }, [open]);
 
   /* ── BUG FIX: préserver la position de scroll du formulaire Banque ──
-     MoraliApp attache un listener "blockScroll" + un restoreScrollPositions
-     qui appellent window.scrollTo(0,0) et remettent les conteneurs à 0 quand
-     le clavier visuel se ferme. Sur l'étape Banque (plein écran), cela
-     empêche l'utilisateur de scroller vers le bouton "Confirmer" : le scroll
-     revient systématiquement à la position initiale.
-     Solution : pendant qu'on est sur l'étape "bank", on intercepte et bloquer
-     les appels window.scrollTo(0,0) et on garde intacte la position du
-     conteneur bankScrollRef. */
+     Sur l'étape Banque (plein écran), le scroll du formulaire ne doit pas
+     être reset par les effets externes (restoreScrollPositions, etc.). On
+     active scrollRestoration="manual" et on capture/restaure la position
+     du conteneur autour des événements qui pourraient le reset. */
   useEffect(() => {
     if (!open || transferStage !== "bank") return;
 
-    // 1) Empêcher window.scrollTo(0,0) de remettre la page à 0
-    const origScrollTo = window.scrollTo.bind(window);
-    const patchedScrollTo = ((...args: Parameters<typeof window.scrollTo>) => {
-      const y = typeof args[0] === "number" ? args[0] : args[0]?.top;
-      // Si on tente de revenir à 0 (restoreScrollPositions), on ignore
-      if (y === 0) return;
-      return origScrollTo(...args as Parameters<typeof window.scrollTo>);
-    }) as typeof window.scrollTo;
-    window.scrollTo = patchedScrollTo;
-
-    // 2) Empêcher les reset scrollTop des conteneurs sauf le nôtre
-    const blockDocScrollReset = (e: Event) => {
-      const target = e.target as HTMLElement;
-      if (target === bankScrollRef.current) return; // notre conteneur : OK
-      if (target && typeof target.scrollTop === "number" && target.scrollTop === 0) {
-        // pas notre conteneur, on laisse faire
-      }
-    };
-    document.addEventListener("scroll", blockDocScrollReset, { passive: true });
-
-    // 3) Bloquer les scroll-restoration au niveau du body
+    // 1) Désactiver la restauration auto du navigateur
+    const prevRestoration = "scrollRestoration" in history ? history.scrollRestoration : "auto";
     if ("scrollRestoration" in history) {
-      const prev = history.scrollRestoration;
       history.scrollRestoration = "manual";
-      // restaurer au démontage
-      return () => {
-        window.scrollTo = origScrollTo;
-        document.removeEventListener("scroll", blockDocScrollReset);
-        history.scrollRestoration = prev;
-      };
     }
 
+    // 2) Sauvegarder la position avant un éventuel reset et la restaurer
+    //    immédiatement après (debounced via requestAnimationFrame).
+    let savedTop = 0;
+    const capturePos = () => {
+      if (bankScrollRef.current) savedTop = bankScrollRef.current.scrollTop;
+    };
+    const restorePos = () => {
+      if (bankScrollRef.current && savedTop > 0) {
+        requestAnimationFrame(() => {
+          if (bankScrollRef.current) bankScrollRef.current.scrollTop = savedTop;
+        });
+      }
+    };
+
+    // Capturer avant que le clavier ne se ferme / ne s'ouvre
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", capturePos);
+      window.visualViewport.addEventListener("resize", restorePos);
+    }
+
+    // 3) Empêcher le window.scrollTo(0,0) de reset la position du conteneur
+    //    (on ne touche pas à window.scrollTo lui-même — trop risqué en TS)
+    const onScroll = () => {
+      if (bankScrollRef.current && bankScrollRef.current.scrollTop === 0 && savedTop > 0) {
+        bankScrollRef.current.scrollTop = savedTop;
+      }
+    };
+    document.addEventListener("scroll", onScroll, { passive: true });
+
     return () => {
-      window.scrollTo = origScrollTo;
-      document.removeEventListener("scroll", blockDocScrollReset);
+      if ("scrollRestoration" in history) {
+        history.scrollRestoration = prevRestoration;
+      }
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener("resize", capturePos);
+        window.visualViewport.removeEventListener("resize", restorePos);
+      }
+      document.removeEventListener("scroll", onScroll);
     };
   }, [open, transferStage]);
 

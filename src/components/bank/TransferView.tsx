@@ -65,7 +65,18 @@ export default function TransferView({
   initialRecipientQuery,
 }: TransferViewProps) {
   /* ── Transfer state ── */
-  const [transferStage, setTransferStage] = useState<"search" | "amount" | "pin" | "processing" | "success" | "error">("search");
+  // "choice" = écran de sélection Banque/Morali (étape initiale)
+  // "bank" = formulaire de virement bancaire (IBAN/BIC)
+  const [transferStage, setTransferStage] = useState<"choice" | "search" | "amount" | "pin" | "processing" | "success" | "error" | "bank">("choice");
+  const [bankForm, setBankForm] = useState({
+    iban: "",
+    bic: "",
+    holderName: "",
+    bankName: "",
+    amount: "",
+    motif: "",
+  });
+  const [bankProcessing, setBankProcessing] = useState(false);
   const [transferRecipientQuery, setTransferRecipientQuery] = useState("");
   const [transferRecipient, setTransferRecipient] = useState<MoraliUser | null>(null);
   const [transferAmountInput, setTransferAmountInput] = useState("");
@@ -116,7 +127,7 @@ export default function TransferView({
      ───────────────────────────────────────────── */
 
   const resetTransferFlow = () => {
-    setTransferStage("search");
+    setTransferStage("choice");
     setTransferRecipientQuery("");
     setTransferRecipient(null);
     setTransferAmountInput("");
@@ -133,6 +144,8 @@ export default function TransferView({
     setTransferPostBalance(null);
     setTransferErrorMsg("");
     setPinVerifying(false);
+    setBankForm({ iban: "", bic: "", holderName: "", bankName: "", amount: "", motif: "" });
+    setBankProcessing(false);
     if (transferSearchDebounceRef.current) {
       clearTimeout(transferSearchDebounceRef.current);
     }
@@ -174,6 +187,72 @@ export default function TransferView({
       // Double-check cleanup after React re-renders
       window.setTimeout(() => forceCleanupBody(), 100);
     }, 0);
+  };
+
+  /* ── Submit bank transfer (IBAN/BIC) ──
+     Crée une transaction "retrait" avec destination="banque:IBAN:BIC" pour
+     débiter le solde Morali du wallet vers un compte bancaire externe. */
+  const submitBankTransfer = async () => {
+    const numericAmount = parseInt(bankForm.amount.replace(/\D/g, ""), 10);
+    if (!bankForm.iban.trim() || !bankForm.holderName.trim() || !numericAmount || numericAmount <= 0) {
+      showToast("Veuillez remplir tous les champs obligatoires");
+      return;
+    }
+    if (numericAmount > balance) {
+      showToast("Solde insuffisant pour ce virement");
+      return;
+    }
+
+    setBankProcessing(true);
+    try {
+      const receiptId = `bnk-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const headers = await getAuthHeaders();
+      const res = await fetch("/api/transactions/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({
+          receiptId,
+          senderUid: authUid,
+          senderMoraliId: bankingIdentity?.id || "",
+          senderName: dashboardName,
+          recipientUid: authUid, // self-transaction (retrait du wallet Morali)
+          recipientMoraliId: bankingIdentity?.id || "",
+          recipientName: `${bankForm.holderName} (${bankForm.bankName || "Banque"})`,
+          amount: numericAmount,
+          fees: 0,
+          type: "retrait",
+          destination: `banque:${bankForm.iban}:${bankForm.bic || ""}`,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        showToast(data.error || "Virement bancaire échoué");
+        setBankProcessing(false);
+        return;
+      }
+
+      // Notification temps réel (best-effort)
+      try {
+        await createRealtimeNotification(authUid, {
+          title: `Virement bancaire — FCFA ${formatCurrency(numericAmount)}`,
+          time: "À l'instant",
+          badge: "Banque",
+          badgeClass: "nb-blue",
+          icon: "send",
+          bg: "rgba(59,130,246,0.12)",
+          read: false,
+        });
+      } catch { /* best-effort */ }
+
+      showToast(`Virement bancaire de ${formatCurrency(numericAmount)} FCFA effectué`);
+      setBankProcessing(false);
+      closeTransferModal();
+      onNavigate?.("dashboard");
+    } catch (err) {
+      console.error("[bank-transfer] error:", err);
+      showToast("Erreur réseau. Réessayez.");
+      setBankProcessing(false);
+    }
   };
 
   const searchMoraliRecipient = async (rawValue?: string) => {
@@ -682,6 +761,22 @@ export default function TransferView({
 
   if (!open && !transferConfirmOpen) return null;
 
+  // Shared input style for the bank transfer form (matches the app theme)
+  const bankInputStyle: React.CSSProperties = {
+    width: "100%",
+    height: 48,
+    padding: "0 14px",
+    borderRadius: 14,
+    border: "1px solid rgba(255,255,255,0.08)",
+    background: "rgba(255,255,255,0.03)",
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: 600,
+    fontFamily: "'Montserrat',sans-serif",
+    outline: "none",
+    transition: "border-color .2s ease, background .2s ease",
+  };
+
   return (
     <>
       {/* ── Transfer modal ── */}
@@ -696,10 +791,12 @@ export default function TransferView({
             {/* ====== HEADER ====== */}
             <div className="transaction-flow-head">
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                {transferStage !== "search" && transferStage !== "processing" && transferStage !== "error" && (
+                {transferStage !== "choice" && transferStage !== "processing" && transferStage !== "error" && (
                   <button className="contact-modal-close" onClick={() => {
                     if (transferStage === "pin") setTransferStage("amount");
                     else if (transferStage === "amount") { setTransferStage("search"); setTransferRecipient(null); }
+                    else if (transferStage === "bank") setTransferStage("choice");
+                    else if (transferStage === "search") setTransferStage("choice");
                     else if (transferStage === "success") { closeTransferModal(); onNavigate?.("dashboard"); }
                   }} aria-label="Retour" style={{ width: 38, height: 38 }}>
                     <span style={{ fontSize: 18, lineHeight: 1 }}>←</span>
@@ -707,20 +804,24 @@ export default function TransferView({
                 )}
                 <div>
                   <div className="transaction-flow-title">
-                    {transferStage === "search" && "Nouveau virement"}
+                    {transferStage === "choice" && "Nouveau virement"}
+                    {transferStage === "search" && "Vers Morali"}
                     {transferStage === "amount" && "Montant"}
                     {transferStage === "pin" && "Code PIN"}
                     {transferStage === "processing" && "Traitement..."}
                     {transferStage === "success" && "Virement envoyé"}
                     {transferStage === "error" && "Échec"}
+                    {transferStage === "bank" && "Vers Banque"}
                   </div>
                   <div className="transaction-flow-sub">
+                    {transferStage === "choice" && "Choisissez la destination du virement."}
                     {transferStage === "search" && "Entrez un Pseudo, ID ou RIB Morali pour commencer le virement."}
                     {transferStage === "amount" && `Vers ${transferRecipient?.name || ""}`}
                     {transferStage === "pin" && (securitySettings.faceId ? "Face ID non reconnu. Saisissez votre code PIN pour confirmer." : "Saisissez votre code secret à 4 chiffres pour sécuriser l'opération.")}
                     {transferStage === "processing" && "Virement en cours de traitement..."}
                     {transferStage === "success" && "Fonds transférés avec succès"}
                     {transferStage === "error" && "Le virement n'a pas pu aboutir"}
+                    {transferStage === "bank" && "Virement vers un compte bancaire externe (IBAN)."}
                   </div>
                 </div>
               </div>
@@ -735,6 +836,266 @@ export default function TransferView({
                 </button>
               </div>
             </div>
+
+            {/* ====== ÉTAPE 0 : CHOIX DE LA DESTINATION (Banque ou Morali) ====== */}
+            {transferStage === "choice" && (
+              <div style={{ padding: "8px 4px 4px", display: "flex", flexDirection: "column", gap: 14 }}>
+                <div style={{ padding: "0 2px" }}>
+                  <p style={{ fontSize: 11, color: "var(--dim)", textTransform: "uppercase", fontWeight: 900, letterSpacing: "0.18em", margin: 0 }}>
+                    Sélectionnez le type de virement
+                  </p>
+                </div>
+
+                {/* Option : Vers Morali */}
+                <button
+                  onClick={() => { setTransferStage("search"); setTimeout(() => transferInputRef.current?.focus(), 60); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 16, width: "100%",
+                    padding: 20, borderRadius: 24, cursor: "pointer",
+                    background: "linear-gradient(135deg, rgba(59,130,246,0.10), rgba(37,99,235,0.05))",
+                    border: "1px solid rgba(59,130,246,0.25)",
+                    textAlign: "left", transition: "all .25s ease",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = "rgba(59,130,246,0.5)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(59,130,246,0.25)")}
+                >
+                  <div style={{
+                    width: 52, height: 52, borderRadius: 16, flexShrink: 0,
+                    background: "rgba(59,130,246,0.18)",
+                    border: "1px solid rgba(59,130,246,0.35)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <AppIcon name="send" size={22} stroke="#60a5fa" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", fontFamily: "'Montserrat',sans-serif" }}>
+                      Vers Morali
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, lineHeight: 1.4 }}>
+                      Virement instantané vers un autre compte Morali Pay (ID, pseudo ou RIB).
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 22, color: "var(--dim)", flexShrink: 0 }}>›</span>
+                </button>
+
+                {/* Option : Vers Banque */}
+                <button
+                  onClick={() => setTransferStage("bank")}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 16, width: "100%",
+                    padding: 20, borderRadius: 24, cursor: "pointer",
+                    background: "linear-gradient(135deg, rgba(212,164,55,0.10), rgba(212,164,55,0.04))",
+                    border: "1px solid rgba(212,164,55,0.25)",
+                    textAlign: "left", transition: "all .25s ease",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = "rgba(212,164,55,0.5)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(212,164,55,0.25)")}
+                >
+                  <div style={{
+                    width: 52, height: 52, borderRadius: 16, flexShrink: 0,
+                    background: "rgba(212,164,55,0.18)",
+                    border: "1px solid rgba(212,164,55,0.35)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D4A437" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 21h18" /><path d="M3 10h18" /><path d="M5 6l7-3 7 3" /><path d="M4 10v11" /><path d="M20 10v11" /><path d="M8 10v11" /><path d="M12 10v11" /><path d="M16 10v11" />
+                    </svg>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", fontFamily: "'Montserrat',sans-serif" }}>
+                      Vers Banque
+                    </div>
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, lineHeight: 1.4 }}>
+                      Virement vers un compte bancaire externe (IBAN / BIC). Délai 1 à 3 jours ouvrés.
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 22, color: "var(--dim)", flexShrink: 0 }}>›</span>
+                </button>
+
+                <div style={{
+                  marginTop: 4, padding: "14px 16px", borderRadius: 16,
+                  background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+                  display: "flex", alignItems: "center", gap: 10,
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" />
+                  </svg>
+                  <span style={{ fontSize: 11, color: "var(--dim)", lineHeight: 1.5 }}>
+                    Solde disponible : <strong style={{ color: "var(--muted)" }}>{formatCurrency(balance)} FCFA</strong>
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* ====== ÉTAPE BANQUE : formulaire IBAN/BIC ====== */}
+            {transferStage === "bank" && (
+              <div style={{ padding: "8px 4px 4px", display: "flex", flexDirection: "column", gap: 14, maxHeight: "70vh", overflowY: "auto" }}>
+                {/* Solde disponible */}
+                <div style={{
+                  padding: "16px 18px", borderRadius: 20,
+                  background: "linear-gradient(135deg, rgba(212,164,55,0.08), rgba(212,164,55,0.02))",
+                  border: "1px solid rgba(212,164,55,0.18)",
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: "var(--dim)", textTransform: "uppercase", fontWeight: 900, letterSpacing: "0.15em" }}>
+                      Solde disponible
+                    </div>
+                    <div style={{ fontSize: 22, fontWeight: 900, color: "#fff", fontFamily: "'Montserrat',sans-serif", marginTop: 4 }}>
+                      {formatCurrency(balance)} <span style={{ fontSize: 13, color: "var(--muted)" }}>FCFA</span>
+                    </div>
+                  </div>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#D4A437" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 21h18" /><path d="M3 10h18" /><path d="M5 6l7-3 7 3" /><path d="M4 10v11" /><path d="M20 10v11" />
+                  </svg>
+                </div>
+
+                {/* Bénéficiaire */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label style={{ fontSize: 11, fontWeight: 800, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                    Nom du bénéficiaire *
+                  </label>
+                  <input
+                    type="text" autoComplete="off" placeholder="Jean Dupont"
+                    value={bankForm.holderName}
+                    onChange={(e) => setBankForm({ ...bankForm, holderName: e.target.value })}
+                    style={bankInputStyle}
+                  />
+                </div>
+
+                {/* IBAN */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label style={{ fontSize: 11, fontWeight: 800, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                    IBAN *
+                  </label>
+                  <input
+                    type="text" autoComplete="off" placeholder="CG 12 30002 00012 3456789012345 67"
+                    value={bankForm.iban}
+                    onChange={(e) => setBankForm({ ...bankForm, iban: e.target.value.toUpperCase() })}
+                    style={{ ...bankInputStyle, fontFamily: "'Courier New', monospace", letterSpacing: "0.05em" }}
+                  />
+                </div>
+
+                {/* BIC + Banque */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <label style={{ fontSize: 11, fontWeight: 800, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                      BIC / SWIFT
+                    </label>
+                    <input
+                      type="text" autoComplete="off" placeholder="BICAFRCG"
+                      value={bankForm.bic}
+                      onChange={(e) => setBankForm({ ...bankForm, bic: e.target.value.toUpperCase() })}
+                      style={{ ...bankInputStyle, fontFamily: "'Courier New', monospace" }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <label style={{ fontSize: 11, fontWeight: 800, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                      Nom de la banque
+                    </label>
+                    <input
+                      type="text" autoComplete="off" placeholder="Banque Congolaise"
+                      value={bankForm.bankName}
+                      onChange={(e) => setBankForm({ ...bankForm, bankName: e.target.value })}
+                      style={bankInputStyle}
+                    />
+                  </div>
+                </div>
+
+                {/* Montant */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label style={{ fontSize: 11, fontWeight: 800, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                    Montant (FCFA) *
+                  </label>
+                  <input
+                    type="text" inputMode="numeric" autoComplete="off" placeholder="50 000"
+                    value={bankForm.amount}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, "");
+                      setBankForm({ ...bankForm, amount: digits ? parseInt(digits, 10).toLocaleString("fr-FR") : "" });
+                    }}
+                    style={{ ...bankInputStyle, fontSize: 18, fontWeight: 800 }}
+                  />
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+                    {[5000, 10000, 25000, 50000, 100000].map((amt) => (
+                      <button
+                        key={amt}
+                        onClick={() => setBankForm({ ...bankForm, amount: amt.toLocaleString("fr-FR") })}
+                        style={{
+                          padding: "6px 12px", borderRadius: 10, fontSize: 11, fontWeight: 700,
+                          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                          color: "var(--muted)", cursor: "pointer", transition: "all .2s",
+                        }}
+                      >
+                        {amt.toLocaleString("fr-FR")}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Motif */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <label style={{ fontSize: 11, fontWeight: 800, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                    Motif du virement
+                  </label>
+                  <input
+                    type="text" autoComplete="off" placeholder="Paiement facture / don / etc."
+                    value={bankForm.motif}
+                    onChange={(e) => setBankForm({ ...bankForm, motif: e.target.value.slice(0, 100) })}
+                    style={bankInputStyle}
+                  />
+                </div>
+
+                {/* Frais + délai */}
+                <div style={{
+                  padding: "14px 16px", borderRadius: 16,
+                  background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+                  display: "flex", flexDirection: "column", gap: 8,
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                    <span style={{ color: "var(--dim)" }}>Frais bancaires</span>
+                    <span style={{ color: "#22c55e", fontWeight: 700 }}>Gratuit</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                    <span style={{ color: "var(--dim)" }}>Délai d'exécution</span>
+                    <span style={{ color: "var(--muted)", fontWeight: 700 }}>1 à 3 jours ouvrés</span>
+                  </div>
+                  {bankForm.amount && (
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, paddingTop: 8, marginTop: 4, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                      <span style={{ color: "var(--muted)", fontWeight: 700 }}>Total à débiter</span>
+                      <span style={{ color: "#fff", fontWeight: 900 }}>
+                        {parseInt(bankForm.amount.replace(/\D/g, ""), 10).toLocaleString("fr-FR")} FCFA
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Bouton confirmer */}
+                <button
+                  onClick={submitBankTransfer}
+                  disabled={bankProcessing || !bankForm.iban.trim() || !bankForm.holderName.trim() || !bankForm.amount}
+                  style={{
+                    width: "100%", height: 54, borderRadius: 16, border: "none",
+                    background: bankProcessing || !bankForm.iban.trim() || !bankForm.holderName.trim() || !bankForm.amount
+                      ? "rgba(59,130,246,0.3)"
+                      : "linear-gradient(135deg, #D4A437, #f0d98a)",
+                    color: "#0a0e17", fontSize: 15, fontWeight: 900,
+                    fontFamily: "'Montserrat',sans-serif", cursor: bankProcessing ? "wait" : "pointer",
+                    transition: "all .25s ease", marginTop: 4,
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  }}
+                >
+                  {bankProcessing ? (
+                    <>
+                      <span style={{ width: 16, height: 16, border: "2px solid rgba(10,14,23,0.3)", borderTopColor: "#0a0e17", borderRadius: "50%", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
+                      Traitement...
+                    </>
+                  ) : (
+                    <>Confirmer le virement bancaire</>
+                  )}
+                </button>
+              </div>
+            )}
 
             {/* ====== ÉTAPE 1 : RECHERCHE ====== */}
             {transferStage === "search" && (

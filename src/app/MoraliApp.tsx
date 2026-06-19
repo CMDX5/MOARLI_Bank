@@ -7204,7 +7204,7 @@ function App() {
                     </div>
                     <div>
                       <p className="tab-card-title">Virement</p>
-                      <p className="tab-card-sub">Vers banque ou mobile</p>
+                      <p className="tab-card-sub">Vers Banque ou Morali</p>
                     </div>
                   </button>
                   <button className="service-card demander" onClick={openRequestQr}>

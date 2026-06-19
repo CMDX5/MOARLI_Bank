@@ -821,7 +821,7 @@ export default function TransferView({
                     {transferStage === "processing" && "Virement en cours de traitement..."}
                     {transferStage === "success" && "Fonds transférés avec succès"}
                     {transferStage === "error" && "Le virement n'a pas pu aboutir"}
-                    {transferStage === "bank" && "Virement vers un compte bancaire externe (IBAN)."}
+                    {transferStage === "bank" && "Virement vers un compte bancaire externe (IBAN). Délai 1 à 3 jours ouvrés."}
                   </div>
                 </div>
               </div>

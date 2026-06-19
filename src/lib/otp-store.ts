@@ -11,7 +11,7 @@
  * and in-memory Map doesn't persist between instances.
  */
 
-import { timingSafeEqual } from "crypto";
+import { timingSafeEqual, randomBytes } from "crypto";
 import { doc, setDoc, getDoc, deleteDoc, updateDoc } from "firebase/firestore";
 import { firebaseDb } from "@/lib/firebase";
 
@@ -233,8 +233,12 @@ export async function verifyOtp(phone: string, code: string): Promise<string> {
  * DUAL-WRITE: stored in Firestore + memory for cross-instance reliability.
  */
 export async function createResetToken(email: string): Promise<string> {
-  const key = normalizeKey(email);
-  const token = `rst_${Buffer.from(`${key}:${Date.now()}`).toString("base64url")}`;
+  // SECURITY FIX: token must be cryptographically random and unguessable.
+  // Previously it was `rst_base64(email:timestamp)` — fully deterministic
+  // from public data, allowing an attacker to forge a reset token for any
+  // account WITHOUT the OTP. 256 bits of entropy makes brute-force infeasible.
+  void normalizeKey(email); // kept for API stability; not used as token material
+  const token = `rst_${randomBytes(32).toString("hex")}`;
   const expiresAt = Date.now() + RESET_TOKEN_TTL_MS;
 
   // Store in memory (fast path for same-instance)

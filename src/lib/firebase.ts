@@ -30,7 +30,12 @@ const app = isConfigured
 
 let analyticsPromise: Promise<ReturnType<typeof getAnalytics> | null> | null = null;
 
-if (typeof window !== "undefined" && app) {
+// BUG FIX: Only initialize Analytics when a measurementId is configured AND the
+// environment supports it. Previously, analytics was initialized even without a
+// measurementId, causing repeated "TypeError: Failed to fetch" errors in the
+// console on every page load (the SDK tried to reach Google Analytics endpoints
+// that reject requests without a valid measurement id).
+if (typeof window !== "undefined" && app && firebaseConfig.measurementId) {
   analyticsPromise = isSupported()
     .then((supported) => (supported ? getAnalytics(app) : null))
     .catch(() => null);

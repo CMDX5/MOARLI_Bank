@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth-verify";
+import { requireAdmin } from "@/lib/auth-verify";
 import { setAdminClaim } from "@/lib/auth-verify";
 import { getAdminFirestore } from "@/lib/admin-firestore";
 
@@ -8,9 +8,15 @@ import { getAdminFirestore } from "@/lib/admin-firestore";
  *
  * Sets both Firestore role field AND Firebase custom claims for the authenticated user.
  * This ensures admin access works across all API routes (claims-based + Firestore fallback).
+ *
+ * SECURITY FIX: This route was guarded by `requireAuth`, which meant ANY authenticated
+ * user could self-promote to admin. It now requires `requireAdmin`, so only an existing
+ * admin can grant admin to another account. The first admin must be bootstrapped
+ * out-of-band (e.g. via a Firebase Admin SDK script) — this endpoint must never be the
+ * way the initial admin is created.
  */
 export async function POST(req: NextRequest) {
-  const auth = await requireAuth(req);
+  const auth = await requireAdmin(req);
   if (auth.error) return auth.error;
   if (!auth.uid) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });

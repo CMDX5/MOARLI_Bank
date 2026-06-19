@@ -114,6 +114,44 @@ export async function POST(req: NextRequest) {
 
         transaction.set(docRef, txData);
 
+        // ── BUG FIX: Update the user's balance atomically for deposits/withdrawals ──
+        // Previously this route only recorded the transaction document WITHOUT
+        // crediting/debiting the balance, so deposits appeared in the history
+        // but the available balance stayed at 0 — making withdrawals impossible
+        // and breaking the entire financial chain.
+        if (isDepositOrWithdrawal) {
+          const userRef = adminDb.collection("moraliUsers").doc(callerUid);
+          const userSnap = await transaction.get(userRef);
+
+          let currentBalance = 0;
+          if (userSnap.exists) {
+            currentBalance = Number(userSnap.data()?.balance) || 0;
+          }
+
+          const numericAmount = Number(amount);
+          const numericFees = Number(fees) || 0;
+
+          if (type === "depot") {
+            // Deposit: credit the full amount (fees are paid by the bank in demo mode)
+            const newBalance = currentBalance + numericAmount;
+            transaction.set(userRef, {
+              balance: newBalance,
+              updatedAt: new Date(),
+            }, { merge: true });
+          } else if (type === "retrait") {
+            // Withdrawal: debit amount + fees, refuse if insufficient balance
+            const totalDebit = numericAmount + numericFees;
+            if (currentBalance < totalDebit) {
+              throw new Error("INSUFFICIENT_BALANCE");
+            }
+            const newBalance = currentBalance - totalDebit;
+            transaction.set(userRef, {
+              balance: newBalance,
+              updatedAt: new Date(),
+            }, { merge: true });
+          }
+        }
+
         // Create the lock (prevents race condition)
         transaction.set(lockRef, {
           transactionId: docRef.id,
@@ -156,6 +194,14 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json(result);
     } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      // Map balance-related transaction errors to user-friendly responses
+      if (errMsg === "INSUFFICIENT_BALANCE") {
+        return NextResponse.json(
+          { success: false, error: "Solde insuffisant pour cette opération" },
+          { status: 400 }
+        );
+      }
       captureError(err, { action: "transaction:create", route: "/api/transactions/create", uid: callerUid, extra: { receiptId, senderUid, recipientUid, amount } });
       return NextResponse.json({ success: false, error: "Transaction failed" }, { status: 500 });
     }

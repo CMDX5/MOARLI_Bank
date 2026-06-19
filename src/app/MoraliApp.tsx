@@ -1317,19 +1317,32 @@ function App() {
       }
     };
 
-    // Block scroll on body/window only — not on inner scrollable containers
+    // Block scroll on body/window only — not on inner scrollable containers.
+    // BUG FIX (Chrome): previously this listener was attached unconditionally
+    // with { passive: false } + preventDefault() on every screen, which on
+    // Chrome left the document in a "scroll-locked" state after closing a
+    // deposit/withdrawal/transfer modal — the page could still scroll but no
+    // button was clickable (Chrome's hit-testing ties pointer events to
+    // scroll-blocking listeners). Safari is more permissive, which is why the
+    // bug only appeared on Chrome. Now we only attach it on the auth screen
+    // (its original purpose: prevent the mobile keyboard from pushing the page).
     const blockScroll = (e: Event) => {
       if (e.target === document || e.target === document.body || e.target === document.documentElement) {
         e.preventDefault();
       }
     };
+    const isAuthScreen = screen === "auth";
 
     document.addEventListener("focusin", handleFocusIn);
     if (window.visualViewport) {
       window.visualViewport.addEventListener("resize", handleViewportResize);
-      window.visualViewport.addEventListener("scroll", blockScroll, { passive: false });
+      if (isAuthScreen) {
+        window.visualViewport.addEventListener("scroll", blockScroll, { passive: false });
+      }
     }
-    document.addEventListener("scroll", blockScroll, { passive: false });
+    if (isAuthScreen) {
+      document.addEventListener("scroll", blockScroll, { passive: false });
+    }
 
     return () => {
       document.removeEventListener("focusin", handleFocusIn);
@@ -4231,7 +4244,13 @@ function App() {
   };
 
   const closeTransaction = () => {
+    // Defensive: force-close overlays + remove any residual scroll lock so
+    // Chrome doesn't end up in a state where the page scrolls but buttons
+    // no longer respond to clicks.
     resetTransactionFlow();
+    setTransferOpen(false);
+    setNotificationsOpen(false);
+    document.body.classList.remove("lock-scroll");
     setScreen(transactionReturnScreen);
   };
 
@@ -4456,7 +4475,13 @@ function App() {
     setTransactionAmount("");
     setTransactionPhone("");
     setTransactionMethod("mtn");
+    // Defensive: force-close every overlay that could trap pointer events on
+    // Chrome after a deposit/withdrawal/transfer (blockScroll residual listener,
+    // quick-notif ghost layer, etc.).
     resetTransactionFlow();
+    setTransferOpen(false);
+    setNotificationsOpen(false);
+    document.body.classList.remove("lock-scroll");
     setScreen(transactionReturnScreen);
   };
 
@@ -6383,7 +6408,7 @@ function App() {
                     </div>
                     <div>
                       <p className="tab-card-title">Virement</p>
-                      <p className="tab-card-sub">Vers banque ou mobile</p>
+                      <p className="tab-card-sub">Vers Banque ou Morali</p>
                     </div>
                   </button>
                   <button className="service-card demander" onClick={openRequestQr}>

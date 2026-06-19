@@ -785,8 +785,8 @@ export default function TransferView({
         {/* CRITICAL FIX: Backdrop with blur SEPARATE from content — Chrome fix */}
         <div className="transfer-overlay" onClick={closeTransferModal} />
         {/* Content layer — NO backdrop-filter */}
-        <div className="transfer-overlay-content" onClick={closeTransferModal}>
-          <div className="transfer-modal" onClick={(event) => event.stopPropagation()}>
+        <div className={`transfer-overlay-content${transferStage === "bank" ? " bank-fullscreen-overlay" : ""}`} onClick={closeTransferModal}>
+          <div className={`transfer-modal${transferStage === "bank" ? " bank-fullscreen" : ""}`} onClick={(event) => event.stopPropagation()}>
 
             {/* ====== HEADER ====== */}
             <div className="transaction-flow-head">
@@ -927,9 +927,9 @@ export default function TransferView({
               </div>
             )}
 
-            {/* ====== ÉTAPE BANQUE : formulaire IBAN/BIC ====== */}
+            {/* ====== ÉTAPE BANQUE : formulaire IBAN/BIC (plein écran) ====== */}
             {transferStage === "bank" && (
-              <div style={{ padding: "8px 4px 4px", display: "flex", flexDirection: "column", gap: 14, maxHeight: "70vh", overflowY: "auto" }}>
+              <div style={{ padding: "8px 4px 4px", display: "flex", flexDirection: "column", gap: 14, flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
                 {/* Solde disponible */}
                 <div style={{
                   padding: "16px 18px", borderRadius: 20,
@@ -1474,6 +1474,9 @@ export default function TransferView({
 .transfer-overlay-content .transfer-modal{pointer-events:auto}
 .transfer-modal{position:relative;width:100%;max-width:100%;max-height:100%;overflow:hidden;margin:0;flex-shrink:0;background:linear-gradient(180deg,#101a30 0%,#080f1e 100%);border:1px solid rgba(59,130,246,.22);border-radius:28px;padding:22px 20px calc(4px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:18px;opacity:1}
 .transfer-modal::-webkit-scrollbar{width:4px}.transfer-modal::-webkit-scrollbar-track{background:transparent}.transfer-modal::-webkit-scrollbar-thumb{background:rgba(96,165,250,.45);border-radius:4px}
+/* ── Plein écran pour l'étape Banque (IBAN/BIC) ── */
+.transfer-overlay-content.bank-fullscreen-overlay{padding:0;align-items:stretch}
+.transfer-modal.bank-fullscreen{max-width:100%;width:100%;height:100dvh;min-height:100dvh;border-radius:0;border-left:none;border-right:none;border-top:none;border-bottom:none;padding-top:calc(20px + env(safe-area-inset-top,0px));padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));gap:14px}
 @keyframes transferModalIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
 .transfer-search{display:flex;flex-direction:column;gap:10px}
 .transfer-search input{width:100%;height:54px;border-radius:18px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);color:#fff;padding:0 16px;font-size:15px;outline:none}

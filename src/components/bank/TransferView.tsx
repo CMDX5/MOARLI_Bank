@@ -103,6 +103,10 @@ export default function TransferView({
   const transferPinInputRef = useRef<HTMLInputElement | null>(null);
   const transferDragRef = useRef({ active: false, startX: 0, startProgress: 0 });
   const transferSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Ref vers le conteneur scrollable du formulaire Banque — utilisé pour
+  // empêcher le restoreScrollPositions de MoraliApp de ramener le scroll à 0
+  // pendant que l'utilisateur consulte le formulaire.
+  const bankScrollRef = useRef<HTMLDivElement | null>(null);
 
   /* ── Sync initialRecipientQuery from QR scanner or saved contact click ── */
   useEffect(() => {
@@ -121,6 +125,56 @@ export default function TransferView({
       return () => clearTimeout(timer);
     }
   }, [open]);
+
+  /* ── BUG FIX: préserver la position de scroll du formulaire Banque ──
+     MoraliApp attache un listener "blockScroll" + un restoreScrollPositions
+     qui appellent window.scrollTo(0,0) et remettent les conteneurs à 0 quand
+     le clavier visuel se ferme. Sur l'étape Banque (plein écran), cela
+     empêche l'utilisateur de scroller vers le bouton "Confirmer" : le scroll
+     revient systématiquement à la position initiale.
+     Solution : pendant qu'on est sur l'étape "bank", on intercepte et bloquer
+     les appels window.scrollTo(0,0) et on garde intacte la position du
+     conteneur bankScrollRef. */
+  useEffect(() => {
+    if (!open || transferStage !== "bank") return;
+
+    // 1) Empêcher window.scrollTo(0,0) de remettre la page à 0
+    const origScrollTo = window.scrollTo.bind(window);
+    const patchedScrollTo = ((...args: Parameters<typeof window.scrollTo>) => {
+      const y = typeof args[0] === "number" ? args[0] : args[0]?.top;
+      // Si on tente de revenir à 0 (restoreScrollPositions), on ignore
+      if (y === 0) return;
+      return origScrollTo(...args as Parameters<typeof window.scrollTo>);
+    }) as typeof window.scrollTo;
+    window.scrollTo = patchedScrollTo;
+
+    // 2) Empêcher les reset scrollTop des conteneurs sauf le nôtre
+    const blockDocScrollReset = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target === bankScrollRef.current) return; // notre conteneur : OK
+      if (target && typeof target.scrollTop === "number" && target.scrollTop === 0) {
+        // pas notre conteneur, on laisse faire
+      }
+    };
+    document.addEventListener("scroll", blockDocScrollReset, { passive: true });
+
+    // 3) Bloquer les scroll-restoration au niveau du body
+    if ("scrollRestoration" in history) {
+      const prev = history.scrollRestoration;
+      history.scrollRestoration = "manual";
+      // restaurer au démontage
+      return () => {
+        window.scrollTo = origScrollTo;
+        document.removeEventListener("scroll", blockDocScrollReset);
+        history.scrollRestoration = prev;
+      };
+    }
+
+    return () => {
+      window.scrollTo = origScrollTo;
+      document.removeEventListener("scroll", blockDocScrollReset);
+    };
+  }, [open, transferStage]);
 
   /* ─────────────────────────────────────────────
      Transfer Functions
@@ -929,7 +983,7 @@ export default function TransferView({
 
             {/* ====== ÉTAPE BANQUE : formulaire IBAN/BIC (plein écran) ====== */}
             {transferStage === "bank" && (
-              <div style={{ padding: "8px 4px 4px", display: "flex", flexDirection: "column", gap: 14, flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+              <div ref={bankScrollRef} style={{ padding: "8px 4px 4px", display: "flex", flexDirection: "column", gap: 14, flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", touchAction: "pan-y" }}>
                 {/* Solde disponible */}
                 <div style={{
                   padding: "16px 18px", borderRadius: 20,

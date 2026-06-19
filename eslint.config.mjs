@@ -23,6 +23,9 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "react/display-name": "off",
     "react/prop-types": "off",
     "react-compiler/react-compiler": "off",
+    // FIX: eslint-plugin-react@7.37.5 est incompatible avec eslint@10 (crash
+    // getFilename is not a function). On désactive la règle qui déclenche le bug.
+    "react/no-direct-mutation-state": "off",
     
     // Next.js rules
     "@next/next/no-img-element": "off",

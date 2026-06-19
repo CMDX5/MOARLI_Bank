@@ -118,9 +118,11 @@ export function encryptPinServerSide(pin: string, uid: string): string | null {
  */
 export function decryptPinServerSide(encryptedBase64: string, uid: string): string | null {
   try {
-    const combined = Buffer.from(encryptedBase64, "utf8");
+    // FIX: lire en base64 (le payload est produit par combined.toString("base64")
+    // dans encryptPinServerSide). Avant c'était "utf8" ce qui corrompait les bytes.
+    const combined = Buffer.from(encryptedBase64, "base64");
 
-    // Try to extract version prefix (format: "v1:...")
+    // Try to extract version prefix (format: "v1:..." en bytes base64-décodés)
     let version = CURRENT_KEY_VERSION;
     let payload = combined;
     const colonIdx = combined.indexOf(0x3A); // ':' character
@@ -130,12 +132,6 @@ export function decryptPinServerSide(encryptedBase64: string, uid: string): stri
         version = potentialVersion;
         payload = combined.slice(colonIdx + 1);
       }
-    }
-
-    // Handle backward compatibility: payloads without version prefix (created before key versioning)
-    const isBase64 = combined.length > 0 && /[A-Za-z0-9+/=]/.test(combined.toString("utf8").slice(0, 4));
-    if (!isBase64) {
-      payload = Buffer.from(encryptedBase64, "base64");
     }
 
     const masterKey = getVersionedKey(version);

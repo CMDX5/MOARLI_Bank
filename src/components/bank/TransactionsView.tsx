@@ -41,25 +41,25 @@ function ConfirmationModal({
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-end',
         justifyContent: 'center',
-        padding: '0 20px',
+        padding: '0 16px calc(20px + env(safe-area-inset-bottom, 0px))',
         animation: 'fadeIn .3s ease',
       }}
     >
       <div
         style={{
           width: '100%',
-          maxWidth: 360,
-          maxHeight: '85dvh',
+          maxWidth: 390,
+          maxHeight: '90dvh',
           overflow: 'hidden',
           background: 'linear-gradient(180deg, #101a30 0%, #080f1e 100%)',
           border: '1px solid rgba(59,130,246,0.22)',
-          borderRadius: 28,
+          borderRadius: '28px 28px 0 0',
           boxShadow: '0 30px 80px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.05)',
-          padding: '26px 22px 22px',
+          padding: '22px 20px calc(18px + env(safe-area-inset-bottom, 0px))',
           opacity: 1,
-          transform: 'scale(1)',
+          transform: 'translateY(0)',
           animation: 'panelSpringUp .3s cubic-bezier(.34,1.2,.64,1) forwards',
         }}
       >

@@ -107,6 +107,7 @@ export default function AuthView({
   const [forgotNewPw, setForgotNewPw] = useState("");
   const [forgotConfirmPw, setForgotConfirmPw] = useState("");
   const [forgotResetting, setForgotResetting] = useState(false);
+  const [forgotResetToken, setForgotResetToken] = useState("");
 
   const otpInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -337,6 +338,7 @@ export default function AuthView({
     setForgotNewPw("");
     setForgotConfirmPw("");
     setForgotResetting(false);
+    setForgotResetToken("");
     setForgotStep("email");
     setAuthTab("forgot");
   };
@@ -383,7 +385,8 @@ export default function AuthView({
         body: JSON.stringify({ email: forgotEmail.trim(), code: forgotOtpCode }),
       });
       const data = await res.json();
-      if (data.valid) {
+      if (data.valid && data.resetToken) {
+        setForgotResetToken(data.resetToken);
         setForgotVerified(true);
         setForgotStep("newPassword");
         showToast("Code vérifié ! Choisissez votre nouveau mot de passe.");
@@ -411,7 +414,7 @@ export default function AuthView({
       const res = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: forgotEmail.trim(), newPassword: forgotNewPw }),
+        body: JSON.stringify({ email: forgotEmail.trim(), newPassword: forgotNewPw, resetToken: forgotResetToken }),
       });
       const data = await res.json();
       if (data.success) {

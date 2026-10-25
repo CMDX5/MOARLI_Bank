@@ -87,6 +87,7 @@ const [adminRegLoading, setAdminRegLoading] = useState(false);
 const [adminForgotStep, setAdminForgotStep] = useState<"idle" | "email" | "code" | "newPassword" | "success">("idle");
 const [adminForgotEmail, setAdminForgotEmail] = useState("");
 const [adminForgotOtpCode, setAdminForgotOtpCode] = useState("");
+const [adminForgotResetToken, setAdminForgotResetToken] = useState("");
 const [adminForgotNewPw, setAdminForgotNewPw] = useState("");
 const [adminForgotConfirmPw, setAdminForgotConfirmPw] = useState("");
 const [adminForgotSending, setAdminForgotSending] = useState(false);
@@ -251,7 +252,8 @@ const adminForgotVerifyCode = async () => {
       body: JSON.stringify({ email: adminForgotEmail.trim(), code: adminForgotOtpCode }),
     });
     const data = await res.json();
-    if (data.success) {
+    if (data.valid && data.resetToken) {
+      setAdminForgotResetToken(data.resetToken);
       setAdminForgotStep("newPassword");
     } else {
       showToast(data.error || "Code invalide");
@@ -277,7 +279,7 @@ const adminForgotResetPassword = async () => {
     const res = await fetch("/api/auth/reset-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: adminForgotEmail.trim(), code: adminForgotOtpCode, newPassword: adminForgotNewPw }),
+      body: JSON.stringify({ email: adminForgotEmail.trim(), newPassword: adminForgotNewPw, resetToken: adminForgotResetToken }),
     });
     const data = await res.json();
     if (data.success) {

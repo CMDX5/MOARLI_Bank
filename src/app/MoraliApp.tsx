@@ -508,6 +508,12 @@ function App() {
   const transactionPinOpenRef = useRef(false);
   const transactionProcessingRef = useRef(false);
   const transactionSuccessRef = useRef(false);
+  const deferredUserSnapRef = useRef<FirestoreMoraliUser | null>(null);
+  // Auth listener is subscribed once, so it must read the live screen.
+  // A signed-in admin also matches onAuthStateChanged; without this, the
+  // customer redirect replaces the admin shell (onboarding / dashboard).
+  const screenRef = useRef(screen);
+  screenRef.current = screen;
   const [transactionPinVerifying, setTransactionPinVerifying] = useState(false);
   const [loanAmount, setLoanAmount] = useState(5000);
   const [personalLoanAmount, setPersonalLoanAmount] = useState(250000);
@@ -841,9 +847,14 @@ function App() {
     // Debounce rapid Firestore updates to prevent cascading re-renders
     let snapshotRafId: number | null = null;
     const unsub = onSnapshot(userRef, (snap) => {
-      // CRITICAL: Skip snapshot updates during active transaction flow to prevent
-      // render storm that freezes the UI after deposit/withdrawal/transfer
-      if (transactionPinOpenRef.current || transactionProcessingRef.current || transactionSuccessRef.current) return;
+      // Skip live updates while the PIN modal is open (avoids a render storm).
+      // The deferred snapshot is applied once that flow closes — the ledger is
+      // the only balance writer, so dropping this event would leave the UI at 0.
+      if (transactionPinOpenRef.current || transactionProcessingRef.current || transactionSuccessRef.current) {
+        deferredUserSnapRef.current = snap.exists() ? (snap.data() as FirestoreMoraliUser) : null;
+        return;
+      }
+      deferredUserSnapRef.current = null;
       if (snapshotRafId) cancelAnimationFrame(snapshotRafId);
       snapshotRafId = requestAnimationFrame(() => {
         snapshotRafId = null;
@@ -901,6 +912,18 @@ function App() {
     });
     return () => { unsub(); if (snapshotRafId) cancelAnimationFrame(snapshotRafId); };
   }, [authUid]);
+
+  // Apply the balance snapshot that arrived while the PIN modal was open.
+  useEffect(() => {
+    if (transactionPinOpen || transactionProcessing || transactionSuccess) return;
+    const data = deferredUserSnapRef.current;
+    if (!data) return;
+    deferredUserSnapRef.current = null;
+    if (typeof data.balance === "number") setFirestoreBalance(Math.max(0, data.balance));
+    if (typeof data.savingsBalance === "number") setSavingsAmount(data.savingsBalance);
+    if (typeof data.eurWallet === "number") setEurWallet(data.eurWallet);
+    if (typeof data.usdWallet === "number") setUsdWallet(data.usdWallet);
+  }, [transactionPinOpen, transactionProcessing, transactionSuccess]);
 
   // Auto-repair balance disabled — caused permission errors from composite Firestore queries
   // (kept as no-op for future reactivation with proper indexes)
@@ -1099,8 +1122,11 @@ function App() {
             }).catch((err: unknown) => { console.error("Erreur publication annuaire:", err); });
           }
 
-          setScreen("dashboard");
-          setNavActive("Accueil");
+          // Stay on the admin shell when this sign-in came from the admin gate.
+          if (screenRef.current !== "admin") {
+            setScreen("dashboard");
+            setNavActive("Accueil");
+          }
 
           // ── Vérification session token (détection "autres appareils déconnectés") ──
           try {
@@ -1127,7 +1153,7 @@ function App() {
             }
           } catch { /* silent — session check non bloquant */ }
           const onboardingDone = typeof localStorage !== 'undefined' && localStorage.getItem("morali-onboarding-done");
-          if (!onboardingDone) {
+          if (!onboardingDone && screenRef.current !== "admin") {
             setScreen("onboarding");
           }
         } else {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/admin-firestore";
-import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
+import { rateLimit } from "@/lib/rate-limit";
 import { requireAuth } from "@/lib/auth-verify";
 import { createHash, timingSafeEqual } from "crypto";
 // firebase-admin v13: doc/collection/query methods are on the Firestore instance (adminDb)
@@ -22,18 +22,17 @@ import { auditLog, AUDIT_ACTIONS, getClientIp } from "@/lib/audit-log";
  * new PINs are stored with bcrypt from the start.
  */
 export async function POST(req: NextRequest) {
-  const clientId = getClientId(req);
-  const rl = rateLimitByIp(`verify-pin:${clientId}`, { maxRequests: 5, windowSec: 60 });
+  const auth = await requireAuth(req);
+  if (auth.error) return auth.error;
+  if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+  const rl = await rateLimit(auth.uid, "verify-pin", { maxRequests: 5, windowSec: 60 });
   if (!rl.allowed) {
     return NextResponse.json({ error: "Trop de tentatives. Réessayez dans 1 minute." }, {
       status: 429,
       headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
     });
   }
-
-  const auth = await requireAuth(req);
-  if (auth.error) return auth.error;
-  if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
   let rawBody: unknown;
   try {
@@ -57,15 +56,33 @@ export async function POST(req: NextRequest) {
     const pinRef = adminDb.doc("pinRecords/" + auth.uid);
     const snap = await pinRef.get();
 
-    // Random delay to prevent timing attacks (regardless of record existence)
-    const delay = 100 + Math.floor(Math.random() * 200);
-    await new Promise((resolve) => setTimeout(resolve, delay));
+    await new Promise((resolve) => setTimeout(resolve, 150));
 
     if (!snap.exists) {
       return NextResponse.json({ valid: false }, { status: 200 });
     }
 
     const record = snap.data()!;
+    const lockedUntil = Number(record.lockedUntil) || 0;
+    if (lockedUntil > Date.now()) {
+      return NextResponse.json({ error: "Trop de tentatives. Réessayez dans 1 minute.", valid: false }, {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil((lockedUntil - Date.now()) / 1000)) },
+      });
+    }
+
+    const noteFailure = async () => {
+      const next = (Number(record.failCount) || 0) + 1;
+      await pinRef.set({
+        failCount: next,
+        lockedUntil: next >= 5 ? Date.now() + 15 * 60 * 1000 : 0,
+      }, { merge: true }).catch(() => {});
+    };
+    const noteSuccess = async () => {
+      if (record.failCount || record.lockedUntil) {
+        await pinRef.set({ failCount: 0, lockedUntil: 0 }, { merge: true }).catch(() => {});
+      }
+    };
 
     // ── Path 1: Modern bcrypt verification ──
     if (record.pinBcrypt) {
@@ -74,12 +91,15 @@ export async function POST(req: NextRequest) {
 
       // Log security event for failed attempts
       if (!isValid) {
+        await noteFailure();
         captureError(new Error("PIN verification failed (bcrypt)"), {
           action: "pin:verify:fail",
           route: "/api/verify-pin",
           uid: auth.uid,
           level: "warning",
         });
+      } else {
+        await noteSuccess();
       }
 
       auditLog({
@@ -102,33 +122,31 @@ export async function POST(req: NextRequest) {
       const bufStored = Buffer.from(record.pinHash, "utf8");
 
       if (bufComputed.length !== bufStored.length) {
+        await noteFailure();
         return NextResponse.json({ valid: false }, { status: 200 });
       }
 
       const isValid = timingSafeEqual(bufComputed, bufStored);
 
       if (isValid) {
-        // ── Migrate: re-hash PIN with bcrypt and update Firestore ──
-        // Fire-and-forget — don't block the response
-        (async () => {
-          try {
-            const bcrypt = await import("bcryptjs");
-            const bcryptHash = await bcrypt.hash(pin, 12);
-            await pinRef.update({
-              pinBcrypt: bcryptHash,
-              migratedAt: new Date().toISOString(),
-            });
-            console.log(`[pin:migrate] uid=${auth.uid} SHA-256 → bcrypt migration complete`);
-          } catch (migrationErr) {
-            captureError(migrationErr, {
-              action: "pin:migrate:fail",
-              route: "/api/verify-pin",
-              uid: auth.uid ?? undefined,
-              level: "error",
-            });
-          }
-        })();
+        await noteSuccess();
+        try {
+          const bcrypt = await import("bcryptjs");
+          const bcryptHash = await bcrypt.hash(pin, 12);
+          await pinRef.update({
+            pinBcrypt: bcryptHash,
+            migratedAt: new Date().toISOString(),
+          });
+        } catch (migrationErr) {
+          captureError(migrationErr, {
+            action: "pin:migrate:fail",
+            route: "/api/verify-pin",
+            uid: auth.uid ?? undefined,
+            level: "error",
+          });
+        }
       } else {
+        await noteFailure();
         captureError(new Error("PIN verification failed (legacy SHA-256)"), {
           action: "pin:verify:fail",
           route: "/api/verify-pin",

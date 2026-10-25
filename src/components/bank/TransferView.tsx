@@ -1,20 +1,7 @@
 'use client';
 import React, { useEffect, useRef, useState } from "react";
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  increment,
-  limit,
-  query,
-  runTransaction,
-  serverTimestamp,
-  where,
-} from "firebase/firestore";
-import { firebaseAuth, firebaseDb } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { firebaseDb } from "@/lib/firebase";
 import type { MoraliUser, FirestoreMoraliUser, FirestoreTransfer, FirestoreNotification, IconName } from "@/types/morali";
 import { sanitizeInput, formatCurrency } from "@/lib/helpers";
 import { AppIcon } from "./Icons";
@@ -82,6 +69,7 @@ export default function TransferView({
   const [transferAmountInput, setTransferAmountInput] = useState("");
   const [transferPinOpen, setTransferPinOpen] = useState(false);
   const [transferPin, setTransferPin] = useState("");
+  const verifiedPinRef = useRef("");
   const [transferProcessing, setTransferProcessing] = useState(false);
   const [transferSuccess, setTransferSuccess] = useState(false);
   const [transferReceiptId, setTransferReceiptId] = useState("");
@@ -330,7 +318,7 @@ export default function TransferView({
     setTransferProcessing(true);
     const ms = Date.now().toString();
     const receiptId = `TRX-${ms.slice(-8)}`;
-    let transferDone = true; // default: skip post-balance if block not entered
+    let transferDone = false;
     try {
       if (authUid && transferRecipient) {
         const recipientUid = transferRecipient.uid || transferRecipient.account;
@@ -362,67 +350,25 @@ export default function TransferView({
               senderName: dashboardName || "Utilisateur",
               senderMoraliId: bankingIdentity.id || "",
               receiptId,
+              pin: verifiedPinRef.current,
             }),
           });
           const atomicData = await atomicRes.json().catch(() => ({}));
           if (atomicData.success) {
             transferDone = true;
+            verifiedPinRef.current = "";
             setTransferPostBalance(atomicData.newSenderBalance ?? (balance - amount));
-          } else if (atomicRes.status === 400 || atomicRes.status === 403) {
-            // Business logic error — show to user, don't fall through
+          } else {
             apiError = atomicData.error || "Erreur lors du virement";
           }
-          // 500/503 errors — fall through to client-side fallback
         } catch {
-          // Network error — fall through to client-side fallback
+          apiError = "Erreur lors du virement";
         }
 
-        if (apiError) {
-          showToast(apiError);
+        if (apiError || !transferDone) {
+          showToast(apiError || "Erreur lors du virement");
           setTransferProcessing(false);
           return;
-        }
-
-        // ── FALLBACK: Client-side Phase 1 + 2 + 3 ──
-        if (!transferDone) {
-          // Phase 1: Atomically debit sender (own doc — allowed by rules)
-          await runTransaction(firebaseDb, async (tx) => {
-            const senderDoc = await tx.get(senderRef);
-            if (!senderDoc.exists()) throw new Error("SENDER_NOT_FOUND");
-            const currentBalance = senderDoc.data().balance || 0;
-            if (amount > currentBalance) throw new Error("INSUFFICIENT_BALANCE");
-            tx.update(senderRef, { balance: currentBalance - amount, updatedAt: serverTimestamp() });
-          });
-
-          // Phase 2: Create transaction record in Firestore
-          await addDoc(collection(firebaseDb, "transactions"), {
-            senderUid: authUid, senderMoraliId: bankingIdentity.id, senderName: dashboardName,
-            recipientUid, recipientMoraliId: transferRecipient.account, recipientName: transferRecipient.name,
-            amount, fees: 0, type: "virement", status: "success", receiptId,
-            createdAt: serverTimestamp(),
-          });
-          await createRealtimeTransaction({
-            senderUid: authUid, senderMoraliId: bankingIdentity.id, senderName: dashboardName,
-            recipientUid, recipientMoraliId: transferRecipient.account, recipientName: transferRecipient.name,
-            amount, fees: 0, type: "virement", status: "success", receiptId,
-          });
-
-          // Phase 3: Credit recipient — create pending credit (recipient auto-claims via onSnapshot)
-          try {
-            await fetch("/api/directory/pending-credit", {
-              method: "POST",
-              headers: await getAuthHeaders(),
-              body: JSON.stringify({
-                recipientUid,
-                amount,
-                senderName: dashboardName || "Utilisateur",
-                senderMoraliId: bankingIdentity.id || "",
-                receiptId,
-              }),
-            });
-          } catch {
-            // Best-effort — recipient will auto-claim pending credits on next login/snapshot
-          }
         }
 
         // Phase 4: Notify sender
@@ -453,28 +399,8 @@ export default function TransferView({
         "send",
         "#D4A437"
       );
-    } catch (err: unknown) {
-      // Compensating transaction — refund sender if any phase after debit fails
-      const msg = err instanceof Error ? err.message : "";
-      if (msg !== "SENDER_NOT_FOUND" && msg !== "INSUFFICIENT_BALANCE") {
-        try {
-          const senderRef = doc(firebaseDb, "moraliUsers", authUid);
-          await runTransaction(firebaseDb, async (tx) => {
-            const senderDoc = await tx.get(senderRef);
-            if (senderDoc.exists()) {
-              const currentBal = senderDoc.data().balance || 0;
-              tx.update(senderRef, { balance: currentBal + amount, updatedAt: serverTimestamp() });
-            }
-          });
-          showToast("Virement échoué — votre solde a été remboursé");
-        } catch {
-          showToast("Erreur lors du virement. Vérifiez votre solde.");
-        }
-      } else if (msg === "INSUFFICIENT_BALANCE") {
-        setTransferErrorMsg("Solde insuffisant pour effectuer ce virement.");
-      } else if (msg === "SENDER_NOT_FOUND") {
-        setTransferErrorMsg("Compte introuvable. Veuillez vous reconnecter.");
-      }
+    } catch {
+      showToast("Erreur lors du virement. Vérifiez votre solde.");
       setTransferStage("error");
     } finally {
       setTransferProcessing(false);
@@ -514,12 +440,13 @@ export default function TransferView({
           setTransferPin("");
           setPinVerifying(false);
           return;
-        } else if (!data.valid) {
+        } else         if (!data.valid) {
           setTransferPin("");
           showToast("Code PIN incorrect");
           setPinVerifying(false);
           return;
         }
+        verifiedPinRef.current = next;
         // PIN verified — transition to animated processing stage
         setTransferStage("processing");
         setPinVerifying(false);

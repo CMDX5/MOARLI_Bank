@@ -8,7 +8,8 @@ import {
   signInWithRedirect,
   updateProfile,
 } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
+import { syncOwnProfile } from "@/lib/profile-sync";
 import { firebaseAuth, firebaseDb } from "@/lib/firebase";
 import {
   firebaseAuthMessage,
@@ -451,16 +452,15 @@ export default function AuthView({
       const identity = generateMoraliIdentity(getIdentitySeed(user.email, user.uid));
       const phone = profileForm.phone.trim() || `${registerData.prefix || "+242"}${registerData.tel || ""}`;
 
-      await setDoc(
-        doc(firebaseDb, "moraliUsers", user.uid),
+      const token = await user.getIdToken();
+      await syncOwnProfile(
+        { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         {
-          uid: user.uid, fullName: displayName, firstName, lastName,
+          fullName: displayName, firstName, lastName,
           pseudo: pseudoBase, moraliId: identity.id,
           moraliIdNormalized: identity.id.replace(/[^A-Z0-9]/g, ""),
           rib: identity.rib, phone, email: user.email || "",
-          updatedAt: serverTimestamp(), createdAt: serverTimestamp(),
         },
-        { merge: true },
       );
 
       cacheIdentityForUid(user.uid, identity);

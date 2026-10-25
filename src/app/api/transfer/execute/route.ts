@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
     senderName?: string;
     senderMoraliId?: string;
     receiptId?: string;
+    pin?: string;
   };
   try {
     body = await req.json();
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { recipientUid, amount, senderName, senderMoraliId, receiptId } = body;
+  const { recipientUid, amount, receiptId, pin } = body;
 
   if (!recipientUid || amount === undefined || amount === null) {
     return NextResponse.json(
@@ -102,6 +103,13 @@ export async function POST(req: NextRequest) {
   }
 
   const cleanAmount = Math.round(numericAmount);
+  if (cleanAmount <= 0) {
+    return NextResponse.json({ error: "Montant invalide" }, { status: 400 });
+  }
+
+  if (!pin || !/^\d{4}$/.test(pin)) {
+    return NextResponse.json({ error: "Code PIN requis" }, { status: 403 });
+  }
 
   // ── 4. Get Admin Firestore ──
   const adminDb = await getAdminFirestore();
@@ -112,104 +120,70 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── 5. Atomic transfer: debit sender + credit recipient + create record ──
+  // ── 5. PIN is required. The client check is not trusted. ──
+  const pinRl = await rateLimit(auth.uid, "transfer:pin", { maxRequests: 5, windowSec: 60 });
+  if (!pinRl.allowed) {
+    return NextResponse.json({ error: "Trop de tentatives. Réessayez dans 1 minute." }, { status: 429 });
+  }
+  const pinSnap = await adminDb.doc("pinRecords/" + auth.uid).get();
+  if (!pinSnap.exists || !pinSnap.data()?.pinBcrypt) {
+    return NextResponse.json({ error: "Code PIN requis" }, { status: 403 });
+  }
+  const bcrypt = await import("bcryptjs");
+  const pinOk = await bcrypt.compare(pin, String(pinSnap.data()?.pinBcrypt));
+  if (!pinOk) {
+    return NextResponse.json({ error: "Code PIN incorrect" }, { status: 403 });
+  }
+
+  // ── 6. Atomic transfer: all reads, then all writes ──
   try {
     const result = await adminDb.runTransaction(async (transaction) => {
-      // ── Read sender document ──
       const senderRef = adminDb.collection("moraliUsers").doc(auth.uid!);
+      const recipientRef = adminDb.collection("moraliUsers").doc(recipientUid);
       const senderSnap = await transaction.get(senderRef);
-
-      let senderData: Record<string, unknown>;
-      let senderBalance: number;
-
-      if (!senderSnap.exists) {
-        // Auto-create sender profile
-        transaction.set(senderRef, {
-          uid: auth.uid,
-          email: "",
-          fullName: "Utilisateur",
-          balance: 0,
-          savingsAmount: 0,
-          totalSent: 0,
-          totalReceived: 0,
-          accountStatus: "active",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-        senderData = { fullName: "Utilisateur", moraliId: "", name: "Utilisateur", accountStatus: "active" };
-        senderBalance = 0;
-      } else {
-        senderData = senderSnap.data()!;
-        // Check account suspension
-        if (senderData.accountStatus === "suspended") {
-          throw new Error("ACCOUNT_SUSPENDED");
-        }
-        senderBalance = Number(senderData.balance) || 0;
-      }
-
-      if (senderBalance < cleanAmount) {
-        throw new Error("INSUFFICIENT_BALANCE");
-      }
-
-      // ── Read recipient document ──
-      const recipientRef = adminDb
-        .collection("moraliUsers")
-        .doc(recipientUid);
       const recipientSnap = await transaction.get(recipientRef);
 
-      let recipientData: Record<string, unknown>;
-      let recipientBalance: number;
+      if (!senderSnap.exists) throw new Error("SENDER_NOT_FOUND");
+      const senderData = senderSnap.data() || {};
+      if (senderData.accountStatus === "suspended") throw new Error("ACCOUNT_SUSPENDED");
+      const senderBalance = Number(senderData.balance) || 0;
+      if (senderBalance < cleanAmount) throw new Error("INSUFFICIENT_BALANCE");
 
-      if (!recipientSnap.exists) {
-        // Auto-create recipient profile
+      const recipientData = recipientSnap.exists ? (recipientSnap.data() || {}) : {};
+      const recipientBalance = recipientSnap.exists ? Number(recipientData.balance) || 0 : 0;
+
+      const newSenderBalance = senderBalance - cleanAmount;
+      const newRecipientBalance = recipientBalance + cleanAmount;
+      const senderName = sanitize(String(senderData.fullName || senderData.name || "Utilisateur"), 100);
+      const recipientName = sanitize(String(recipientData.fullName || recipientData.name || "Utilisateur"), 100);
+
+      transaction.update(senderRef, { balance: newSenderBalance, updatedAt: new Date() });
+
+      if (recipientSnap.exists) {
+        transaction.update(recipientRef, { balance: newRecipientBalance, updatedAt: new Date() });
+      } else {
         transaction.set(recipientRef, {
           uid: recipientUid,
           email: "",
           fullName: "Utilisateur",
-          balance: 0,
-          savingsAmount: 0,
+          balance: newRecipientBalance,
+          savingsBalance: 0,
           totalSent: 0,
-          totalReceived: 0,
+          totalReceived: cleanAmount,
           accountStatus: "active",
           createdAt: new Date(),
           updatedAt: new Date(),
         });
-        recipientData = { fullName: "Utilisateur", moraliId: "", name: "Utilisateur" };
-        recipientBalance = 0;
-      } else {
-        recipientData = recipientSnap.data()!;
-        recipientBalance = Number(recipientData.balance) || 0;
       }
 
-      // ── Debit sender ──
-      const newSenderBalance = senderBalance - cleanAmount;
-      transaction.update(senderRef, {
-        balance: newSenderBalance,
-        updatedAt: new Date(),
-      });
-
-      // ── Credit recipient ──
-      const newRecipientBalance = recipientBalance + cleanAmount;
-      transaction.update(recipientRef, {
-        balance: newRecipientBalance,
-        updatedAt: new Date(),
-      });
-
-      // ── Create transaction record (auto-generated ID) ──
       const txnRef = adminDb.collection("transactions").doc();
       transaction.set(txnRef, {
         senderUid: auth.uid,
-        senderMoraliId: sanitize(senderMoraliId || "", 50),
-        senderName: sanitize(senderName || "", 100),
+        senderMoraliId: sanitize(String(senderData.moraliId || ""), 50),
+        senderName,
         recipientUid,
-        recipientMoraliId:
-          sanitize(String(recipientData.moraliId || recipientData.id || ""), 50),
-        recipientName: sanitize(
-          String(recipientData.fullName ||
-            recipientData.name ||
-            "Utilisateur"),
-          100
-        ),
+        recipientMoraliId: sanitize(String(recipientData.moraliId || recipientData.id || ""), 50),
+        recipientName,
         amount: cleanAmount,
         fees: 0,
         type: "virement",
@@ -222,8 +196,8 @@ export async function POST(req: NextRequest) {
         newSenderBalance,
         newRecipientBalance,
         txnId: txnRef.id,
-        recipientName:
-          recipientData.fullName || recipientData.name || "Utilisateur",
+        senderName,
+        recipientName,
       };
     });
 
@@ -231,7 +205,7 @@ export async function POST(req: NextRequest) {
     try {
       const formattedAmount = cleanAmount.toLocaleString("fr-FR");
       const now = new Date().toLocaleString("fr-FR", { timeZone: "Africa/Brazzaville" });
-      const senderNameStr = result.recipientName || "Utilisateur";
+      const senderNameStr = result.senderName || "Utilisateur";
 
       // Recipient notification: "Vous avez reçu un virement"
       await adminDb.collection("users").doc(recipientUid).collection("notifications").add({

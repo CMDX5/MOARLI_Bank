@@ -48,7 +48,6 @@ export async function POST(req: NextRequest) {
     }
 
     const userData = userDoc.data()!;
-    const userBalance = Number(userData.balance) || 0;
     const userName = userData.fullName || userData.name || "Utilisateur";
 
     // Skip admin accounts
@@ -104,81 +103,81 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 4. Count existing maintenance fees for this user
+    // 4. Seed from existing revenue rows only when the counter document is absent.
     const existingFees = await adminDb
       .collection("bankRevenue")
       .where("type", "==", "account_maintenance")
       .where("sourceUid", "==", auth.uid)
       .get();
+    const seededCount = existingFees.size;
 
-    const feesCharged = existingFees.size;
-    const monthsToCharge = Math.min(monthsElapsed - feesCharged, MAX_MONTHS_CHARGE);
+    const userRef = adminDb.collection("moraliUsers").doc(auth.uid);
+    const counterRef = adminDb.collection("accountMaintenance").doc(auth.uid);
 
-    // Already up to date
-    if (monthsToCharge <= 0) {
+    const charge = await adminDb.runTransaction(async (tx) => {
+      const userSnap = await tx.get(userRef);
+      const counterSnap = await tx.get(counterRef);
+      const already = counterSnap.exists ? Number(counterSnap.data()?.monthsCharged) || 0 : seededCount;
+      const due = Math.min(Math.max(monthsElapsed - already, 0), MAX_MONTHS_CHARGE);
+      const balance = Number(userSnap.data()?.balance) || 0;
+      const affordable = Math.min(due, Math.floor(balance / MAINTENANCE_FEE));
+      if (affordable <= 0) {
+        if (!counterSnap.exists) {
+          tx.set(counterRef, { monthsCharged: already, updatedAt: new Date() });
+        }
+        return { charged: false as const, monthsCharged: 0, totalFeesPaid: already, reason: due <= 0 ? "up_to_date" : "insufficient_balance" };
+      }
+      const totalCharge = affordable * MAINTENANCE_FEE;
+      tx.update(userRef, { balance: balance - totalCharge, updatedAt: new Date() });
+      tx.set(counterRef, { monthsCharged: already + affordable, updatedAt: new Date() }, { merge: true });
+      for (let i = 0; i < affordable; i++) {
+        const feeDate = new Date(createdAt);
+        feeDate.setMonth(feeDate.getMonth() + already + i + 1);
+        feeDate.setDate(1);
+        const monthLabel = feeDate.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+        const monthIndex = already + i + 1;
+        tx.set(adminDb.collection("bankRevenue").doc(`maint_${auth.uid}_${monthIndex}`), {
+          type: "account_maintenance",
+          amount: MAINTENANCE_FEE,
+          sourceUid: auth.uid,
+          sourceName: userName,
+          referenceId: `MAINT-${auth.uid}-${monthIndex}`,
+          description: `Frais d'entretien compte — ${monthLabel}`,
+          currency: "FCFA",
+          createdAt: new Date(),
+        });
+      }
+      tx.set(adminDb.collection("transactions").doc(`maint_${auth.uid}_${already + affordable}`), {
+        senderUid: auth.uid,
+        senderMoraliId: userData.moraliId || "",
+        senderName: userName,
+        recipientUid: "system",
+        recipientMoraliId: "system",
+        recipientName: "Morali Pay — Entretien",
+        amount: totalCharge,
+        fees: 0,
+        type: "retrait",
+        destination: "maintenance",
+        status: "success",
+        receiptId: `MAINT-${auth.uid}-${already + affordable}`,
+        createdAt: new Date(),
+      });
+      return { charged: true as const, amount: totalCharge, monthsCharged: affordable, totalFeesPaid: already + affordable };
+    });
+
+    if (!charge.charged) {
       const nextDue = getNextDueDate(createdAt, now);
       return NextResponse.json({
         charged: false,
-        reason: "up_to_date",
+        reason: charge.reason,
         monthsCharged: 0,
-        totalFeesPaid: feesCharged,
+        totalFeesPaid: charge.totalFeesPaid,
         nextDueDate: nextDue,
       });
     }
 
-    // 5. Calculate total amount to charge
-    const totalCharge = monthsToCharge * MAINTENANCE_FEE;
-
-    // Check if user has enough balance (but allow negative balance for maintenance)
-    // We'll charge even if balance is low, as this is a mandatory fee
-    const newBalance = userBalance - totalCharge;
-
-    // 6. Execute the charge atomically
-    const userRef = adminDb.collection("moraliUsers").doc(auth.uid);
-
-    await adminDb.runTransaction(async (tx) => {
-      const userSnap = await tx.get(userRef);
-      const currentBal = Number(userSnap.data()?.balance) || 0;
-      tx.update(userRef, { balance: currentBal - totalCharge, updatedAt: new Date() });
-    });
-
-    // 7. Create revenue entries (one per month for transparency)
-    for (let i = 0; i < monthsToCharge; i++) {
-      const feeDate = new Date(createdAt);
-      feeDate.setMonth(feeDate.getMonth() + feesCharged + i + 1);
-      feeDate.setDate(1); // First of the month
-
-      const monthLabel = feeDate.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
-
-      await adminDb.collection("bankRevenue").add({
-        type: "account_maintenance",
-        amount: MAINTENANCE_FEE,
-        sourceUid: auth.uid,
-        sourceName: userName,
-        referenceId: `MAINT-${Date.now()}-${i}`,
-        description: `Frais d'entretien compte — ${monthLabel}`,
-        currency: "FCFA",
-        createdAt: new Date(),
-      });
-    }
-
-    // 8. Create a transaction record for the maintenance charge
-    const receiptId = `MAINT-${Date.now()}`;
-    await adminDb.collection("transactions").add({
-      senderUid: auth.uid,
-      senderMoraliId: userData.moraliId || "",
-      senderName: userName,
-      recipientUid: "system",
-      recipientMoraliId: "system",
-      recipientName: "Morali Pay — Entretien",
-      amount: totalCharge,
-      fees: 0,
-      type: "retrait",
-      destination: "maintenance",
-      status: "success",
-      receiptId,
-      createdAt: new Date(),
-    });
+    const totalCharge = charge.amount;
+    const monthsToCharge = charge.monthsCharged;
 
     // 9. Notify user about the maintenance charge
     try {
@@ -201,7 +200,7 @@ export async function POST(req: NextRequest) {
       charged: true,
       amount: totalCharge,
       monthsCharged: monthsToCharge,
-      totalFeesPaid: feesCharged + monthsToCharge,
+      totalFeesPaid: charge.totalFeesPaid,
       nextDueDate: nextDue,
     });
   } catch (err) {

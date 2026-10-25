@@ -1,6 +1,6 @@
 // ── MOARLI Bank — Service Worker ──
 
-const CACHE_NAME = 'morali-v1';
+const CACHE_NAME = 'morali-v2';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
@@ -33,9 +33,9 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // API calls: network-first
+  // API calls are never cached (balances, history, profile).
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(networkFirst(request));
+    event.respondWith(fetch(request));
     return;
   }
 
@@ -126,7 +126,15 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  const urlToOpen = event.notification.data?.url || '/';
+  let urlToOpen = '/';
+  try {
+    const parsed = new URL(event.notification.data?.url || '/', self.location.origin);
+    if (parsed.origin === self.location.origin) {
+      urlToOpen = parsed.pathname + parsed.search + parsed.hash;
+    }
+  } catch {
+    urlToOpen = '/';
+  }
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {

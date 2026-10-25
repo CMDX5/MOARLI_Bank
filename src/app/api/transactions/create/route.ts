@@ -49,14 +49,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Impossible d'envoyer à soi-même" }, { status: 400 });
     }
 
-    // Ownership check: authenticated user must be the sender (or admin)
-    if (callerUid !== senderUid) {
-      const callerDoc = await adminDb.collection("moraliUsers").doc(callerUid).get();
-      const callerRole = callerDoc.data()?.role;
-      if (callerRole !== "admin") {
-        captureSecurityEvent("transaction_idor_attempt", { uid: callerUid, details: { senderUid, recipientUid } });
-        return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
-      }
+    // Cash deposits are not booked here. A depot used to credit balance with no payment.
+    if (type === "depot") {
+      captureSecurityEvent("unbacked_deposit_rejected", { uid: callerUid, details: { amount, destination } });
+      return NextResponse.json(
+        { success: false, error: "Les dépôts sont crédités par le grand livre ou par un paiement confirmé.", code: "UNBACKED_DEPOSIT" },
+        { status: 400 },
+      );
+    }
+
+    // Ownership check: authenticated user must be the sender (or a custom-claim admin).
+    const claimAdmin = auth.claims?.admin === true || auth.claims?.role === "admin";
+    if (callerUid !== senderUid && !claimAdmin) {
+      captureSecurityEvent("transaction_idor_attempt", { uid: callerUid, details: { senderUid, recipientUid } });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
     }
 
     // SECURITY FIX: Use Firestore runTransaction for atomic duplicate detection + write
@@ -114,43 +120,8 @@ export async function POST(req: NextRequest) {
 
         transaction.set(docRef, txData);
 
-        // ── BUG FIX: Update the user's balance atomically for deposits/withdrawals ──
-        // Previously this route only recorded the transaction document WITHOUT
-        // crediting/debiting the balance, so deposits appeared in the history
-        // but the available balance stayed at 0 — making withdrawals impossible
-        // and breaking the entire financial chain.
-        if (isDepositOrWithdrawal) {
-          const userRef = adminDb.collection("moraliUsers").doc(callerUid);
-          const userSnap = await transaction.get(userRef);
-
-          let currentBalance = 0;
-          if (userSnap.exists) {
-            currentBalance = Number(userSnap.data()?.balance) || 0;
-          }
-
-          const numericAmount = Number(amount);
-          const numericFees = Number(fees) || 0;
-
-          if (type === "depot") {
-            // Deposit: credit the full amount (fees are paid by the bank in demo mode)
-            const newBalance = currentBalance + numericAmount;
-            transaction.set(userRef, {
-              balance: newBalance,
-              updatedAt: new Date(),
-            }, { merge: true });
-          } else if (type === "retrait") {
-            // Withdrawal: debit amount + fees, refuse if insufficient balance
-            const totalDebit = numericAmount + numericFees;
-            if (currentBalance < totalDebit) {
-              throw new Error("INSUFFICIENT_BALANCE");
-            }
-            const newBalance = currentBalance - totalDebit;
-            transaction.set(userRef, {
-              balance: newBalance,
-              updatedAt: new Date(),
-            }, { merge: true });
-          }
-        }
+        // Balance changes are owned by /api/ledger (and the payment webhook).
+        // This route only records history so a second call cannot mint or debit again.
 
         // Create the lock (prevents race condition)
         transaction.set(lockRef, {
@@ -163,34 +134,6 @@ export async function POST(req: NextRequest) {
 
         return { success: true, id: docRef.id, fees: Number(fees) || 0 };
       });
-
-      // ── Track bank revenue server-side for fee-generating transactions ──
-      const txFees = (result as any).fees || 0;
-      if (txFees > 0 && (type === "retrait" || type === "depot")) {
-        try {
-          const feeType = type === "retrait" ? "withdrawal_fee" : "service_fee";
-          let sourceName = "Utilisateur";
-          try {
-            const userDoc = await adminDb.collection("moraliUsers").doc(callerUid).get();
-            if (userDoc.exists) {
-              sourceName = userDoc.data()?.fullName || userDoc.data()?.name || "Utilisateur";
-            }
-          } catch { /* ignore */ }
-          await adminDb.collection("bankRevenue").add({
-            type: feeType,
-            amount: Math.round(txFees),
-            sourceUid: callerUid,
-            sourceName,
-            referenceId: String(receiptId),
-            description: `${feeType === "withdrawal_fee" ? "Frais de retrait (2%)" : "Frais de service (2%)"} — ${Number(amount).toLocaleString("fr-FR")} FCFA`,
-            currency: "FCFA",
-            createdAt: new Date(),
-          });
-        } catch (revErr) {
-          // Revenue tracking best-effort — never block the transaction
-          console.error("[tx:create] Revenue tracking failed:", revErr);
-        }
-      }
 
       return NextResponse.json(result);
     } catch (err: unknown) {

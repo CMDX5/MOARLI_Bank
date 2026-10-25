@@ -27,29 +27,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Champs requis manquants" }, { status: 400 });
     }
 
-    // SECURITY FIX: Only admin can send cross-user notifications.
-    // Regular users can only send notifications to themselves.
-    // Check both Firebase custom claims AND Firestore role (fallback).
-    const isAdmin = auth.claims?.admin === true;
+    // Cross-user notifications require a Firebase custom claim, not a Firestore role.
+    const isAdmin = auth.claims?.admin === true || auth.claims?.role === "admin";
     let targetUid: string;
 
-    // Firestore fallback: check role field if custom claims not set
-    let isFireStoreAdmin = false;
-    if (!isAdmin && auth.uid) {
-      try {
-        const adminDb = await getAdminFirestore();
-        if (adminDb) {
-          const userDoc = await adminDb.collection("moraliUsers").doc(auth.uid).get();
-          if (userDoc.exists && userDoc.data()?.role === "admin") {
-            isFireStoreAdmin = true;
-          }
-        }
-      } catch {
-        // Ignore Firestore check errors
-      }
-    }
-
-    if (isAdmin || isFireStoreAdmin) {
+    if (isAdmin) {
       // Admin can send to any user
       targetUid = String(uid);
     } else {
@@ -85,7 +67,7 @@ export async function POST(req: NextRequest) {
       read: false,
       createdAt: new Date(),
       // Track sender for audit
-      sentBy: (isAdmin || isFireStoreAdmin) ? "admin" : "self",
+      sentBy: isAdmin ? "admin" : "self",
       senderUid: auth.uid ?? "",
     });
 

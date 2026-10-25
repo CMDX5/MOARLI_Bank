@@ -3,15 +3,21 @@ import { encryptPinServerSide, decryptPinServerSide } from "../pin-server-crypto
 
 describe("pin-server-crypto", () => {
   beforeAll(() => {
-    // Ensure the dev fallback key is used (needs min 32 chars)
-    // In dev mode, the library falls back automatically
     // @ts-expect-error — NODE_ENV is read-only in TS 5.9 types
     process.env.NODE_ENV = "test";
+    process.env.MORALI_PIN_MASTER_KEY = "ab".repeat(32);
   });
 
   const testUid = "test-user-123";
   const testPin = "1234";
   const otherUid = "other-user-456";
+
+  it("returns null when the master key is missing", () => {
+    const previous = process.env.MORALI_PIN_MASTER_KEY;
+    delete process.env.MORALI_PIN_MASTER_KEY;
+    expect(encryptPinServerSide(testPin, testUid)).toBeNull();
+    process.env.MORALI_PIN_MASTER_KEY = previous;
+  });
 
   it("encrypts a 4-digit PIN and returns a base64 string", () => {
     const encrypted = encryptPinServerSide(testPin, testUid);

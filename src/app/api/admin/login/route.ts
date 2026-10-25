@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash, timingSafeEqual } from "crypto";
 import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { captureError, captureSecurityEvent } from "@/lib/sentry";
 
@@ -71,25 +72,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── Email comparison (timing-safe) ──
-    // Normalize both emails for comparison
     const normalizedInput = email.toLowerCase().trim();
     const normalizedAdmin = adminEmail.toLowerCase().trim();
+    const emailOk = timingSafeEqual(
+      createHash("sha256").update(normalizedInput).digest(),
+      createHash("sha256").update(normalizedAdmin).digest(),
+    );
 
-    if (normalizedInput !== normalizedAdmin) {
-      captureSecurityEvent("admin_login_email_mismatch", { ip: req.headers.get("x-forwarded-for") || undefined });
-      return NextResponse.json(
-        { success: false, error: "Identifiants incorrects" },
-        { status: 401 }
-      );
-    }
-
-    // ── Password verification (bcrypt with constant-time comparison) ──
+    // Always run bcrypt so a wrong email does not return faster than a wrong password.
     const bcrypt = await import("bcryptjs");
     const isPasswordValid = await bcrypt.compare(password, adminPasswordHash);
 
-    if (!isPasswordValid) {
-      captureSecurityEvent("admin_login_invalid_password", { ip: req.headers.get("x-forwarded-for") || undefined });
+    if (!emailOk || !isPasswordValid) {
+      captureSecurityEvent(emailOk ? "admin_login_invalid_password" : "admin_login_email_mismatch", { ip: req.headers.get("x-forwarded-for") || undefined });
       return NextResponse.json(
         { success: false, error: "Identifiants incorrects" },
         { status: 401 }

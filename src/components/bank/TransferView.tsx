@@ -77,6 +77,7 @@ export default function TransferView({
     motif: "",
   });
   const [bankProcessing, setBankProcessing] = useState(false);
+  const [bankAwaitingPin, setBankAwaitingPin] = useState(false);
   const [transferRecipientQuery, setTransferRecipientQuery] = useState("");
   const [transferRecipient, setTransferRecipient] = useState<MoraliUser | null>(null);
   const [transferAmountInput, setTransferAmountInput] = useState("");
@@ -224,6 +225,7 @@ export default function TransferView({
     setPinVerifying(false);
     setBankForm({ iban: "", bic: "", holderName: "", bankName: "", amount: "", motif: "" });
     setBankProcessing(false);
+    setBankAwaitingPin(false);
     if (transferSearchDebounceRef.current) {
       clearTimeout(transferSearchDebounceRef.current);
     }
@@ -267,10 +269,8 @@ export default function TransferView({
     }, 0);
   };
 
-  /* ── Submit bank transfer (IBAN/BIC) ──
-     Crée une transaction "retrait" avec destination="banque:IBAN:BIC" pour
-     débiter le solde Morali du wallet vers un compte bancaire externe. */
-  const submitBankTransfer = async () => {
+  /* ── Open the same server-side PIN step used by Morali transfers ── */
+  const requestBankPin = () => {
     const numericAmount = parseInt(bankForm.amount.replace(/\D/g, ""), 10);
     if (!bankForm.iban.trim() || !bankForm.holderName.trim() || !numericAmount || numericAmount <= 0) {
       showToast("Veuillez remplir tous les champs obligatoires");
@@ -278,6 +278,32 @@ export default function TransferView({
     }
     if (numericAmount > balance) {
       showToast("Solde insuffisant pour ce virement");
+      return;
+    }
+    setBankAwaitingPin(true);
+    setTransferPin("");
+    setTransferPinOpen(true);
+    setPinVerifying(false);
+    setTransferStage("pin");
+  };
+
+  /* ── Submit bank transfer (IBAN/BIC) ──
+     Crée une transaction "retrait" avec destination="banque:IBAN:BIC" pour
+     débiter le solde Morali du wallet vers un compte bancaire externe.
+     Called only after /api/verify-pin succeeds. */
+  const submitBankTransfer = async () => {
+    const numericAmount = parseInt(bankForm.amount.replace(/\D/g, ""), 10);
+    if (!bankForm.iban.trim() || !bankForm.holderName.trim() || !numericAmount || numericAmount <= 0) {
+      showToast("Veuillez remplir tous les champs obligatoires");
+      setBankAwaitingPin(false);
+      setTransferStage("bank");
+      return;
+    }
+    if (numericAmount > balance) {
+      showToast("Solde insuffisant pour ce virement");
+      setBankAwaitingPin(false);
+      setTransferPin("");
+      setTransferStage("bank");
       return;
     }
 
@@ -301,6 +327,9 @@ export default function TransferView({
       if (!res.ok || !data.success) {
         showToast(data.error || "Virement bancaire échoué");
         setBankProcessing(false);
+        setBankAwaitingPin(false);
+        setTransferPin("");
+        setTransferStage("bank");
         return;
       }
 
@@ -325,6 +354,9 @@ export default function TransferView({
       console.error("[bank-transfer] error:", err);
       showToast("Erreur réseau. Réessayez.");
       setBankProcessing(false);
+      setBankAwaitingPin(false);
+      setTransferPin("");
+      setTransferStage("bank");
     }
   };
 
@@ -540,7 +572,7 @@ export default function TransferView({
 
   // PIN input via system keyboard (same as depot/retrait)
   const handleTransferPinInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (transferProcessing || transferSuccess || pinVerifying) return;
+    if (transferProcessing || transferSuccess || pinVerifying || bankProcessing) return;
     const raw = e.target.value.replace(/\D/g, "").slice(0, 4);
     setTransferPin(raw);
     if (raw.length === 4) {
@@ -573,6 +605,11 @@ export default function TransferView({
           return;
         }
         verifiedPinRef.current = raw;
+        if (bankAwaitingPin) {
+          setPinVerifying(false);
+          await submitBankTransfer();
+          return;
+        }
         setTransferStage("processing");
         setPinVerifying(false);
         window.setTimeout(() => executeTransfer(), 150);
@@ -788,6 +825,8 @@ export default function TransferView({
     transition: "border-color .2s ease, background .2s ease",
   };
 
+  const bankFullScreen = transferStage === "bank" || (bankAwaitingPin && transferStage === "pin");
+
   return (
     <>
       {/* ── Transfer modal ── */}
@@ -796,15 +835,24 @@ export default function TransferView({
         {/* CRITICAL FIX: Backdrop with blur SEPARATE from content — Chrome fix */}
         <div className="transfer-overlay" onClick={closeTransferModal} />
         {/* Content layer — NO backdrop-filter */}
-        <div className={`transfer-overlay-content${transferStage === "bank" ? " bank-fullscreen-overlay" : ""}`} onClick={closeTransferModal}>
-          <div className={`transfer-modal${transferStage === "bank" ? " bank-fullscreen" : ""}`} onClick={(event) => event.stopPropagation()}>
+        <div className={`transfer-overlay-content${bankFullScreen ? " bank-fullscreen-overlay" : ""}`} onClick={closeTransferModal}>
+          <div className={`transfer-modal${bankFullScreen ? " bank-fullscreen" : ""}`} onClick={(event) => event.stopPropagation()}>
 
             {/* ====== HEADER ====== */}
             <div className="transaction-flow-head">
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 {transferStage !== "choice" && transferStage !== "processing" && transferStage !== "error" && (
                   <button className="contact-modal-close" onClick={() => {
-                    if (transferStage === "pin") setTransferStage("amount");
+                    if (transferStage === "pin") {
+                      if (bankAwaitingPin) {
+                        setBankAwaitingPin(false);
+                        setTransferPin("");
+                        setTransferPinOpen(false);
+                        setTransferStage("bank");
+                      } else {
+                        setTransferStage("amount");
+                      }
+                    }
                     else if (transferStage === "amount") { setTransferStage("search"); setTransferRecipient(null); }
                     else if (transferStage === "bank") setTransferStage("choice");
                     else if (transferStage === "search") setTransferStage("choice");
@@ -828,7 +876,9 @@ export default function TransferView({
                     {transferStage === "choice" && "Choisissez la destination du virement."}
                     {transferStage === "search" && "Entrez un Pseudo, ID ou RIB Morali pour commencer le virement."}
                     {transferStage === "amount" && `Vers ${transferRecipient?.name || ""}`}
-                    {transferStage === "pin" && (securitySettings.faceId ? "Face ID non reconnu. Saisissez votre code PIN pour confirmer." : "Saisissez votre code secret à 4 chiffres pour sécuriser l'opération.")}
+                    {transferStage === "pin" && (bankAwaitingPin
+                      ? "Saisissez votre code secret à 4 chiffres pour sécuriser l'opération."
+                      : (securitySettings.faceId ? "Face ID non reconnu. Saisissez votre code PIN pour confirmer." : "Saisissez votre code secret à 4 chiffres pour sécuriser l'opération."))}
                     {transferStage === "processing" && "Virement en cours de traitement..."}
                     {transferStage === "success" && "Fonds transférés avec succès"}
                     {transferStage === "error" && "Le virement n'a pas pu aboutir"}
@@ -1083,7 +1133,7 @@ export default function TransferView({
 
                 {/* Bouton confirmer */}
                 <button
-                  onClick={submitBankTransfer}
+                  onClick={requestBankPin}
                   disabled={bankProcessing || !bankForm.iban.trim() || !bankForm.holderName.trim() || !bankForm.amount}
                   style={{
                     width: "100%", height: 54, borderRadius: 16, border: "none",
@@ -1258,15 +1308,15 @@ export default function TransferView({
                 <div className="pin-summary">
                   <div>
                     <span>Opération</span>
-                    <strong>Virement</strong>
+                    <strong>{bankAwaitingPin ? "Virement bancaire" : "Virement"}</strong>
                   </div>
                   <div>
                     <span>Destinataire</span>
-                    <strong>{transferRecipient?.name || ""}</strong>
+                    <strong>{bankAwaitingPin ? bankForm.holderName : (transferRecipient?.name || "")}</strong>
                   </div>
                   <div>
                     <small>Montant</small>
-                    <strong>FCFA {formatCurrency(Number(transferAmountInput || 0))}</strong>
+                    <strong>FCFA {formatCurrency(bankAwaitingPin ? (parseInt(bankForm.amount.replace(/\D/g, ""), 10) || 0) : Number(transferAmountInput || 0))}</strong>
                   </div>
                 </div>
 
@@ -1301,7 +1351,9 @@ export default function TransferView({
                       MozAppearance: 'textfield',
                     }}
                   />
-                  {pinVerifying ? (
+                  {bankProcessing ? (
+                    <div className="pin-helper" style={{ color: "#60a5fa" }}>Virement en cours…</div>
+                  ) : pinVerifying ? (
                     <div className="pin-helper" style={{ color: "#60a5fa" }}>Vérification du code PIN…</div>
                   ) : (
                     <div className="pin-helper">La vérification démarre automatiquement.</div>

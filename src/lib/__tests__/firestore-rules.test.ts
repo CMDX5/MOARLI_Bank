@@ -13,6 +13,11 @@ describe("firestore.rules", () => {
     expect(rules.slice(start, end)).toMatch(/allow write:\s*if false/);
   });
 
+  it("denies client access to cinetpayPayments", () => {
+    expect(rules).toMatch(/match \/databases\/\{db\}\/documents\/cinetpayPayments\/\{paymentId\}/);
+    expect(rules).toMatch(/cinetpayPayments\/\{paymentId\} \{\s*allow read, write: if false;/);
+  });
+
   it("denies client writes on transactions", () => {
     const start = rules.indexOf("match /databases/{db}/documents/transactions/{txId}");
     const end = rules.indexOf("match /databases/{db}/documents/serverTransactions/{txId}");

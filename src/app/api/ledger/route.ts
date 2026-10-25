@@ -15,8 +15,8 @@ import {
  * POST /api/ledger
  *
  * The only path a signed-in user has to move their own balances.
- * Cash deposits credit the caller (the in-app Mobile Money screen has no
- * payment-provider handshake). They are rejected on POST /api/transactions/create.
+ * Cash deposits are rejected here. A Mobile Money deposit is credited only
+ * after CinetPay confirms it (see /api/webhooks/cinetpay).
  * Withdrawals, savings transfers and FX never trust a client-supplied balance.
  */
 
@@ -94,13 +94,23 @@ export async function POST(req: NextRequest) {
   const lockRef = adminDb.collection("txLocks").doc(`ledger_${uid}_${receiptId.replace(/[^a-zA-Z0-9_-]/g, "_")}`);
 
   try {
-    if (op === "deposit" || op === "withdraw") {
+    if (op === "deposit") {
+      return NextResponse.json(
+        {
+          error: "Un dépôt est crédité seulement après confirmation CinetPay.",
+          code: "DEPOSIT_REQUIRES_PAYMENT",
+        },
+        { status: 403 },
+      );
+    }
+
+    if (op === "withdraw") {
       const channel = body.channel === "service" ? "service" : "momo";
       const principal = Math.round(amount);
       if (principal <= 0) {
         return NextResponse.json({ error: "Montant invalide", code: "INVALID_AMOUNT" }, { status: 400 });
       }
-      const fee = op === "withdraw" ? serverWithdrawalFee(principal, channel, body.applyFee === true) : 0;
+      const fee = serverWithdrawalFee(principal, channel, body.applyFee === true);
       const result = await adminDb.runTransaction(async (tx) => {
         const lockSnap = await tx.get(lockRef);
         if (lockSnap.exists && lockSnap.data()?.result) {
@@ -112,9 +122,8 @@ export async function POST(req: NextRequest) {
         const data = userSnap.data() || {};
         if (data.accountStatus === "suspended") throw new Error("ACCOUNT_SUSPENDED");
         const balance = Number(data.balance) || 0;
-        const delta = op === "deposit" ? principal : -(principal + fee);
-        if (op === "withdraw" && balance < principal + fee) throw new Error("INSUFFICIENT_BALANCE");
-        const newBalance = balance + delta;
+        if (balance < principal + fee) throw new Error("INSUFFICIENT_BALANCE");
+        const newBalance = balance - (principal + fee);
         const txRef = adminDb.collection("transactions").doc();
         const name = sanitize(String(data.fullName || data.name || body.senderName || "Utilisateur"), 100);
         const moraliId = sanitize(String(data.moraliId || body.senderMoraliId || ""), 50);
@@ -129,10 +138,8 @@ export async function POST(req: NextRequest) {
           recipientName: name,
           amount: principal,
           fees: fee,
-          type: op === "deposit" ? "depot" : "retrait",
-          destination: op === "withdraw"
-            ? sanitize(String(body.destination || "cash"), 160) || "cash"
-            : "cash",
+          type: "retrait",
+          destination: sanitize(String(body.destination || "cash"), 160) || "cash",
           status: "success",
           createdAt: new Date(),
         });
@@ -144,7 +151,7 @@ export async function POST(req: NextRequest) {
             sourceUid: uid,
             sourceName: name,
             referenceId: receiptId,
-            description: `Frais ${op === "withdraw" ? "de retrait" : "de service"} (2%) — ${principal} FCFA`,
+            description: `Frais de retrait (2%) — ${principal} FCFA`,
             currency: "FCFA",
             createdAt: new Date(),
           });

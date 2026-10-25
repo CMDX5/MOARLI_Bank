@@ -84,7 +84,25 @@ The app will be available at `http://localhost:3000`.
 
 See [`.env.production.example`](./.env.production.example) for the full list of required environment variables.
 
-`MORALI_PIN_MASTER_KEY` is required wherever PIN encryption runs (64 hex characters). Balances are written only by the Admin SDK: deploy `firestore.rules` with `firebase deploy --only firestore:rules` so clients cannot write `moraliUsers`.
+`MORALI_PIN_MASTER_KEY` is required wherever PIN encryption runs (64 hex characters). Balances are written only by the Admin SDK: deploy `firestore.rules` with `firebase deploy --only firestore:rules` so clients cannot write `moraliUsers`. The same rules deny client access to `cinetpayPayments`.
+
+### CinetPay deposits
+
+Mobile Money deposits (MTN / Airtel) start a CinetPay checkout. The balance is credited only after CinetPay confirms the payment. Set these server-side variables on Vercel (see [`.env.production.example`](./.env.production.example)):
+
+| Variable | Required for deposits | Purpose |
+|---|---|---|
+| `CINETPAY_API_KEY` | yes | CinetPay apikey |
+| `CINETPAY_SITE_ID` | yes | CinetPay site_id |
+| `CINETPAY_SECRET_KEY` | yes | HMAC secret for the notify `x-token` header |
+| `APP_BASE_URL` | yes | Public HTTPS origin, no trailing slash |
+| `CINETPAY_CURRENCY` | no | Defaults to `XAF` |
+
+Notify URL to save in the CinetPay dashboard:
+
+`https://<APP_BASE_URL>/api/webhooks/cinetpay`
+
+CinetPay must be able to `GET` (availability ping) and `POST` that URL. The return URL is sent with each payment (`/api/payments/cinetpay/return`) and only shows the status page at `/depot/retour`. `PAYMENT_WEBHOOK_SECRET` is obsolete and is not read anymore.
 
 ## API Endpoints
 
@@ -148,7 +166,9 @@ See [`.env.production.example`](./.env.production.example) for the full list of 
 | POST | `/api/kyc` | Submit KYC data |
 | POST | `/api/notifications/create` | Create a notification |
 | GET | `/api/health` | Health check endpoint |
-| POST | `/api/webhooks/payment` | Payment webhook handler |
+| POST | `/api/payments/cinetpay/init` | Start a CinetPay Mobile Money deposit |
+| GET | `/api/payments/cinetpay/status` | Deposit status for the signed-in payer |
+| POST | `/api/webhooks/cinetpay` | CinetPay notify URL (credits after check-status) |
 | POST | `/api/verify-pin` | Verify transaction PIN |
 
 ## Project Structure

@@ -3,6 +3,7 @@ import { rateLimitByIp, getClientId } from "@/lib/rate-limit";
 import { getAdminAuth } from "@/lib/auth-verify";
 import { validateBody, schemas } from "@/lib/validation";
 import { consumeResetToken } from "@/lib/otp-store";
+import { revokeUserTokens } from "@/lib/auth-verify";
 
 /**
  * Reset the user's account password using Firebase Admin SDK.
@@ -29,34 +30,35 @@ export async function POST(req: NextRequest) {
     }
     const { email, newPassword } = validation.data;
 
-    // SECURITY FIX: Require a valid reset token (obtained after OTP verification)
+    const adminAuth = await getAdminAuth();
+    if (!adminAuth) {
+      return NextResponse.json({ error: "Service indisponible. Contactez le support." }, { status: 503 });
+    }
+
+    // Token is bound to the email that verified the OTP and is single-use.
     const resetToken = rawBody.resetToken;
-    if (!resetToken || !(await consumeResetToken(resetToken))) {
+    if (!resetToken || typeof resetToken !== "string" || !(await consumeResetToken(resetToken, email))) {
       return NextResponse.json(
         { error: "Jeton de réinitialisation invalide ou expiré. Veuillez vérifier votre code OTP d'abord." },
         { status: 403 }
       );
     }
 
-    const adminAuth = await getAdminAuth();
-    if (!adminAuth) {
-      return NextResponse.json({ error: "Service indisponible. Contactez le support." }, { status: 503 });
-    }
-
-    // Get user by email
+    // Same response whether or not an account exists — no email enumeration.
     try {
       const userRecord = await adminAuth.getUserByEmail(email);
-      // Update the password
       await adminAuth.updateUser(userRecord.uid, { password: newPassword });
-      return NextResponse.json({ success: true });
+      await revokeUserTokens(userRecord.uid);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
-      if (message.includes("auth/user-not-found")) {
-        return NextResponse.json({ error: "Aucun compte trouvé avec cet email" }, { status: 404 });
+      const code = typeof err === "object" && err && "code" in err ? String((err as { code?: string }).code || "") : "";
+      const missing = code === "auth/user-not-found" || message.includes("user-not-found") || message.includes("no user record");
+      if (!missing) {
+        console.error("[auth/reset-password] Error:", err);
+        return NextResponse.json({ error: "Erreur lors de la réinitialisation" }, { status: 500 });
       }
-      console.error("[auth/reset-password] Error:", err);
-      return NextResponse.json({ error: "Erreur lors de la réinitialisation" }, { status: 500 });
     }
+    return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Erreur interne" }, { status: 500 });
   }

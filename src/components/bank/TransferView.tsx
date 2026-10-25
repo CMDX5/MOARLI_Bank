@@ -101,6 +101,7 @@ export default function TransferView({
   const transferInputRef = useRef<HTMLInputElement | null>(null);
   const transferAmountRef = useRef<HTMLInputElement | null>(null);
   const transferPinInputRef = useRef<HTMLInputElement | null>(null);
+  const verifiedPinRef = useRef("");
   const transferDragRef = useRef({ active: false, startX: 0, startProgress: 0 });
   const transferSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Ref vers le conteneur scrollable du formulaire Banque — utilisé pour
@@ -282,22 +283,17 @@ export default function TransferView({
 
     setBankProcessing(true);
     try {
-      const receiptId = `bnk-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const receiptId = `bnk-${Date.now().toString().slice(-8)}`;
       const headers = await getAuthHeaders();
-      const res = await fetch("/api/transactions/create", {
+      const res = await fetch("/api/ledger", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify({
-          receiptId,
-          senderUid: authUid,
-          senderMoraliId: bankingIdentity?.id || "",
-          senderName: dashboardName,
-          recipientUid: authUid, // self-transaction (retrait du wallet Morali)
-          recipientMoraliId: bankingIdentity?.id || "",
-          recipientName: `${bankForm.holderName} (${bankForm.bankName || "Banque"})`,
+          op: "withdraw",
           amount: numericAmount,
-          fees: 0,
-          type: "retrait",
+          channel: "service",
+          applyFee: false,
+          receiptId,
           destination: `banque:${bankForm.iban}:${bankForm.bic || ""}`,
         }),
       });
@@ -443,7 +439,7 @@ export default function TransferView({
     setTransferProcessing(true);
     const ms = Date.now().toString();
     const receiptId = `TRX-${ms.slice(-8)}`;
-    let transferDone = true; // default: skip post-balance if block not entered
+    let transferDone = false;
     try {
       if (authUid && transferRecipient) {
         const recipientUid = transferRecipient.uid || transferRecipient.account;
@@ -475,67 +471,25 @@ export default function TransferView({
               senderName: dashboardName || "Utilisateur",
               senderMoraliId: bankingIdentity.id || "",
               receiptId,
+              pin: verifiedPinRef.current,
             }),
           });
           const atomicData = await atomicRes.json().catch(() => ({}));
           if (atomicData.success) {
             transferDone = true;
+            verifiedPinRef.current = "";
             setTransferPostBalance(atomicData.newSenderBalance ?? (balance - amount));
-          } else if (atomicRes.status === 400 || atomicRes.status === 403) {
-            // Business logic error — show to user, don't fall through
+          } else {
             apiError = atomicData.error || "Erreur lors du virement";
           }
-          // 500/503 errors — fall through to client-side fallback
         } catch {
-          // Network error — fall through to client-side fallback
+          apiError = "Erreur lors du virement";
         }
 
-        if (apiError) {
-          showToast(apiError);
+        if (apiError || !transferDone) {
+          showToast(apiError || "Erreur lors du virement");
           setTransferProcessing(false);
           return;
-        }
-
-        // ── FALLBACK: Client-side Phase 1 + 2 + 3 ──
-        if (!transferDone) {
-          // Phase 1: Atomically debit sender (own doc — allowed by rules)
-          await runTransaction(firebaseDb, async (tx) => {
-            const senderDoc = await tx.get(senderRef);
-            if (!senderDoc.exists()) throw new Error("SENDER_NOT_FOUND");
-            const currentBalance = senderDoc.data().balance || 0;
-            if (amount > currentBalance) throw new Error("INSUFFICIENT_BALANCE");
-            tx.update(senderRef, { balance: currentBalance - amount, updatedAt: serverTimestamp() });
-          });
-
-          // Phase 2: Create transaction record in Firestore
-          await addDoc(collection(firebaseDb, "transactions"), {
-            senderUid: authUid, senderMoraliId: bankingIdentity.id, senderName: dashboardName,
-            recipientUid, recipientMoraliId: transferRecipient.account, recipientName: transferRecipient.name,
-            amount, fees: 0, type: "virement", status: "success", receiptId,
-            createdAt: serverTimestamp(),
-          });
-          await createRealtimeTransaction({
-            senderUid: authUid, senderMoraliId: bankingIdentity.id, senderName: dashboardName,
-            recipientUid, recipientMoraliId: transferRecipient.account, recipientName: transferRecipient.name,
-            amount, fees: 0, type: "virement", status: "success", receiptId,
-          });
-
-          // Phase 3: Credit recipient — create pending credit (recipient auto-claims via onSnapshot)
-          try {
-            await fetch("/api/directory/pending-credit", {
-              method: "POST",
-              headers: await getAuthHeaders(),
-              body: JSON.stringify({
-                recipientUid,
-                amount,
-                senderName: dashboardName || "Utilisateur",
-                senderMoraliId: bankingIdentity.id || "",
-                receiptId,
-              }),
-            });
-          } catch {
-            // Best-effort — recipient will auto-claim pending credits on next login/snapshot
-          }
         }
 
         // Phase 4: Notify sender
@@ -569,28 +523,8 @@ export default function TransferView({
           "#D4A437"
         );
       }, 50);
-    } catch (err: unknown) {
-      // Compensating transaction — refund sender if any phase after debit fails
-      const msg = err instanceof Error ? err.message : "";
-      if (msg !== "SENDER_NOT_FOUND" && msg !== "INSUFFICIENT_BALANCE") {
-        try {
-          const senderRef = doc(firebaseDb, "moraliUsers", authUid);
-          await runTransaction(firebaseDb, async (tx) => {
-            const senderDoc = await tx.get(senderRef);
-            if (senderDoc.exists()) {
-              const currentBal = senderDoc.data().balance || 0;
-              tx.update(senderRef, { balance: currentBal + amount, updatedAt: serverTimestamp() });
-            }
-          });
-          showToast("Virement échoué — votre solde a été remboursé");
-        } catch {
-          showToast("Erreur lors du virement. Vérifiez votre solde.");
-        }
-      } else if (msg === "INSUFFICIENT_BALANCE") {
-        setTransferErrorMsg("Solde insuffisant pour effectuer ce virement.");
-      } else if (msg === "SENDER_NOT_FOUND") {
-        setTransferErrorMsg("Compte introuvable. Veuillez vous reconnecter.");
-      }
+    } catch {
+      showToast("Erreur lors du virement. Vérifiez votre solde.");
       // Defer error state to next tick to prevent UI freeze
       window.setTimeout(() => {
         setTransferStage("error");
@@ -638,6 +572,7 @@ export default function TransferView({
           setPinVerifying(false);
           return;
         }
+        verifiedPinRef.current = raw;
         setTransferStage("processing");
         setPinVerifying(false);
         window.setTimeout(() => executeTransfer(), 150);
@@ -674,10 +609,9 @@ export default function TransferView({
 
   // Helper: go directly to processing (after successful Face ID)
   const goToProcessing = () => {
-    setTransferPinOpen(true);
-    setTransferStage("processing");
-    // Use setTimeout to let React render the processing stage first
-    window.setTimeout(() => executeTransfer(), 150);
+    // Face ID stays a local prompt. The server still requires the PIN,
+    // so success continues on the existing PIN step instead of debiting alone.
+    goToPinStage();
   };
 
   const startTransferAuth = async () => {

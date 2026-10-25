@@ -73,9 +73,7 @@ async function firestoreRateLimit(
 ): Promise<RateLimitResult | null> {
   const maxRequests = config.maxRequests ?? 30;
   const windowSec = config.windowSec ?? 60;
-  const now = Date.now();
-  const resetAt = now + windowSec * 1000;
-  const docId = `${uid}:${endpoint}`;
+  const docId = `${uid}:${endpoint}`.replace(/\//g, "_");
 
   try {
     const { getAdminFirestore } = await import("@/lib/admin-firestore");
@@ -83,23 +81,25 @@ async function firestoreRateLimit(
     if (!adminDb) return null;
 
     const docRef = adminDb.collection("rateLimits").doc(docId);
-    const docSnap = await docRef.get();
+    return await adminDb.runTransaction(async (tx) => {
+      const docSnap = await tx.get(docRef);
+      const currentNow = Date.now();
 
-    if (!docSnap.exists || (docSnap.data()?.resetAt ?? 0) <= now) {
-      // New window — set counter to 1
-      await docRef.set({ count: 1, resetAt, updatedAt: new Date().toISOString() });
-      return { allowed: true, remaining: maxRequests - 1, resetAt };
-    }
+      if (!docSnap.exists || (docSnap.data()?.resetAt ?? 0) <= currentNow) {
+        const windowReset = currentNow + windowSec * 1000;
+        tx.set(docRef, { count: 1, resetAt: windowReset, updatedAt: new Date().toISOString() });
+        return { allowed: true, remaining: maxRequests - 1, resetAt: windowReset };
+      }
 
-    const data = docSnap.data()!;
-    if (data.count >= maxRequests) {
-      return { allowed: false, remaining: 0, resetAt: data.resetAt };
-    }
+      const data = docSnap.data()!;
+      if (data.count >= maxRequests) {
+        return { allowed: false, remaining: 0, resetAt: data.resetAt as number };
+      }
 
-    // Increment counter (fire-and-forget for performance)
-    docRef.update({ count: data.count + 1 }).catch(() => {});
-
-    return { allowed: true, remaining: maxRequests - data.count - 1, resetAt: data.resetAt };
+      const next = Number(data.count) + 1;
+      tx.update(docRef, { count: next, updatedAt: new Date().toISOString() });
+      return { allowed: true, remaining: maxRequests - next, resetAt: data.resetAt as number };
+    });
   } catch {
     return null; // Fallback to memory
   }
@@ -147,8 +147,15 @@ export function rateLimitByIp(
  * Used as fallback when uid is not available.
  */
 export function getClientId(req: Request): string {
+  // Prefer the platform-set address. x-forwarded-for is only a fallback:
+  // a client can forge the left-most hop when the proxy does not overwrite it.
+  const platform =
+    req.headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("cf-connecting-ip")?.trim() ||
+    req.headers.get("x-real-ip")?.trim() ||
+    "";
   const forwarded = req.headers.get("x-forwarded-for");
-  const ip = forwarded ? forwarded.split(",")[0].trim() : "unknown";
+  const ip = platform || (forwarded ? forwarded.split(",")[0].trim() : "unknown");
 
   const ua = req.headers.get("user-agent") || "";
   const uaHash = ua.slice(0, 16).replace(/[^a-zA-Z0-9]/g, "_");

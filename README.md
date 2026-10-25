@@ -84,6 +84,8 @@ The app will be available at `http://localhost:3000`.
 
 See [`.env.production.example`](./.env.production.example) for the full list of required environment variables.
 
+`MORALI_PIN_MASTER_KEY` is required wherever PIN encryption runs (64 hex characters). Balances are written only by the Admin SDK: deploy `firestore.rules` with `firebase deploy --only firestore:rules` so clients cannot write `moraliUsers`.
+
 ## API Endpoints
 
 ### Authentication

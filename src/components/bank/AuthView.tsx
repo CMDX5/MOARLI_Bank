@@ -8,7 +8,8 @@ import {
   signInWithRedirect,
   updateProfile,
 } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
+import { syncOwnProfile } from "@/lib/profile-sync";
 import { firebaseAuth, firebaseDb } from "@/lib/firebase";
 import {
   firebaseAuthMessage,
@@ -106,6 +107,7 @@ export default function AuthView({
   const [forgotNewPw, setForgotNewPw] = useState("");
   const [forgotConfirmPw, setForgotConfirmPw] = useState("");
   const [forgotResetting, setForgotResetting] = useState(false);
+  const [forgotResetToken, setForgotResetToken] = useState("");
 
   const otpInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -336,6 +338,7 @@ export default function AuthView({
     setForgotNewPw("");
     setForgotConfirmPw("");
     setForgotResetting(false);
+    setForgotResetToken("");
     setForgotStep("email");
     setAuthTab("forgot");
   };
@@ -382,7 +385,8 @@ export default function AuthView({
         body: JSON.stringify({ email: forgotEmail.trim(), code: forgotOtpCode }),
       });
       const data = await res.json();
-      if (data.valid) {
+      if (data.valid && data.resetToken) {
+        setForgotResetToken(data.resetToken);
         setForgotVerified(true);
         setForgotStep("newPassword");
         showToast("Code vérifié ! Choisissez votre nouveau mot de passe.");
@@ -410,7 +414,7 @@ export default function AuthView({
       const res = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: forgotEmail.trim(), newPassword: forgotNewPw }),
+        body: JSON.stringify({ email: forgotEmail.trim(), newPassword: forgotNewPw, resetToken: forgotResetToken }),
       });
       const data = await res.json();
       if (data.success) {
@@ -451,16 +455,15 @@ export default function AuthView({
       const identity = generateMoraliIdentity(getIdentitySeed(user.email, user.uid));
       const phone = profileForm.phone.trim() || `${registerData.prefix || "+242"}${registerData.tel || ""}`;
 
-      await setDoc(
-        doc(firebaseDb, "moraliUsers", user.uid),
+      const token = await user.getIdToken();
+      await syncOwnProfile(
+        { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         {
-          uid: user.uid, fullName: displayName, firstName, lastName,
+          fullName: displayName, firstName, lastName,
           pseudo: pseudoBase, moraliId: identity.id,
           moraliIdNormalized: identity.id.replace(/[^A-Z0-9]/g, ""),
           rib: identity.rib, phone, email: user.email || "",
-          updatedAt: serverTimestamp(), createdAt: serverTimestamp(),
         },
-        { merge: true },
       );
 
       cacheIdentityForUid(user.uid, identity);

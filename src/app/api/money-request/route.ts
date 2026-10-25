@@ -353,7 +353,8 @@ async function handlePay(
         throw new Error("NOT_AUTHORIZED_TO_PAY");
       }
 
-      const requestAmount = Number(requestData.amount) || 0;
+      const requestAmount = Math.round(Number(requestData.amount) || 0);
+      if (requestAmount <= 0) throw new Error("INVALID_AMOUNT");
       const requesterUid = requestData.senderUid;
 
       // ── Read payer document (the person who received the request) ──
@@ -384,20 +385,8 @@ async function handlePay(
       let requesterData: Record<string, unknown>;
       let requesterBalance: number;
 
-      if (!requesterSnap.exists) {
-        // Auto-create requester profile if it doesn't exist
-        transaction.set(requesterRef, {
-          uid: requesterUid,
-          email: "",
-          fullName: requestData.senderName || "Utilisateur",
-          balance: 0,
-          savingsAmount: 0,
-          totalSent: 0,
-          totalReceived: 0,
-          accountStatus: "active",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
+      const requesterMissing = !requesterSnap.exists;
+      if (requesterMissing) {
         requesterData = {
           fullName: requestData.senderName || "Utilisateur",
           moraliId: requestData.senderMoraliId || "",
@@ -417,13 +406,29 @@ async function handlePay(
         updatedAt: new Date(),
       });
 
-      // ── Credit requester (senderUid) ──
+      // ── Credit requester (senderUid). A missing profile is created once;
+      // a later update() would fail because Firestore saw no document to update.
       const newRequesterBalance = requesterBalance + requestAmount;
-      transaction.update(requesterRef, {
-        balance: newRequesterBalance,
-        totalReceived: FieldValue.increment(requestAmount),
-        updatedAt: new Date(),
-      });
+      if (requesterMissing) {
+        transaction.set(requesterRef, {
+          uid: requesterUid,
+          email: "",
+          fullName: requestData.senderName || "Utilisateur",
+          balance: newRequesterBalance,
+          savingsBalance: 0,
+          totalSent: 0,
+          totalReceived: requestAmount,
+          accountStatus: "active",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      } else {
+        transaction.update(requesterRef, {
+          balance: newRequesterBalance,
+          totalReceived: FieldValue.increment(requestAmount),
+          updatedAt: new Date(),
+        });
+      }
 
       // ── Update money request status to "paid" ──
       transaction.update(requestRef, {
@@ -631,6 +636,10 @@ async function handlePay(
       INSUFFICIENT_BALANCE: {
         status: 400,
         error: "Solde insuffisant pour payer cette demande",
+      },
+      INVALID_AMOUNT: {
+        status: 400,
+        error: "Montant invalide",
       },
     };
 

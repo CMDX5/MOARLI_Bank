@@ -43,15 +43,20 @@ export async function POST(req: NextRequest) {
       const bcrypt = await import("bcryptjs");
       const pinBcrypt = await bcrypt.hash(rawBody.pin, 12);
 
+      const { encryptPinServerSide } = await import("@/lib/pin-server-crypto");
+      const serverEncryptedPin = encryptPinServerSide(rawBody.pin, auth.uid);
+
       const pinRef = adminDb.doc("pinRecords/" + auth.uid);
       await pinRef.set({
         pinBcrypt,
-        // Keep encrypted PIN fields if provided (for PIN reveal feature)
-        encryptedPin: rawBody.encryptedPin || null,
-        pinIv: rawBody.pinIv || null,
+        serverEncryptedPin: serverEncryptedPin || null,
+        encryptedPin: null,
+        pinIv: null,
+        failCount: 0,
+        lockedUntil: 0,
         resetAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      }, { merge: true });
+      });
 
       auditLog({
         uid: auth.uid!,
@@ -73,10 +78,13 @@ export async function POST(req: NextRequest) {
     await pinRef.set({
       pinHash,
       salt,
+      serverEncryptedPin: null,
       encryptedPin: encryptedPin || null,
       pinIv: pinIv || null,
+      failCount: 0,
+      lockedUntil: 0,
       resetAt: new Date().toISOString(),
-    }, { merge: true });
+    });
 
     return NextResponse.json({ success: true, legacy: true });
   } catch (err) {

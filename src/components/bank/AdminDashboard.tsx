@@ -6,7 +6,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  addDoc,
   collection,
   onSnapshot,
   query,
@@ -14,10 +13,7 @@ import {
   updateDoc,
   deleteDoc,
   setDoc,
-  serverTimestamp,
-  runTransaction,
   writeBatch,
-  increment,
 } from "firebase/firestore";
 import { signOut, signInWithEmailAndPassword } from "firebase/auth";
 import { firebaseAuth, firebaseDb } from "@/lib/firebase";
@@ -91,6 +87,7 @@ const [adminRegLoading, setAdminRegLoading] = useState(false);
 const [adminForgotStep, setAdminForgotStep] = useState<"idle" | "email" | "code" | "newPassword" | "success">("idle");
 const [adminForgotEmail, setAdminForgotEmail] = useState("");
 const [adminForgotOtpCode, setAdminForgotOtpCode] = useState("");
+const [adminForgotResetToken, setAdminForgotResetToken] = useState("");
 const [adminForgotNewPw, setAdminForgotNewPw] = useState("");
 const [adminForgotConfirmPw, setAdminForgotConfirmPw] = useState("");
 const [adminForgotSending, setAdminForgotSending] = useState(false);
@@ -255,7 +252,8 @@ const adminForgotVerifyCode = async () => {
       body: JSON.stringify({ email: adminForgotEmail.trim(), code: adminForgotOtpCode }),
     });
     const data = await res.json();
-    if (data.success) {
+    if (data.valid && data.resetToken) {
+      setAdminForgotResetToken(data.resetToken);
       setAdminForgotStep("newPassword");
     } else {
       showToast(data.error || "Code invalide");
@@ -281,7 +279,7 @@ const adminForgotResetPassword = async () => {
     const res = await fetch("/api/auth/reset-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: adminForgotEmail.trim(), code: adminForgotOtpCode, newPassword: adminForgotNewPw }),
+      body: JSON.stringify({ email: adminForgotEmail.trim(), newPassword: adminForgotNewPw, resetToken: adminForgotResetToken }),
     });
     const data = await res.json();
     if (data.success) {
@@ -317,63 +315,23 @@ const handleAdminLogin = async () => {
         return;
       }
     } catch (fetchErr: unknown) {
-      // API unreachable — log the error for debugging
       console.error("[ADMIN LOGIN] API fetch error:", fetchErr);
-      // Don't block login entirely — proceed to Firebase Auth as fallback
-      // The admin credentials are also verified server-side via bcrypt,
-      // but Firebase Auth provides a secondary auth layer
+      setAdminLoginError("Erreur de connexion. Vérifiez vos identifiants.");
+      setAdminLoginLoading(false);
+      return;
     }
 
-    // 1. Se connecter — si le compte Firebase n'existe pas, le créer automatiquement
-    let cred;
-    try {
-      cred = await signInWithEmailAndPassword(firebaseAuth, adminLoginEmail, adminLoginPassword);
-    } catch (signInErr: unknown) {
-      const signInCode = typeof signInErr === "object" && signInErr && "code" in signInErr ? String((signInErr as { code?: string }).code || "") : "";
-      // If user doesn't exist in Firebase Auth, create them (first-time admin setup)
-      if (signInCode === "auth/user-not-found" || signInCode === "auth/invalid-credential") {
-        try {
-          const { createUserWithEmailAndPassword } = await import("firebase/auth");
-          const newCred = await createUserWithEmailAndPassword(firebaseAuth, adminLoginEmail, adminLoginPassword);
-          cred = newCred;
-        } catch (createErr: unknown) {
-          const createCode = typeof createErr === "object" && createErr && "code" in createErr ? String((createErr as { code?: string }).code || "") : "";
-          if (createCode === "auth/email-already-in-use") {
-            // Race condition: user was created between sign-in attempt and now — retry sign-in
-            cred = await signInWithEmailAndPassword(firebaseAuth, adminLoginEmail, adminLoginPassword);
-          } else {
-            throw createErr;
-          }
-        }
-      } else {
-        throw signInErr;
-      }
-    }
-
-    // 2. Vérifier/créer le rôle "admin" dans Firestore
-    const userRef = doc(firebaseDb, "moraliUsers", cred.user.uid);
-    const userDoc = await getDoc(userRef);
-
-    if (!userDoc.exists()) {
-      // Auto-create admin profile in Firestore
-      await setDoc(userRef, {
-        email: adminLoginEmail.toLowerCase().trim(),
-        displayName: "Administrateur",
-        role: "admin",
-        roleLevel: "full",
-        createdAt: serverTimestamp(),
-        isAdmin: true,
-      });
-    }
-
-    const userData = (await getDoc(userRef)).data();
-    if (userData?.role !== "admin") {
+    // Admin identity is a Firebase custom claim, never a client-written role field.
+    const cred = await signInWithEmailAndPassword(firebaseAuth, adminLoginEmail, adminLoginPassword);
+    const tokenResult = await cred.user.getIdTokenResult(true);
+    const claims = tokenResult.claims as Record<string, unknown>;
+    const isAdminClaim = claims.admin === true || claims.role === "admin";
+    if (!isAdminClaim) {
       setAdminLoginError("Accès refusé. Vous n'avez pas les droits administrateur.");
       await signOut(firebaseAuth);
       return;
     }
-    // Set permission level: "full" for super-admin, "viewer" for read-only
-    setAdminPermissionLevel(userData.roleLevel === "viewer" ? "viewer" : "full");
+    setAdminPermissionLevel(claims.roleLevel === "viewer" ? "viewer" : "full");
 
     setIsAdminLoggedIn(true);
     setAdminLoginEmail("");
@@ -678,30 +636,23 @@ const handleAdminBalanceEdit = async (mode: "add" | "subtract") => {
     return;
   }
   try {
-    const userRef = doc(firebaseDb, "moraliUsers", adminSelectedUser.uid);
-    // Read current balance first (works even if doc doesn't exist yet)
-    const userSnap = await getDoc(userRef);
-    const currentBalance = userSnap.exists() ? (userSnap.data().balance || 0) : 0;
-    const newBalance = mode === "add" ? currentBalance + amount : Math.max(0, currentBalance - amount);
+    const headers = await getAuthHeaders();
+    const endpoint = mode === "add" ? "/api/admin/recharge" : "/api/admin/withdraw";
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ uid: adminSelectedUser.uid, amount, description: mode === "add" ? "Dépôt admin" : "Retrait admin" }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      showToast(data.error || "Erreur lors de la modification du solde");
+      return;
+    }
+    const newBalance = typeof data.newBalance === "number"
+      ? data.newBalance
+      : (adminSelectedUser.balance || 0) + (mode === "add" ? amount : -amount);
 
     if (mode === "add") {
-      // Use setDoc with merge to create document if it doesn't exist
-      await setDoc(userRef, { balance: newBalance, updatedAt: serverTimestamp() }, { merge: true });
-      const txReceiptId = `ADM-${Date.now()}`;
-      // Écrire dans Firestore pour le dashboard + PostgreSQL pour l'historique
-      await addDoc(collection(firebaseDb, "transactions"), {
-        senderUid: "admin", senderMoraliId: "admin", senderName: "Admin Morali",
-        recipientUid: adminSelectedUser.uid, recipientMoraliId: adminSelectedUser.moraliId || "",
-        recipientName: adminSelectedUser.fullName || adminSelectedUser.pseudo || "",
-        amount, fees: 0, type: "depot", status: "success", receiptId: txReceiptId,
-        createdAt: serverTimestamp(),
-      });
-      await createRealtimeTransaction({
-        senderUid: "admin", senderMoraliId: "admin", senderName: "Admin Morali",
-        recipientUid: adminSelectedUser.uid, recipientMoraliId: adminSelectedUser.moraliId || "",
-        recipientName: adminSelectedUser.fullName || adminSelectedUser.pseudo || "",
-        amount, fees: 0, type: "depot", status: "success", receiptId: txReceiptId,
-      });
       logAdminActivity("Dépôt de fonds", `+${formatCurrency(amount)} XAF → ${adminSelectedUser.fullName || adminSelectedUser.pseudo}`);
       // Notifier l'utilisateur du dépôt
       await createRealtimeNotification(adminSelectedUser.uid, {
@@ -714,23 +665,6 @@ const handleAdminBalanceEdit = async (mode: "add" | "subtract") => {
         read: false,
       });
     } else {
-      // Use setDoc with merge — works even if doc doesn't exist yet
-      await setDoc(userRef, { balance: newBalance, updatedAt: serverTimestamp() }, { merge: true });
-      const txReceiptId = `ADM-${Date.now()}`;
-      // Écrire dans Firestore pour le dashboard + PostgreSQL pour l'historique
-      await addDoc(collection(firebaseDb, "transactions"), {
-        senderUid: adminSelectedUser.uid, senderMoraliId: adminSelectedUser.moraliId || "",
-        senderName: adminSelectedUser.fullName || adminSelectedUser.pseudo || "",
-        recipientUid: "admin", recipientMoraliId: "admin", recipientName: "Admin Morali",
-        amount, fees: 0, type: "retrait", status: "success", receiptId: txReceiptId,
-        createdAt: serverTimestamp(),
-      });
-      await createRealtimeTransaction({
-        senderUid: adminSelectedUser.uid, senderMoraliId: adminSelectedUser.moraliId || "",
-        senderName: adminSelectedUser.fullName || adminSelectedUser.pseudo || "",
-        recipientUid: "admin", recipientMoraliId: "admin", recipientName: "Admin Morali",
-        amount, fees: 0, type: "retrait", status: "success", receiptId: txReceiptId,
-      });
       logAdminActivity("Retrait de fonds", `-${formatCurrency(amount)} XAF → ${adminSelectedUser.fullName || adminSelectedUser.pseudo}`);
       // Notifier l'utilisateur du retrait
       await createRealtimeNotification(adminSelectedUser.uid, {
@@ -745,8 +679,8 @@ const handleAdminBalanceEdit = async (mode: "add" | "subtract") => {
     }
     setAdminBalanceEditAmount("");
     setAdminBalanceEditMode(null);
-    setAdminUsers((prev) => prev.map((u) => u.uid === adminSelectedUser.uid ? { ...u, balance: (u.balance || 0) + (mode === "add" ? amount : -amount) } : u));
-    setAdminSelectedUser((prev) => prev ? { ...prev, balance: (prev.balance || 0) + (mode === "add" ? amount : -amount) } : prev);
+    setAdminUsers((prev) => prev.map((u) => u.uid === adminSelectedUser.uid ? { ...u, balance: newBalance } : u));
+    setAdminSelectedUser((prev) => prev ? { ...prev, balance: newBalance } : prev);
     fetchAdminData();
     showToast(mode === "add" ? "Fonds ajoutés avec succès" : "Fonds retirés avec succès");
   } catch (err) {
@@ -759,9 +693,14 @@ const handleAdminSuspendUser = async () => {
   if (!adminSelectedUser) return;
   const isSuspended = adminSelectedUser.accountStatus === "suspended";
   try {
-    const userRef = doc(firebaseDb, "moraliUsers", adminSelectedUser.uid);
-    await updateDoc(userRef, { accountStatus: isSuspended ? "active" : "suspended" });
     const newStatus = isSuspended ? "active" : "suspended";
+    const res = await fetch("/api/admin/ledger", {
+      method: "POST",
+      headers: await getAuthHeaders(),
+      body: JSON.stringify({ action: "status", uid: adminSelectedUser.uid, accountStatus: newStatus }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) return;
     setAdminUsers((prev) => prev.map((u) => u.uid === adminSelectedUser.uid ? { ...u, accountStatus: newStatus as "active" | "suspended" } : u));
     setAdminSelectedUser((prev) => prev ? { ...prev, accountStatus: newStatus as "active" | "suspended" } : prev);
     logAdminActivity(isSuspended ? "Réactivation compte" : "Suspension compte", `${adminSelectedUser.fullName || adminSelectedUser.pseudo} → ${newStatus}`);
@@ -837,8 +776,16 @@ const handleAdminResetPin = async () => {
     // SECURITY: PIN is stored client-side only (hashed).
     // Admin cannot set a PIN for another user — they can only
     // flag the account to require PIN re-setup on next login.
-    const userRef = doc(firebaseDb, "moraliUsers", adminSelectedUser.uid);
-    await updateDoc(userRef, { pinResetRequired: true });
+    const res = await fetch("/api/admin/ledger", {
+      method: "POST",
+      headers: await getAuthHeaders(),
+      body: JSON.stringify({ action: "pin-reset-flag", uid: adminSelectedUser.uid }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      showToast("Échec de la réinitialisation PIN");
+      return;
+    }
     logAdminActivity("Réinitialisation PIN", `PIN réinitialisé pour ${adminSelectedUser.fullName || adminSelectedUser.pseudo}`);
     showToast("PIN réinitialisé — l'utilisateur devra créer un nouveau code");
     // Notifier l'utilisateur que son PIN a été réinitialisé
@@ -860,31 +807,21 @@ const handleAdminResetPin = async () => {
 const handleAdminRefund = async (tx: FirestoreTransfer) => {
   if (!tx || tx.type !== "virement") return;
   try {
-    if (tx.recipientUid !== tx.senderUid) {
-      const senderRef = doc(firebaseDb, "moraliUsers", tx.senderUid);
-      const recipientRef = doc(firebaseDb, "moraliUsers", tx.recipientUid);
-      await runTransaction(firebaseDb, async (txn) => {
-        const [recipientDoc, senderDoc] = await Promise.all([txn.get(recipientRef), txn.get(senderRef)]);
-        if (!recipientDoc.exists()) throw new Error("RECIPIENT_NOT_FOUND");
-        if (!senderDoc.exists()) throw new Error("SENDER_NOT_FOUND");
-        const recipientBal = recipientDoc.data().balance || 0;
-        if (recipientBal < tx.amount) throw new Error("INSUFFICIENT_BALANCE");
-        txn.update(recipientRef, { balance: recipientBal - tx.amount, updatedAt: serverTimestamp() });
-        const senderBal = senderDoc.data().balance || 0;
-        txn.update(senderRef, { balance: senderBal + tx.amount, updatedAt: serverTimestamp() });
-      });
-    } else {
-      const senderRef = doc(firebaseDb, "moraliUsers", tx.senderUid);
-      await updateDoc(senderRef, { balance: increment(tx.amount) });
-    }
-    // Create refund transaction record after successful balance operations
-    await createRealtimeTransaction({
-      senderUid: "admin", senderMoraliId: "admin", senderName: "Admin Morali",
-      recipientUid: tx.senderUid, recipientMoraliId: tx.senderMoraliId || "",
-      recipientName: tx.senderName || "",
-      amount: tx.amount, fees: 0, type: "remboursement", status: "success",
-      receiptId: `REF-${Date.now()}`,
+    const res = await fetch("/api/admin/ledger", {
+      method: "POST",
+      headers: await getAuthHeaders(),
+      body: JSON.stringify({
+        action: "refund",
+        senderUid: tx.senderUid,
+        recipientUid: tx.recipientUid,
+        amount: tx.amount,
+      }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      showToast(data.error || "Erreur lors du remboursement");
+      return;
+    }
     // Notify the sender about the refund
     try {
       await createRealtimeNotification(tx.senderUid, {
@@ -1495,26 +1432,23 @@ const handleAdminRestore = async (file: File) => {
 // ── Admin Loan Management ──
 const handleAdminApproveLoan = async (loan: { id: string; senderUid: string; senderName: string; senderMoraliId: string; amount: number; type?: string }) => {
   try {
-    const userRef = doc(firebaseDb, "moraliUsers", loan.senderUid);
-    const loanTxRef = doc(firebaseDb, "transactions", loan.id);
-
-    // Atomically credit user balance and update loan status
-    await runTransaction(firebaseDb, async (tx) => {
-      const userDoc = await tx.get(userRef);
-      if (!userDoc.exists()) throw new Error("USER_NOT_FOUND");
-      const currentBal = userDoc.data().balance || 0;
-      tx.update(userRef, { balance: currentBal + loan.amount, updatedAt: serverTimestamp() });
-      tx.update(loanTxRef, { status: "success", destination: "loan_granted", updatedAt: serverTimestamp() });
+    const res = await fetch("/api/admin/ledger", {
+      method: "POST",
+      headers: await getAuthHeaders(),
+      body: JSON.stringify({
+        action: "loan-approve",
+        loanId: loan.id,
+        senderUid: loan.senderUid,
+        senderName: loan.senderName,
+        senderMoraliId: loan.senderMoraliId,
+        amount: loan.amount,
+      }),
     });
-
-    // Create disbursement transaction record
-    await createRealtimeTransaction({
-      senderUid: "admin", senderMoraliId: "MORALI-ADMIN", senderName: "Morali Pay",
-      recipientUid: loan.senderUid, recipientMoraliId: loan.senderMoraliId, recipientName: loan.senderName,
-      amount: loan.amount, fees: 0,
-      type: "depot", destination: "loan_granted", status: "success",
-      receiptId: "LN-APPROVED-" + Date.now().toString().slice(-8),
-    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      showToast(data.error || "Erreur lors de l'approbation");
+      return;
+    }
 
     // Notify user
     await createRealtimeNotification(loan.senderUid, {
@@ -1534,8 +1468,16 @@ const handleAdminApproveLoan = async (loan: { id: string; senderUid: string; sen
 
 const handleAdminRejectLoan = async (loan: { id: string; senderUid: string; senderName: string; amount: number; type?: string }) => {
   try {
-    const loanTxRef = doc(firebaseDb, "transactions", loan.id);
-    await updateDoc(loanTxRef, { status: "contested", updatedAt: serverTimestamp() });
+    const res = await fetch("/api/admin/ledger", {
+      method: "POST",
+      headers: await getAuthHeaders(),
+      body: JSON.stringify({ action: "loan-reject", loanId: loan.id, senderUid: loan.senderUid }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      showToast("Erreur lors du refus");
+      return;
+    }
 
     // Notify user
     await createRealtimeNotification(loan.senderUid, {

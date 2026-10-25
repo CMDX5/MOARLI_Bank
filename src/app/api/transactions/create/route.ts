@@ -49,14 +49,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Impossible d'envoyer à soi-même" }, { status: 400 });
     }
 
-    // Ownership check: authenticated user must be the sender (or admin)
-    if (callerUid !== senderUid) {
-      const callerDoc = await adminDb.collection("moraliUsers").doc(callerUid).get();
-      const callerRole = callerDoc.data()?.role;
-      if (callerRole !== "admin") {
-        captureSecurityEvent("transaction_idor_attempt", { uid: callerUid, details: { senderUid, recipientUid } });
-        return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
-      }
+    // Cash deposits are not booked here. On main this route already stopped
+    // mutating balances; rejecting the type also stops a fake "success" history.
+    if (type === "depot") {
+      captureSecurityEvent("unbacked_deposit_rejected", { uid: callerUid, details: { amount, destination } });
+      return NextResponse.json(
+        { success: false, error: "Les dépôts sont crédités par le grand livre ou par un paiement confirmé.", code: "UNBACKED_DEPOSIT" },
+        { status: 400 },
+      );
+    }
+
+    // Ownership check: authenticated user must be the sender (or a custom-claim admin).
+    const claimAdmin = auth.claims?.admin === true || auth.claims?.role === "admin";
+    if (callerUid !== senderUid && !claimAdmin) {
+      captureSecurityEvent("transaction_idor_attempt", { uid: callerUid, details: { senderUid, recipientUid } });
+      return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
     }
 
     // SECURITY FIX: Use Firestore runTransaction for atomic duplicate detection + write
@@ -125,34 +132,6 @@ export async function POST(req: NextRequest) {
 
         return { success: true, id: docRef.id, fees: Number(fees) || 0 };
       });
-
-      // ── Track bank revenue server-side for fee-generating transactions ──
-      const txFees = (result as any).fees || 0;
-      if (txFees > 0 && (type === "retrait" || type === "depot")) {
-        try {
-          const feeType = type === "retrait" ? "withdrawal_fee" : "service_fee";
-          let sourceName = "Utilisateur";
-          try {
-            const userDoc = await adminDb.collection("moraliUsers").doc(callerUid).get();
-            if (userDoc.exists) {
-              sourceName = userDoc.data()?.fullName || userDoc.data()?.name || "Utilisateur";
-            }
-          } catch { /* ignore */ }
-          await adminDb.collection("bankRevenue").add({
-            type: feeType,
-            amount: Math.round(txFees),
-            sourceUid: callerUid,
-            sourceName,
-            referenceId: String(receiptId),
-            description: `${feeType === "withdrawal_fee" ? "Frais de retrait (2%)" : "Frais de service (2%)"} — ${Number(amount).toLocaleString("fr-FR")} FCFA`,
-            currency: "FCFA",
-            createdAt: new Date(),
-          });
-        } catch (revErr) {
-          // Revenue tracking best-effort — never block the transaction
-          console.error("[tx:create] Revenue tracking failed:", revErr);
-        }
-      }
 
       return NextResponse.json(result);
     } catch (err: unknown) {

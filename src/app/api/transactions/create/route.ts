@@ -49,12 +49,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Impossible d'envoyer à soi-même" }, { status: 400 });
     }
 
-    // Cash deposits are not booked here. On main this route already stopped
-    // mutating balances; rejecting the type also stops a fake "success" history.
+    // Cash deposits are not booked here. CinetPay credits the balance after check-status.
     if (type === "depot") {
       captureSecurityEvent("unbacked_deposit_rejected", { uid: callerUid, details: { amount, destination } });
       return NextResponse.json(
-        { success: false, error: "Les dépôts sont crédités par le grand livre ou par un paiement confirmé.", code: "UNBACKED_DEPOSIT" },
+        { success: false, error: "Un dépôt est crédité seulement après confirmation CinetPay.", code: "UNBACKED_DEPOSIT" },
         { status: 400 },
       );
     }

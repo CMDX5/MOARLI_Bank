@@ -126,12 +126,17 @@ describe("validate-env", () => {
     // Remove optional vars
     delete process.env.RESEND_API_KEY;
     delete process.env.SMS_API_KEY;
-    delete process.env.PAYMENT_WEBHOOK_SECRET;
+    delete process.env.CINETPAY_API_KEY;
+    delete process.env.CINETPAY_SITE_ID;
+    delete process.env.CINETPAY_SECRET_KEY;
+    delete process.env.APP_BASE_URL;
 
     const result = validateEnv();
     expect(result.optionalMissing.length).toBeGreaterThanOrEqual(3);
     expect(result.optionalMissing.some((m) => m.name === "RESEND_API_KEY")).toBe(true);
     expect(result.optionalMissing.some((m) => m.name === "SMS_API_KEY")).toBe(true);
+    expect(result.optionalMissing.some((m) => m.name === "CINETPAY_API_KEY")).toBe(true);
+    expect(result.optionalMissing.some((m) => m.name === "PAYMENT_WEBHOOK_SECRET")).toBe(false);
   });
 
   it("masks sensitive values in valid results", () => {
@@ -170,6 +175,10 @@ describe("ENV_SCHEMA", () => {
     expect(names).toContain("SMS_API_KEY");
     // Security
     expect(names).toContain("ALLOW_INSECURE_AUTH");
+    expect(names).toContain("CINETPAY_API_KEY");
+    expect(names).toContain("CINETPAY_SECRET_KEY");
+    expect(names).toContain("APP_BASE_URL");
+    expect(names).not.toContain("PAYMENT_WEBHOOK_SECRET");
   });
 
   it("correctly marks public variables", () => {

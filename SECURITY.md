@@ -39,8 +39,9 @@
 - Server-only secrets are never exposed to the client
 
 ### Webhook Verification
-- Payment webhooks are verified via HMAC signature using `PAYMENT_WEBHOOK_SECRET`
-- Unverified webhooks are rejected with 401
+- Mobile Money deposits are confirmed by CinetPay. The notify URL checks the `x-token` HMAC (`CINETPAY_SECRET_KEY`) when that secret is set, then calls CinetPay check-status before crediting.
+- The posted amount is ignored. A payment is credited once, only if the checked amount and currency match the pending deposit.
+- Clients cannot credit a balance through `/api/ledger` (`op: deposit` is rejected).
 
 ## Data Protection
 
@@ -69,7 +70,7 @@ Rotate these credentials periodically (recommended: every 90 days):
 - [ ] **Firebase API Key** — Regenerate in Firebase Console > Project Settings > General
 - [ ] **Admin Password** — Change via admin dashboard or direct DB update + re-hash
 - [ ] **MORALI_PIN_MASTER_KEY** — Requires re-encrypting all stored PINs with the new key
-- [ ] **PAYMENT_WEBHOOK_SECRET** — Update in `.env` and notify payment provider
+- [ ] **CINETPAY_API_KEY / CINETPAY_SITE_ID / CINETPAY_SECRET_KEY** — Rotate in the CinetPay dashboard, then update Vercel. The Secret Key is the `x-token` HMAC key.
 - [ ] **RESEND_API_KEY** — Regenerate in Resend dashboard
 - [ ] **TWILIO_AUTH_TOKEN** — Regenerate in Twilio console
 - [ ] **SMS_API_KEY** — Update with your SMS provider

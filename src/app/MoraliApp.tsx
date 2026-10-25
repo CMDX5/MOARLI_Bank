@@ -2651,16 +2651,6 @@ function App() {
     return data as { converted?: number; balance?: number; savingsBalance?: number; fee?: number };
   };
 
-  const serviceCreditBalance = async (amount: number, receiptId?: string) => {
-    if (!authUid) return;
-    await postLedger({
-      op: "deposit",
-      amount,
-      channel: "momo",
-      receiptId: receiptId || `DEP-${Date.now().toString().slice(-8)}`,
-    });
-  };
-
   const serviceDebitBalance = async (amount: number, applyFee: boolean, receiptId: string) => {
     if (!authUid) return;
     await postLedger({
@@ -2712,23 +2702,6 @@ function App() {
       else if (msg === "INSUFFICIENT_SAVINGS") showToast("Solde épargne insuffisant");
       else showToast("Opération échouée");
     } finally { clearTimeout(safetyTimer); setServiceProcessing(false); }
-  };
-
-  // Service transactions
-  const executeServiceDeposit = async (amount: number, label: string, icon: IconName) => {
-    if (!authUid || amount <= 0) { showToast("Montant invalide"); return; }
-    if (serviceProcessing) return;
-    setServiceProcessing(true);
-    try {
-      await serviceCreditBalance(amount, "TX-" + Date.now().toString().slice(-8));
-      await createRealtimeNotification(authUid, {
-        title: `${label} — +${formatCurrency(amount)} FCFA`,
-        time: "À l'instant", badge: "Reçu", badgeClass: "nb-green",
-        icon, bg: "rgba(34,197,94,0.12)", read: false,
-      });
-      showQuickNotif("credit", label, formatCurrency(amount), icon, "#4ade80");
-    } catch { showToast("Opération échouée"); }
-    finally { setServiceProcessing(false); }
   };
 
   const executeServiceDebit = async (amount: number, label: string, icon: IconName, applyFee: boolean = false) => {
@@ -4632,6 +4605,11 @@ function App() {
       return false;
     }
 
+    if (transactionType === "depot" && (transactionNumericAmount < 100 || transactionNumericAmount % 5 !== 0)) {
+      showToast("Le montant doit être un multiple de 5 FCFA (minimum 100)");
+      return false;
+    }
+
     return true;
   };
 
@@ -4725,6 +4703,33 @@ function App() {
       showToast("Délai dépassé. Vérifiez votre connexion et réessayez.");
     }, 30000);
     try {
+      if (transactionType === "depot") {
+        if (!authUid) {
+          clearTimeout(safetyTimer);
+          setTransactionProcessing(false);
+          showToast("Connexion requise");
+          return;
+        }
+        const res = await fetch("/api/payments/cinetpay/init", {
+          method: "POST",
+          headers: await getAuthHeaders(),
+          body: JSON.stringify({
+            amount: transactionNumericAmount,
+            phone: transactionPhone,
+            operator: transactionMethod,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        clearTimeout(safetyTimer);
+        if (!res.ok || typeof data.paymentUrl !== "string") {
+          setTransactionProcessing(false);
+          showToast(typeof data.error === "string" ? data.error : "Paiement Mobile Money indisponible");
+          return;
+        }
+        window.location.assign(data.paymentUrl);
+        return;
+      }
+
       const receiptId = `TX-${Date.now().toString().slice(-8)}`;
       if (authUid) {
         const userRef = doc(firebaseDb, "moraliUsers", authUid);
@@ -4764,20 +4769,20 @@ function App() {
         }
 
         await postLedger({
-          op: transactionType === "depot" ? "deposit" : "withdraw",
+          op: "withdraw",
           amount: transactionNumericAmount,
           channel: "momo",
-          applyFee: transactionType === "retrait",
+          applyFee: true,
           receiptId,
         });
         try {
-          const netAmount = transactionType === "depot" ? transactionNumericAmount - fees : transactionNumericAmount + fees;
+          const netAmount = transactionNumericAmount + fees;
           await createRealtimeNotification(authUid, {
-            title: `${transactionType === "depot" ? "Dépôt" : "Retrait"} confirmé — FCFA ${formatCurrency(transactionNumericAmount)}`,
-            time: "À l'instant", badge: transactionType === "depot" ? `+${formatCurrency(netAmount)}` : `-${formatCurrency(netAmount)}`,
-            badgeClass: transactionType === "depot" ? "nb-green" : "nb-blue",
-            icon: transactionType === "depot" ? "wallet" : "receive",
-            bg: transactionType === "depot" ? "rgba(34,197,94,0.12)" : "rgba(59,130,246,0.12)", read: false,
+            title: `Retrait confirmé — FCFA ${formatCurrency(transactionNumericAmount)}`,
+            time: "À l'instant", badge: `-${formatCurrency(netAmount)}`,
+            badgeClass: "nb-blue",
+            icon: "receive",
+            bg: "rgba(59,130,246,0.12)", read: false,
           });
         } catch { /* notification best-effort */ }
 
@@ -4796,11 +4801,11 @@ function App() {
         const destLabel = "Mobile Money";
         const opLabel = transactionMethod === "mtn" ? "MTN" : "Airtel";
         showQuickNotif(
-          transactionType === "depot" ? "credit" : "debit",
-          `${transactionType === "depot" ? "Dépôt" : "Retrait"} ${destLabel} ${opLabel}`,
+          "debit",
+          `Retrait ${destLabel} ${opLabel}`,
           formatCurrency(transactionNumericAmount),
-          transactionType === "depot" ? "wallet" : "send",
-          transactionType === "depot" ? "#4ade80" : "#ef4444"
+          "send",
+          "#ef4444"
         );
       }, 500);
     } catch (err: unknown) {
@@ -8989,13 +8994,12 @@ function App() {
                     setTontineGroups(next);
                     saveTontineGroups(next);
                     setTontineDistConfirm(null);
-                    serviceCreditBalance(sharePerMember, "TN-" + Date.now().toString().slice(-8)).catch(() => {});
                     createRealtimeNotification(authUid || "", {
-                      title: `Tontine ${group.name} — Distribution de ${formatCurrency(sharePerMember)} F`,
-                      time: "À l'instant", badge: "Reçu", badgeClass: "nb-green",
+                      title: `Tontine ${group.name} — pot remis à zéro (${formatCurrency(sharePerMember)} F / membre)`,
+                      time: "À l'instant", badge: "Tontine", badgeClass: "nb-blue",
                       icon: "coins", bg: "rgba(212,164,55,0.12)", read: false,
                     }).catch((err: unknown) => { console.error("Erreur notification tontine:", err); });
-                    showToast(`Distribution effectuée ! Vous recevez ${formatCurrency(sharePerMember)} F`);
+                    showToast("Distribution enregistrée. Le pot a été remis à zéro.");
                   }} style={{flex: 1, height: 48, borderRadius: 14, border: "none", background: "linear-gradient(135deg, rgba(212,164,55,0.2), rgba(212,164,55,0.1))", color: "#fbbf24", fontSize: 14, fontWeight: 700, cursor: "pointer"}}>
                     Distribuer
                   </button>

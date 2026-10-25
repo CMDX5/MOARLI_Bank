@@ -129,6 +129,15 @@ service cloud.firestore {
   }
 
   // ─────────────────────────────────────────────
+  //  CINETPAY PAYMENTS — Admin SDK only
+  //  Pending Mobile Money deposits. The balance is credited server-side
+  //  after CinetPay check-status confirms the payment.
+  // ─────────────────────────────────────────────
+  match /databases/{db}/documents/cinetpayPayments/{paymentId} {
+    allow read, write: if false;
+  }
+
+  // ─────────────────────────────────────────────
   //  PENDING CREDITS — Admin SDK only
   // ─────────────────────────────────────────────
   match /databases/{db}/documents/pendingCredits/{docId} {

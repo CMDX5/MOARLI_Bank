@@ -132,12 +132,38 @@ const ENV_SCHEMA: EnvVarSpec[] = [
     description: "DSN Sentry (monitoring d'erreurs). Absent = pas de suivi d'erreurs en production.",
   },
 
-  // ── Webhooks (server-only) ──
+  // ── CinetPay Mobile Money (server-only) ──
   {
-    name: "PAYMENT_WEBHOOK_SECRET",
+    name: "CINETPAY_API_KEY",
     isPublic: false,
     required: "optional",
-    description: "Secret pour la vérification des webhooks de paiement (signature HMAC).",
+    description: "Clé API CinetPay. Absente = les dépôts Mobile Money sont indisponibles.",
+    minLength: 8,
+  },
+  {
+    name: "CINETPAY_SITE_ID",
+    isPublic: false,
+    required: "optional",
+    description: "Identifiant de site CinetPay (site_id).",
+  },
+  {
+    name: "CINETPAY_SECRET_KEY",
+    isPublic: false,
+    required: "optional",
+    description: "Secret Key CinetPay. Si elle est définie, le webhook exige l'en-tête x-token (HMAC-SHA256).",
+    minLength: 8,
+  },
+  {
+    name: "CINETPAY_CURRENCY",
+    isPublic: false,
+    required: "optional",
+    description: "Devise CinetPay (XAF par défaut, aussi XOF, CDF, GNF, USD).",
+  },
+  {
+    name: "APP_BASE_URL",
+    isPublic: false,
+    required: "optional",
+    description: "URL publique HTTPS de l'application, utilisée pour notify_url et return_url CinetPay.",
   },
 
   // ── Security flags (server-only) ──

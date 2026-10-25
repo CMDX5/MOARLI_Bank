@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 
-const FIREBASE_PROJECT_ID = "banque-digitale";
+const FIREBASE_PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "banque-digitale";
 const FIREBASE_ISSUER = `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`;
 
 // Lazy-loaded admin auth instance
@@ -182,7 +182,10 @@ async function verifyRequestAuthFull(req: NextRequest): Promise<{ uid: string; c
     const localUid = verifyTokenLocal(token);
     if (localUid) {
       const jwtClaims = extractJwtPayloadClaims(token);
-      // Also extract timing claims from raw JWT payload for consistency
+      // Unsigned local tokens must not carry privilege claims.
+      delete jwtClaims.admin;
+      delete jwtClaims.role;
+      delete jwtClaims.roleLevel;
       try {
         const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString());
         if (payload.iat != null) jwtClaims.iat = payload.iat;

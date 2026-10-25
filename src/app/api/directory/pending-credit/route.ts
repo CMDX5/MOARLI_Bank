@@ -55,10 +55,12 @@ export async function GET(req: NextRequest) {
       .limit(100);
     const snapshot = await q.get();
 
-    const credits = snapshot.docs.map((d): Record<string, any> => ({
-      id: d.id,
-      ...d.data(),
-    }));
+    const credits = snapshot.docs
+      .map((d): Record<string, any> => ({
+        id: d.id,
+        ...d.data(),
+      }))
+      .filter((c) => c.status === "funded" && c.senderDebited === true);
 
     credits.sort((a, b) => {
       const getTs = (v: unknown): number => {
@@ -118,8 +120,12 @@ export async function POST(req: NextRequest) {
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
       return NextResponse.json({ error: "Montant invalide" }, { status: 400 });
     }
-    if (numericAmount > 50_000_000) {
-      return NextResponse.json({ error: "Montant exceeds la limite (50M FCFA)" }, { status: 400 });
+    if (numericAmount > 1_000_000) {
+      return NextResponse.json({ error: "Montant exceeds la limite (1M FCFA)" }, { status: 400 });
+    }
+
+    if (recipientUid === auth.uid) {
+      return NextResponse.json({ error: "Auto-crédit refusé" }, { status: 400 });
     }
 
     // Sanitize string inputs (prevent XSS/NoSQL injection)
@@ -131,31 +137,44 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Service indisponible" }, { status: 503 });
     }
 
-    const docRef = await adminDb.collection("pendingCredits").add({
-      recipientUid,
-      senderUid: auth.uid,
-      amount: Math.round(numericAmount),
-      senderName: sanitize(senderName || "", 100),
-      senderMoraliId: sanitize(senderMoraliId || "", 50),
-      receiptId: sanitize(receiptId || "", 50),
-      status: "pending",
-      createdAt: new Date(),
-    });
+    const rounded = Math.round(numericAmount);
+    if (rounded <= 0) {
+      return NextResponse.json({ error: "Montant invalide" }, { status: 400 });
+    }
 
-    const credit = {
-      id: docRef.id,
-      recipientUid,
-      senderUid: auth.uid,
-      amount: Math.round(numericAmount),
-      senderName: sanitize(senderName || "", 100),
-      senderMoraliId: sanitize(senderMoraliId || "", 50),
-      receiptId: sanitize(receiptId || "", 50),
-      status: "pending",
-      createdAt: new Date(),
-    };
+    const creditRef = adminDb.collection("pendingCredits").doc();
+    const senderRef = adminDb.collection("moraliUsers").doc(auth.uid);
+
+    const credit = await adminDb.runTransaction(async (tx) => {
+      const senderSnap = await tx.get(senderRef);
+      if (!senderSnap.exists) throw new Error("SENDER_NOT_FOUND");
+      const balance = Number(senderSnap.data()?.balance) || 0;
+      if (balance < rounded) throw new Error("INSUFFICIENT_BALANCE");
+      tx.update(senderRef, { balance: balance - rounded, updatedAt: new Date() });
+      const record = {
+        recipientUid,
+        senderUid: auth.uid,
+        amount: rounded,
+        senderName: sanitize(senderName || "", 100),
+        senderMoraliId: sanitize(senderMoraliId || "", 50),
+        receiptId: sanitize(receiptId || "", 50),
+        status: "funded",
+        senderDebited: true,
+        createdAt: new Date(),
+      };
+      tx.set(creditRef, record);
+      return { id: creditRef.id, ...record };
+    });
 
     return NextResponse.json({ success: true, credit });
   } catch (err) {
+    const msg = err instanceof Error ? err.message : "";
+    if (msg === "INSUFFICIENT_BALANCE") {
+      return NextResponse.json({ error: "Solde insuffisant" }, { status: 400 });
+    }
+    if (msg === "SENDER_NOT_FOUND") {
+      return NextResponse.json({ error: "Compte expéditeur introuvable" }, { status: 404 });
+    }
     console.error("[pending-credit:POST] Operation failed");
     return NextResponse.json({ error: "Erreur interne du serveur" }, { status: 500 });
   }
@@ -199,18 +218,28 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Service indisponible" }, { status: 503 });
     }
 
-    // Ownership check: can only delete own pending credits
-    const docRef = adminDb.doc("pendingCredits/" + id);
-    const docSnap = await docRef.get();
-
-    if (!docSnap.exists || docSnap.data()?.recipientUid !== auth.uid) {
-      return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
-    }
-
-    await docRef.delete();
+    const docRef = adminDb.collection("pendingCredits").doc(id);
+    await adminDb.runTransaction(async (tx) => {
+      const docSnap = await tx.get(docRef);
+      if (!docSnap.exists) throw new Error("NOT_FOUND");
+      const data = docSnap.data() || {};
+      if (data.recipientUid !== auth.uid && data.senderUid !== auth.uid) throw new Error("FORBIDDEN");
+      if (data.status === "funded" && data.senderDebited === true && data.senderUid) {
+        const senderRef = adminDb.collection("moraliUsers").doc(String(data.senderUid));
+        const senderSnap = await tx.get(senderRef);
+        if (senderSnap.exists) {
+          const balance = Number(senderSnap.data()?.balance) || 0;
+          tx.update(senderRef, { balance: balance + Math.round(Number(data.amount) || 0), updatedAt: new Date() });
+        }
+      }
+      tx.delete(docRef);
+    });
 
     return NextResponse.json({ success: true });
   } catch (err) {
+    const msg = err instanceof Error ? err.message : "";
+    if (msg === "NOT_FOUND") return NextResponse.json({ error: "Crédit en attente introuvable" }, { status: 404 });
+    if (msg === "FORBIDDEN") return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
     console.error("[pending-credit:DELETE] Operation failed");
     return NextResponse.json({ error: "Erreur interne du serveur" }, { status: 500 });
   }
@@ -276,6 +305,11 @@ export async function PUT(req: NextRequest) {
       // ── 4. Prevent double-application ──
       if (creditData.status === "applied") {
         throw new Error("ALREADY_APPLIED");
+      }
+
+      // Only a credit that already debited the sender may be applied.
+      if (creditData.status !== "funded" || creditData.senderDebited !== true) {
+        throw new Error("UNBACKED");
       }
 
       // ── 5. Amount MUST come from the Firestore document, never from the body ──
@@ -350,6 +384,15 @@ export async function PUT(req: NextRequest) {
     }
     if (msg === "RECIPIENT_NOT_FOUND") {
       return NextResponse.json({ error: "Destinataire introuvable" }, { status: 404 });
+    }
+    if (msg === "UNBACKED") {
+      return NextResponse.json({ error: "Crédit sans débit de l'émetteur" }, { status: 409 });
+    }
+    if (msg === "NOT_FOUND") {
+      return NextResponse.json({ error: "Crédit en attente introuvable" }, { status: 404 });
+    }
+    if (msg === "FORBIDDEN") {
+      return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
     }
 
     console.error("[pending-credit:PUT] Operation failed:", err);

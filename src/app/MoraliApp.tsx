@@ -36,6 +36,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { firebaseAuth, firebaseDb, isFirebaseConfigured } from "@/lib/firebase";
+import { syncOwnProfile } from "@/lib/profile-sync";
 import { encryptPinWithPassword, decryptPinWithPassword } from "@/lib/pin-utils";
 import { logAdminAction } from "@/lib/admin-logger";
 import jsPDF from "jspdf";
@@ -853,10 +854,7 @@ function App() {
             // Clamp to 0 minimum to prevent negative display
             setFirestoreBalance(Math.max(0, data.balance));
           } else {
-            // Initialize balance for existing users who don't have it yet
-            const initialBalance = 0;
-            updateDoc(userRef, { balance: initialBalance }).catch((err: unknown) => { console.error("Erreur initialisation solde:", err); });
-            setFirestoreBalance(initialBalance);
+            setFirestoreBalance(0);
           }
           // Load savings balance from Firestore
           if (typeof data.savingsBalance === "number") {
@@ -1035,7 +1033,7 @@ function App() {
             if (expectedPseudo && data.pseudo !== expectedPseudo) {
               console.log("[Auto-repair] Mise à jour pseudo:", data.pseudo, "→", expectedPseudo);
               setUserPseudo(expectedPseudo);
-              updateDoc(doc(firebaseDb, "moraliUsers", user.uid), { pseudo: expectedPseudo }).catch(() => {});
+              syncOwnProfile(await getAuthHeaders(), { pseudo: expectedPseudo }).catch(() => {});
             }
           }
 
@@ -1056,7 +1054,7 @@ function App() {
           // Auto-repair: if Firestore has no name but we derived one, save it back
           if (!data.fullName && !data.firstName && fullName !== "Utilisateur") {
             const repaired = { firstName: fullName.split(" ")[0] || "", lastName: fullName.split(" ").slice(1).join(" ") || "", fullName };
-            updateDoc(doc(firebaseDb, "moraliUsers", user.uid), repaired).catch(() => {});
+            syncOwnProfile(await getAuthHeaders(), repaired).catch(() => {});
           }
           setProfileForm({
             fullName,
@@ -1357,7 +1355,7 @@ function App() {
     const pendingRef = collection(firebaseDb, "pendingCredits");
     let pendingUnsub: (() => void) | null = null;
     try {
-      const q = query(pendingRef, where("recipientUid", "==", authUid), where("status", "==", "pending"));
+      const q = query(pendingRef, where("recipientUid", "==", authUid), where("status", "==", "funded"));
       pendingUnsub = onSnapshot(q, (snap) => {
         if (snap.docs.length > 0) {
           processPendingCredits(authUid);
@@ -1375,7 +1373,7 @@ function App() {
   const saveTontineGroups = async (groups: typeof tontineGroups) => {
     if (!authUid) return;
     try {
-      await updateDoc(doc(firebaseDb, "moraliUsers", authUid), { tontineGroups: groups });
+      await syncOwnProfile(await getAuthHeaders(), { tontineGroups: groups });
     } catch {}
   };
 
@@ -2361,10 +2359,6 @@ function App() {
       rib: preservedRib,
       phone: sanitizeInput(profileForm.phone || existingData?.phone || `${registerData.prefix} ${registerData.tel}`.trim(), 30),
       email: sanitizeInput(registerData.email || loginEmail || existingData?.email || "", 100),
-      balance: typeof existingData?.balance === "number" && Number.isFinite(existingData.balance) ? existingData.balance : 0,
-      savingsBalance: typeof existingData?.savingsBalance === "number" && Number.isFinite(existingData.savingsBalance) ? existingData.savingsBalance : 0,
-      eurWallet: typeof existingData?.eurWallet === "number" && Number.isFinite(existingData.eurWallet) ? existingData.eurWallet : 0,
-      usdWallet: typeof existingData?.usdWallet === "number" && Number.isFinite(existingData.usdWallet) ? existingData.usdWallet : 0,
       passwordHint: registerData.pw ? "set" : existingData?.passwordHint,
       createdAt: existingData?.createdAt || serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -2378,7 +2372,9 @@ function App() {
         return true;
       })
     );
-    await setDoc(userRef, cleanPayload, { merge: true });
+    delete cleanPayload.createdAt;
+    delete cleanPayload.updatedAt;
+    await syncOwnProfile(await getAuthHeaders(), cleanPayload);
 
     // Publish directory entry in transactions collection (public read for search)
     await publishDirectoryEntry(uid, { fullName, firstName, lastName, pseudo: payload.pseudo, moraliId: preservedMoraliId });
@@ -2577,16 +2573,16 @@ function App() {
     const uid = overrideUid || authUid;
     if (!uid) return;
 
-    const processOneCredit = async (credit: { id: string; amount: number; senderName?: string }, userRef: ReturnType<typeof doc>) => {
-      // Credit user's own balance (own doc — allowed by rules)
-      await runTransaction(firebaseDb, async (tx) => {
-        const userDoc = await tx.get(userRef);
-        if (!userDoc.exists()) throw new Error("USER_NOT_FOUND");
-        const currentBal = userDoc.data().balance || 0;
-        tx.update(userRef, { balance: currentBal + credit.amount, updatedAt: serverTimestamp() });
+    const processOneCredit = async (credit: { id: string; amount: number; senderName?: string }) => {
+      const applyRes = await fetch("/api/directory/pending-credit", {
+        method: "PUT",
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ pendingCreditId: credit.id }),
       });
-      // Delete processed pending credit
-      await deleteDoc(doc(firebaseDb, "pendingCredits", credit.id)).catch(() => {});
+      if (!applyRes.ok) {
+        const applyData = await applyRes.json().catch(() => ({}));
+        if (!applyData.idempotent) throw new Error(applyData.error || "CREDIT_FAILED");
+      }
       // Notify recipient
       createRealtimeNotification(uid, {
         title: `Virement reçu — FCFA ${formatCurrency(credit.amount)}`,
@@ -2606,53 +2602,47 @@ function App() {
       if (res.ok) {
         const { credits: pendingCredits } = await res.json();
         if (pendingCredits && pendingCredits.length > 0) {
-          const userRef = doc(firebaseDb, "moraliUsers", uid);
           for (const credit of pendingCredits) {
-            try { await processOneCredit(credit, userRef); } catch { /* will retry */ }
+            try { await processOneCredit(credit); } catch { /* will retry */ }
           }
         }
-        return; // API succeeded
       }
     } catch {
-      // API failed — fall through to client-side
-    }
-
-    // Method 2: Client Firestore fallback (read pendingCredits directly — open rules)
-    try {
-      const q = query(collection(firebaseDb, "pendingCredits"), where("recipientUid", "==", uid), where("status", "==", "pending"));
-      const snap = await getDocs(q);
-      if (snap.empty) return;
-      const userRef = doc(firebaseDb, "moraliUsers", uid);
-      for (const docSnap of snap.docs) {
-        const credit = docSnap.data();
-        if (!credit.amount) continue;
-        try { await processOneCredit({ id: docSnap.id, amount: credit.amount, senderName: credit.senderName }, userRef); } catch { /* will retry */ }
-      }
-    } catch {
-      /* client fallback failed */
+      /* pending credits stay funded until the next successful apply */
     }
   };
 
-  // Helper: credit balance (depot)
-  const serviceCreditBalance = async (amount: number) => {
+  const postLedger = async (payload: Record<string, unknown>) => {
+    const res = await fetch("/api/ledger", {
+      method: "POST",
+      headers: await getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(typeof data.code === "string" ? data.code : "LEDGER_FAILED");
+    }
+    return data as { converted?: number; balance?: number; savingsBalance?: number; fee?: number };
+  };
+
+  const serviceCreditBalance = async (amount: number, receiptId?: string) => {
     if (!authUid) return;
-    const userRef = doc(firebaseDb, "moraliUsers", authUid);
-    await runTransaction(firebaseDb, async (tx) => {
-      const userDoc = await tx.get(userRef);
-      const currentBal = userDoc.data()?.balance || 0;
-      tx.update(userRef, { balance: currentBal + amount, updatedAt: serverTimestamp() });
+    await postLedger({
+      op: "deposit",
+      amount,
+      channel: "momo",
+      receiptId: receiptId || `DEP-${Date.now().toString().slice(-8)}`,
     });
   };
 
-  // Helper: debit balance (retrait)
-  const serviceDebitBalance = async (amount: number) => {
+  const serviceDebitBalance = async (amount: number, applyFee: boolean, receiptId: string) => {
     if (!authUid) return;
-    const userRef = doc(firebaseDb, "moraliUsers", authUid);
-    await runTransaction(firebaseDb, async (tx) => {
-      const userDoc = await tx.get(userRef);
-      const currentBal = userDoc.data()?.balance || 0;
-      if (amount > currentBal) throw new Error("INSUFFICIENT_BALANCE");
-      tx.update(userRef, { balance: currentBal - amount, updatedAt: serverTimestamp() });
+    await postLedger({
+      op: "withdraw",
+      amount,
+      channel: "service",
+      applyFee,
+      receiptId,
     });
   };
 
@@ -2669,27 +2659,13 @@ function App() {
     setServiceProcessing(true);
     const safetyTimer = window.setTimeout(() => { setServiceProcessing(false); showToast("Délai dépassé. Réessayez."); }, 30000);
     try {
-      const userRef = doc(firebaseDb, "moraliUsers", authUid);
-      await runTransaction(firebaseDb, async (tx) => {
-        const userDoc = await tx.get(userRef);
-        if (!userDoc.exists()) throw new Error("USER_NOT_FOUND");
-        const currentBalance = userDoc.data().balance || 0;
-        const currentSavings = userDoc.data().savingsBalance || 0;
-        if (mode === "deposit") {
-          if (currentBalance < amt) throw new Error("INSUFFICIENT_BALANCE");
-          tx.update(userRef, { balance: currentBalance - amt, savingsBalance: currentSavings + amt, updatedAt: serverTimestamp() });
-        } else {
-          if (currentSavings < amt) throw new Error("INSUFFICIENT_SAVINGS");
-          tx.update(userRef, { balance: currentBalance + amt, savingsBalance: currentSavings - amt, updatedAt: serverTimestamp() });
-        }
+      await postLedger({
+        op: "savings",
+        direction: mode,
+        amount: amt,
+        receiptId: "TX-" + Date.now().toString().slice(-8),
       });
       if (mode === "deposit") {
-        await createRealtimeTransaction({
-          senderUid: authUid, senderMoraliId: bankingIdentity.id, senderName: dashboardName,
-          recipientUid: authUid, recipientMoraliId: bankingIdentity.id, recipientName: dashboardName,
-          amount: amt, fees: 0, type: "depot", destination: "savings", status: "success",
-          receiptId: "TX-" + Date.now().toString().slice(-8),
-        });
         await createRealtimeNotification(authUid, {
           title: `Dépôt Épargne — ${formatCurrency(amt)} FCFA`,
           time: "À l'instant", badge: "Épargne", badgeClass: "nb-green",
@@ -2697,12 +2673,6 @@ function App() {
         });
         showQuickNotif("credit", "Dépôt Épargne", formatCurrency(amt), "piggy", "#4ade80");
       } else {
-        await createRealtimeTransaction({
-          senderUid: authUid, senderMoraliId: bankingIdentity.id, senderName: dashboardName,
-          recipientUid: authUid, recipientMoraliId: bankingIdentity.id, recipientName: dashboardName,
-          amount: amt, fees: 0, type: "retrait", destination: "savings", status: "success",
-          receiptId: "TX-" + Date.now().toString().slice(-8),
-        });
         await createRealtimeNotification(authUid, {
           title: `Retrait Épargne — ${formatCurrency(amt)} FCFA`,
           time: "À l'instant", badge: "Retrait", badgeClass: "nb-blue",
@@ -2724,13 +2694,7 @@ function App() {
     if (serviceProcessing) return;
     setServiceProcessing(true);
     try {
-      await serviceCreditBalance(amount);
-      await createRealtimeTransaction({
-        senderUid: authUid, senderMoraliId: bankingIdentity.id, senderName: dashboardName,
-        recipientUid: authUid, recipientMoraliId: bankingIdentity.id, recipientName: dashboardName,
-        amount, fees: 0, type: "depot", destination: "cash", status: "success",
-        receiptId: "TX-" + Date.now().toString().slice(-8),
-      });
+      await serviceCreditBalance(amount, "TX-" + Date.now().toString().slice(-8));
       await createRealtimeNotification(authUid, {
         title: `${label} — +${formatCurrency(amount)} FCFA`,
         time: "À l'instant", badge: "Reçu", badgeClass: "nb-green",
@@ -2759,13 +2723,7 @@ function App() {
     if (serviceProcessing) return;
     setServiceProcessing(true);
     try {
-      await serviceDebitBalance(totalDebit);
-      await createRealtimeTransaction({
-        senderUid: authUid, senderMoraliId: bankingIdentity.id, senderName: dashboardName,
-        recipientUid: authUid, recipientMoraliId: bankingIdentity.id, recipientName: dashboardName,
-        amount, fees: serviceFees, type: "retrait", destination: "cash", status: "success",
-        receiptId: "TX-" + Date.now().toString().slice(-8),
-      });
+      await serviceDebitBalance(amount, applyFee, "TX-" + Date.now().toString().slice(-8));
       await createRealtimeNotification(authUid, {
         title: serviceFees > 0
           ? `${label} — -${formatCurrency(amount)} FCFA (frais 2%: ${formatCurrency(serviceFees)})`
@@ -2844,11 +2802,10 @@ function App() {
     setProfileForm((current) => ({ ...current, fullName: normalizedName }));
     setDashboardName(normalizedName);
     if (authUid) {
-      await updateDoc(doc(firebaseDb, "moraliUsers", authUid), {
+      await syncOwnProfile(await getAuthHeaders(), {
         fullName: normalizedName,
         phone: profileForm.phone,
         address: profileForm.address,
-        updatedAt: serverTimestamp(),
       });
     }
     setInfoDrawerOpen(false);
@@ -4217,7 +4174,7 @@ function App() {
           }
           // Auto-repair: save derived name to Firestore if missing
           if (!data.fullName && !data.firstName && fullName) {
-            updateDoc(doc(firebaseDb, "moraliUsers", cred.user.uid), {
+            syncOwnProfile(await getAuthHeaders(), {
               firstName: fullName.split(" ")[0] || "",
               lastName: fullName.split(" ").slice(1).join(" ") || "",
               fullName,
@@ -4780,25 +4737,12 @@ function App() {
           }
         }
 
-        // Atomic balance check + update via runTransaction
-        const balanceDelta = transactionType === "depot"
-          ? transactionNumericAmount - fees  // Net received after fees
-          : -(transactionNumericAmount + fees);  // Gross debited including fees
-        await runTransaction(firebaseDb, async (tx) => {
-          const userDoc = await tx.get(userRef);
-          if (!userDoc.exists()) throw new Error("USER_NOT_FOUND");
-          const currentBal = userDoc.data().balance || 0;
-          if (transactionType === "retrait" && (transactionNumericAmount + fees) > currentBal) {
-            throw new Error("INSUFFICIENT_BALANCE");
-          }
-          tx.update(userRef, { balance: currentBal + balanceDelta, updatedAt: serverTimestamp() });
-        });
-
-        await createRealtimeTransaction({
-          senderUid: authUid, senderMoraliId: bankingIdentity.id, senderName: dashboardName,
-          recipientUid: authUid, recipientMoraliId: bankingIdentity.id, recipientName: dashboardName,
-          amount: transactionNumericAmount, fees,
-          type: transactionType, destination: transactionDestination || "cash", status: "success", receiptId,
+        await postLedger({
+          op: transactionType === "depot" ? "deposit" : "withdraw",
+          amount: transactionNumericAmount,
+          channel: "momo",
+          applyFee: transactionType === "retrait",
+          receiptId,
         });
         try {
           const netAmount = transactionType === "depot" ? transactionNumericAmount - fees : transactionNumericAmount + fees;
@@ -4811,10 +4755,6 @@ function App() {
           });
         } catch { /* notification best-effort */ }
 
-        // ── Track bank revenue for withdrawals (2% fee) ──
-        if (transactionType === "retrait" && fees > 0) {
-          trackBankRevenue("withdrawal_fee", fees, `Frais retrait ${transactionMethod === "mtn" ? "MTN" : "Airtel"} — ${formatCurrency(transactionNumericAmount)} FCFA`);
-        }
       }
       // Success — show popup with a short delay so the processing animation renders first
       clearTimeout(safetyTimer);
@@ -6183,27 +6123,20 @@ function App() {
                     if (amt > userBal) { showToast("Solde FCFA insuffisant pour ce change"); return; }
                     try {
                       setServiceProcessing(true);
-                      const userRef = doc(firebaseDb, "moraliUsers", authUid);
                       const feeAmount = Math.round(amt * currencyFee);
                       const netXaf = amt - feeAmount;
                       const convertedAmt = netXaf * currencyRates[targetCurrency];
-                      await runTransaction(firebaseDb, async (tx) => {
-                        const userDoc = await tx.get(userRef);
-                        if (!userDoc.exists()) throw new Error("USER_NOT_FOUND");
-                        const currentBal = userDoc.data().balance || 0;
-                        if (amt > currentBal) throw new Error("INSUFFICIENT_BALANCE");
-                        const updates: Record<string, unknown> = { balance: currentBal - amt, updatedAt: serverTimestamp() };
-                        if (targetCurrency === "EUR") { updates.eurWallet = (userDoc.data().eurWallet || 0) + convertedAmt; }
-                        else { updates.usdWallet = (userDoc.data().usdWallet || 0) + convertedAmt; }
-                        tx.update(userRef, updates);
+                      const booked = await postLedger({
+                        op: "exchange",
+                        direction: "sell",
+                        currency: targetCurrency,
+                        amount: amt,
+                        quotedRate: currencyRates[targetCurrency],
+                        receiptId: "FX-" + Date.now().toString().slice(-8),
                       });
-                      await createRealtimeTransaction({ senderUid: authUid, senderMoraliId: bankingIdentity.id, senderName: dashboardName, recipientUid: authUid, recipientMoraliId: bankingIdentity.id, recipientName: dashboardName, amount: amt, fees: feeAmount, type: "retrait", destination: "cash", status: "success", receiptId: "FX-" + Date.now().toString().slice(-8) });
-                      await createRealtimeNotification(authUid, { title: `Change ${targetCurrency} — ${formatCurrency(amt)} FCFA → ${convertedAmt.toFixed(2)} ${targetCurrency}`, time: "À l'instant", badge: "Change", badgeClass: "nb-blue", icon: "swap", bg: "rgba(59,130,246,0.12)", read: false });
-                      // ── Track exchange commission (1.5%) ──
-                      if (feeAmount > 0) {
-                        trackBankRevenue("exchange_fee", feeAmount, `Commission change FCFA → ${targetCurrency} — ${formatCurrency(amt)} FCFA`);
-                      }
-                      showToast(`Change réussi ! +${convertedAmt.toFixed(2)} ${targetCurrency} crédités`);
+                      const creditedFx = typeof booked.converted === "number" ? booked.converted : convertedAmt;
+                      await createRealtimeNotification(authUid, { title: `Change ${targetCurrency} — ${formatCurrency(amt)} FCFA → ${creditedFx.toFixed(2)} ${targetCurrency}`, time: "À l'instant", badge: "Change", badgeClass: "nb-blue", icon: "swap", bg: "rgba(59,130,246,0.12)", read: false });
+                      showToast(`Change réussi ! +${creditedFx.toFixed(2)} ${targetCurrency} crédités`);
                       setCurrencyAmount("");
                     } catch (err: unknown) {
                       const msg = err instanceof Error ? err.message : "";
@@ -6218,28 +6151,20 @@ function App() {
                     if (amt > walletBal) { showToast(`Solde ${targetCurrency} insuffisant`); return; }
                     try {
                       setServiceProcessing(true);
-                      const userRef = doc(firebaseDb, "moraliUsers", authUid);
                       const feeCurrency = amt * currencyFee;
                       const netCurrency = amt - feeCurrency;
                       const convertedXaf = Math.round(netCurrency / currencyRates[targetCurrency]);
-                      await runTransaction(firebaseDb, async (tx) => {
-                        const userDoc = await tx.get(userRef);
-                        if (!userDoc.exists()) throw new Error("USER_NOT_FOUND");
-                        const currentWalletBal = targetCurrency === "EUR" ? (userDoc.data().eurWallet || 0) : (userDoc.data().usdWallet || 0);
-                        if (amt > currentWalletBal) throw new Error("INSUFFICIENT_BALANCE");
-                        const updates: Record<string, unknown> = { balance: (userDoc.data().balance || 0) + convertedXaf, updatedAt: serverTimestamp() };
-                        if (targetCurrency === "EUR") { updates.eurWallet = currentWalletBal - amt; }
-                        else { updates.usdWallet = currentWalletBal - amt; }
-                        tx.update(userRef, updates);
+                      const booked = await postLedger({
+                        op: "exchange",
+                        direction: "buy",
+                        currency: targetCurrency,
+                        amount: amt,
+                        quotedRate: currencyRates[targetCurrency],
+                        receiptId: "FX-" + Date.now().toString().slice(-8),
                       });
-                      await createRealtimeTransaction({ senderUid: authUid, senderMoraliId: bankingIdentity.id, senderName: dashboardName, recipientUid: authUid, recipientMoraliId: bankingIdentity.id, recipientName: dashboardName, amount: convertedXaf, fees: 0, type: "depot", destination: "cash", status: "success", receiptId: "FX-" + Date.now().toString().slice(-8) });
-                      await createRealtimeNotification(authUid, { title: `Change ${targetCurrency} — ${amt.toFixed(2)} ${targetCurrency} → ${formatCurrency(convertedXaf)} FCFA`, time: "À l'instant", badge: "Change", badgeClass: "nb-blue", icon: "swap", bg: "rgba(59,130,246,0.12)", read: false });
-                      // ── Track exchange commission (1.5% on currency amount) ──
-                      if (feeCurrency > 0) {
-                        const feeXaf = Math.round(feeCurrency / currencyRates[targetCurrency]);
-                        trackBankRevenue("exchange_fee", feeXaf, `Commission change ${targetCurrency} → FCFA — ${amt.toFixed(2)} ${targetCurrency}`);
-                      }
-                      showToast(`Change réussi ! +${formatCurrency(convertedXaf)} FCFA crédités`);
+                      const creditedXaf = typeof booked.converted === "number" ? booked.converted : convertedXaf;
+                      await createRealtimeNotification(authUid, { title: `Change ${targetCurrency} — ${amt.toFixed(2)} ${targetCurrency} → ${formatCurrency(creditedXaf)} FCFA`, time: "À l'instant", badge: "Change", badgeClass: "nb-blue", icon: "swap", bg: "rgba(59,130,246,0.12)", read: false });
+                      showToast(`Change réussi ! +${formatCurrency(creditedXaf)} FCFA crédités`);
                       setCurrencyAmount("");
                     } catch (err: unknown) {
                       const msg = err instanceof Error ? err.message : "";
@@ -9038,13 +8963,7 @@ function App() {
                     setTontineGroups(next);
                     saveTontineGroups(next);
                     setTontineDistConfirm(null);
-                    serviceCreditBalance(sharePerMember);
-                    createRealtimeTransaction({
-                      senderUid: "tontine", senderMoraliId: "TONTINE", senderName: `Tontine ${group.name}`,
-                      recipientUid: authUid || "", recipientMoraliId: bankingIdentity.id, recipientName: dashboardName,
-                      amount: sharePerMember, fees: 0, type: "depot", destination: "cash", status: "success",
-                      receiptId: "TN-" + Date.now().toString().slice(-8),
-                    }).catch((err: unknown) => { console.error("Erreur transaction tontine:", err); });
+                    serviceCreditBalance(sharePerMember, "TN-" + Date.now().toString().slice(-8)).catch(() => {});
                     createRealtimeNotification(authUid || "", {
                       title: `Tontine ${group.name} — Distribution de ${formatCurrency(sharePerMember)} F`,
                       time: "À l'instant", badge: "Reçu", badgeClass: "nb-green",

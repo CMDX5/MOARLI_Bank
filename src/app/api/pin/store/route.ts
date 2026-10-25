@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
 
   const adminDb = await getAdminFirestore();
   if (!adminDb) {
-    return NextResponse.json({ success: true, fallback: true }, { status: 200 });
+    return NextResponse.json({ success: false, error: "Service indisponible" }, { status: 503 });
   }
 
   try {
@@ -89,6 +89,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, legacy: true });
   } catch (err) {
     captureError(err, { action: "pin:store", route: "/api/pin/store", uid: auth.uid, level: "error" });
-    return NextResponse.json({ success: true, fallback: true });
+    return NextResponse.json({ success: false, error: "Erreur interne" }, { status: 500 });
   }
 }

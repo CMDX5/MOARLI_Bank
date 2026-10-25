@@ -30,20 +30,19 @@ export async function POST(req: NextRequest) {
   if (auth.error) return auth.error;
   if (!auth.uid) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
 
-  // SECURITY FIX: Verify the token was issued recently (re-authentication)
-  // auth.claims contains the Firebase token payload including iat (issued at)
-  const tokenIat = auth.claims?.iat as number | undefined;
-  if (!tokenIat) {
+  // Re-authentication is auth_time (password), not iat (refreshed by getIdToken(true)).
+  const authTime = auth.claims?.auth_time;
+  if (typeof authTime !== "number") {
     return NextResponse.json(
-      { error: "Impossible de vérifier l'âge du jeton. Veuillez vous reconnecter." },
+      { error: "Impossible de vérifier l'heure d'authentification. Veuillez vous reconnecter." },
       { status: 401 }
     );
   }
 
-  const tokenAgeSeconds = Math.floor(Date.now() / 1000) - tokenIat;
-  if (tokenAgeSeconds > 60) {
+  const authAgeSeconds = Math.floor(Date.now() / 1000) - authTime;
+  if (authAgeSeconds > 120) {
     return NextResponse.json(
-      { error: "Jeton trop ancien. Veuillez vous reconnecter pour révéler votre PIN." },
+      { error: "Ré-authentification requise. Saisissez votre mot de passe pour révéler votre PIN." },
       { status: 401 }
     );
   }
